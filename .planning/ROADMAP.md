@@ -16,7 +16,7 @@ This roadmap delivers a playable horror demo through 8 phases that build from co
 
 ### Phase 1: Foundation
 
-**Goal:** Core C++ architecture and player character are operational.
+**Goal:** Core C++ architecture and player character are operational. First-person controller with visible body, movement system (walk/crouch/sprint/stamina), head-bob camera with accessibility toggle, lean mechanic, interaction system with four actor types, and footstep surface detection.
 
 **Dependencies:** None (starting phase)
 
@@ -25,6 +25,16 @@ This roadmap delivers a playable horror demo through 8 phases that build from co
 - PLYR-02: Movement with crouch, sprint, stamina
 - PLYR-03: Head-bob camera with motion sickness option
 - PLYR-04: Interaction system
+
+**Plans:** 6 plans
+
+Plans:
+- [ ] 01-01-PLAN.md -- Project scaffolding, Build.cs, interfaces, tags, log channels
+- [ ] 01-02-PLAN.md -- Character with First Person Rendering, PlayerController, Enhanced Input
+- [ ] 01-03-PLAN.md -- Stamina, head-bob, and lean components
+- [ ] 01-04-PLAN.md -- Interaction component and four interactable actor types
+- [ ] 01-05-PLAN.md -- Footstep component, stamina HUD, full system wiring
+- [ ] 01-06-PLAN.md -- Data assets, Blueprint subclasses, UMG widgets, integration test
 
 **Success Criteria:**
 1. Player can walk, run, crouch in first-person with visible arms/hands when looking down
@@ -180,7 +190,7 @@ This roadmap delivers a playable horror demo through 8 phases that build from co
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 1 | Foundation | PLYR-01, PLYR-02, PLYR-03, PLYR-04 | Not Started |
+| 1 | Foundation | PLYR-01, PLYR-02, PLYR-03, PLYR-04 | Planned (6 plans) |
 | 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | Not Started |
 | 3 | Hiding System | HIDE-01, HIDE-02 | Not Started |
 | 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | Not Started |
@@ -194,4 +204,4 @@ This roadmap delivers a playable horror demo through 8 phases that build from co
 ---
 
 *Roadmap created: 2026-02-07*
-*Last updated: 2026-02-07*
+*Last updated: 2026-02-08*
