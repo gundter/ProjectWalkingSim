@@ -9,7 +9,7 @@ public class ProjectWalkingSimEditorTarget : TargetRules
 	{
 		Type = TargetType.Editor;
 		DefaultBuildSettings = BuildSettingsVersion.V6;
-
-		ExtraModuleNames.AddRange( new string[] { "ProjectWalkingSim" } );
+		IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
+		ExtraModuleNames.AddRange(["ProjectWalkingSim"]);
 	}
 }
