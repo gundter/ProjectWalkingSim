@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 1 in progress. Character and input operational, ready for components.
+**Current Focus:** Phase 1 in progress. Interaction system operational. Character can detect and interact with objects.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,13 +22,13 @@
 ## Current Position
 
 **Phase:** 1 of 8 (Foundation)
-**Plan:** 2 of 6 complete
+**Plan:** 4 of 6 complete
 **Status:** In progress
-**Last activity:** 2026-02-08 - Completed 01-02-PLAN.md (Character and Player Controller)
+**Last activity:** 2026-02-08 - Completed 01-04-PLAN.md (Interaction System)
 
 **Progress:**
 ```
-Phase 1: [##....] 2/6 plans complete
+Phase 1: [####..] 4/6 plans complete
 Overall: [........] 0/8 phases complete
 ```
 
@@ -40,6 +40,7 @@ Overall: [........] 0/8 phases complete
 |-------|-------|-------|------|--------|
 | 1-01  | 1/6   | 2/2   | ~2m  | 0      |
 | 1-02  | 2/6   | 2/2   | ~3m  | 0      |
+| 1-04  | 4/6   | 2/2   | ~5m  | 0      |
 
 ---
 
@@ -59,6 +60,9 @@ Overall: [........] 0/8 phases complete
 | Camera directly on head bone, no spring arm | First-person camera must track head animations; spring arm is third-person pattern | 01-02 |
 | Mouse sensitivity via Enhanced Input modifiers | Data-driven; designers can tune without code changes; supports remapping | 01-02 |
 | Crouch defaults to toggle mode | Matches plan spec; hold mode ready via GameInstance bCrouchToggleMode | 01-02 |
+| Re-broadcast interaction text after TryInteract | Door text changes "Open" to "Close"; HUD needs immediate refresh | 01-04 |
+| Screen-space prompt widget, not world-space UWidgetComponent | Cleaner rendering, no lighting artifacts, still feels world-space via positioning | 01-04 |
+| Door swing direction via dot product | Natural behavior: door opens away from player's approach side | 01-04 |
 
 ### Technical Discoveries
 
@@ -68,7 +72,7 @@ Overall: [........] 0/8 phases complete
 
 - [x] Plan Phase 1: Foundation
 - [x] Research UE5.7 first-person rendering before Phase 1 plans
-- [ ] Execute remaining Phase 1 plans (01-03 through 01-06)
+- [ ] Execute remaining Phase 1 plans (01-05 and 01-06)
 
 ### Blockers
 
@@ -82,18 +86,18 @@ Overall: [........] 0/8 phases complete
 
 **Date:** 2026-02-08
 **Completed:**
-- Executed 01-02-PLAN.md (Character and Player Controller)
-  - Created ASereneCharacter with FP camera on head bone, WorldRepMesh for shadows
-  - CMC configured: 250 walk, 500 sprint, 130 crouch, no jump
-  - Sprint/crouch state management with mutual exclusion
-  - Forward declarations for 5 future components (Stamina, HeadBob, Interaction, Lean, Footstep)
-  - Created ASerenePlayerController with 7 Enhanced Input action bindings
-  - HandleMove decomposes Axis2D via controller yaw rotation
-  - HandleLook with pitch clamp +/-80 degrees
-  - Sprint hold, crouch toggle, interact/lean stubbed
-  - Relocated ASereneGameMode to Core/ with character+controller defaults
+- Executed 01-04-PLAN.md (Interaction System)
+  - UInteractionComponent: camera-center line trace at 150cm, focus management, OnInteractableChanged delegate
+  - UInteractionPromptWidget: C++ base with BindWidget PromptText + ReticleText
+  - AInteractableBase: abstract base with IInteractable defaults, InteractionText, InteractionTag
+  - ADoorActor: DoorMesh rotates via FInterpTo, player-side-aware swing direction
+  - APickupActor: logs + destroys on pickup (Phase 2 inventory stub)
+  - AReadableActor: logs title on interact (future text display deferred)
+  - ADrawerActor: DrawerMesh slides along local X via FInterpTo
+  - Wired InteractionComponent into ASereneCharacter constructor
+  - Wired HandleInteract in PlayerController to call TryInteract
 
-**Next:** Execute 01-03-PLAN.md (Stamina and Head-Bob Components)
+**Next:** Execute 01-05-PLAN.md (Lean Component)
 
 ### Context for Next Session
 
@@ -109,7 +113,7 @@ The roadmap has 8 phases:
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
 
-Phase 1 has 6 plans. Plans 01-02 complete. The project now has:
+Phase 1 has 6 plans. Plans 01-01, 01-02, and 01-04 complete. The project now has:
 - Build.cs with EnhancedInput, UMG, GameplayTags, PhysicsCore, Slate, SlateCore
 - IInteractable, IHideable, ISaveable interfaces
 - 11 native gameplay tags (Interaction, Movement, Player categories)
@@ -118,6 +122,10 @@ Phase 1 has 6 plans. Plans 01-02 complete. The project now has:
 - ASereneCharacter with FP rendering, head-bone camera, WorldRepMesh, grounded CMC
 - ASerenePlayerController with 7 input bindings (Move, Look, Sprint, Crouch, Interact, LeanLeft, LeanRight)
 - ASereneGameMode in Core/ with character+controller defaults
+- UInteractionComponent: per-tick camera line trace, focus management, OnInteractableChanged delegate
+- UInteractionPromptWidget: C++ base with BindWidget slots for UMG
+- AInteractableBase: abstract base with IInteractable, InteractionText, InteractionTag, MeshComponent
+- ADoorActor, APickupActor, AReadableActor, ADrawerActor: four interactable types
 
 All 29 v1 requirements are mapped. No orphans.
 
