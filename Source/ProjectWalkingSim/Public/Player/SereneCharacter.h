@@ -6,11 +6,13 @@
 #include "GameFramework/Character.h"
 #include "SereneCharacter.generated.h"
 
+// Components created in Plan 03
+#include "Player/Components/StaminaComponent.h"
+#include "Player/Components/HeadBobComponent.h"
+#include "Player/Components/LeanComponent.h"
+
 // Forward declarations for future components
-class UStaminaComponent;       // Created in Plan 03
-class UHeadBobComponent;       // Created in Plan 03
 class UInteractionComponent;   // Created in Plan 04
-class ULeanComponent;          // Created in Plan 05
 class UFootstepComponent;      // Created in Plan 06
 
 class UCameraComponent;
@@ -23,11 +25,17 @@ class USkeletalMeshComponent;
  * with a WorldRepresentationMesh for shadow casting. Camera is attached to the head
  * bone of the skeletal mesh. Movement is grounded and deliberate (no jump).
  *
- * Components are attached by later plans:
+ * Attached components:
  * - StaminaComponent (Plan 03): Stamina drain/regen during sprint
  * - HeadBobComponent (Plan 03): Procedural sine-wave camera bob
+ * - LeanComponent (Plan 03): Camera-only lean (Q/E)
+ *
+ * Camera offset aggregation: Tick() reads offsets from HeadBobComponent and
+ * LeanComponent, sums them, and applies the combined result to the camera.
+ * Components compute offsets only -- they never directly modify the camera.
+ *
+ * Future components (attached by later plans):
  * - InteractionComponent (Plan 04): Line trace interaction detection
- * - LeanComponent (Plan 05): Camera-only lean (Q/E)
  * - FootstepComponent (Plan 06): Surface-dependent footstep audio
  */
 UCLASS()
@@ -66,6 +74,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 	// --- Camera ---
@@ -83,19 +92,24 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
 	TObjectPtr<USkeletalMeshComponent> WorldRepresentationMesh;
 
+	// --- Components ---
+
+	/** Stamina drain/regen with exhaustion state. Drains during sprint. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaminaComponent> StaminaComponent;
+
+	/** Procedural sine-wave camera bob. Scales with speed, toggleable. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UHeadBobComponent> HeadBobComponent;
+
+	/** Camera-only lean mechanic. Q/E for peeking around corners. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<ULeanComponent> LeanComponent;
+
 	// --- Future Components (created in later plans) ---
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UStaminaComponent> StaminaComponent;       // Created in Plan 03
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UHeadBobComponent> HeadBobComponent;       // Created in Plan 03
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UInteractionComponent> InteractionComponent; // Created in Plan 04
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<ULeanComponent> LeanComponent;             // Created in Plan 05
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UFootstepComponent> FootstepComponent;     // Created in Plan 06
@@ -122,4 +136,17 @@ protected:
 	 */
 	UPROPERTY(BlueprintReadOnly, Category = "Movement")
 	bool bIsCrouching = false;
+
+private:
+	// --- Camera Offset Aggregation ---
+
+	/**
+	 * Initial camera relative location stored in BeginPlay.
+	 * HeadBob and Lean offsets are added to this base each tick.
+	 */
+	FVector BaseCameraLocation = FVector::ZeroVector;
+
+	/** Callback bound to StaminaComponent::OnStaminaDepleted. Forces sprint stop. */
+	UFUNCTION()
+	void OnStaminaDepleted();
 };

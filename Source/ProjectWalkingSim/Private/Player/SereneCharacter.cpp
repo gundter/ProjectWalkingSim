@@ -7,6 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/Components/InteractionComponent.h"
 #include "Core/SereneLogChannels.h"
+#include "Core/SereneGameInstance.h"
 
 ASereneCharacter::ASereneCharacter()
 {
@@ -42,6 +43,11 @@ ASereneCharacter::ASereneCharacter()
 	WorldRepresentationMesh->SetupAttachment(GetMesh());
 	WorldRepresentationMesh->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::WorldSpaceRepresentation);
 	WorldRepresentationMesh->SetLeaderPoseComponent(GetMesh());
+
+	// --- Plan 03 Components ---
+	StaminaComponent = CreateDefaultSubobject<UStaminaComponent>(TEXT("StaminaComponent"));
+	HeadBobComponent = CreateDefaultSubobject<UHeadBobComponent>(TEXT("HeadBobComponent"));
+	LeanComponent = CreateDefaultSubobject<ULeanComponent>(TEXT("LeanComponent"));
 
 	// --- Interaction Component ---
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
@@ -85,8 +91,61 @@ void ASereneCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Store initial camera relative location as base for offset aggregation
+	if (FirstPersonCamera)
+	{
+		BaseCameraLocation = FirstPersonCamera->GetRelativeLocation();
+	}
+
+	// Bind stamina depletion to force stop sprint
+	if (StaminaComponent)
+	{
+		StaminaComponent->OnStaminaDepleted.AddDynamic(this, &ASereneCharacter::OnStaminaDepleted);
+	}
+
+	// Read GameInstance head-bob accessibility setting
+	if (HeadBobComponent)
+	{
+		if (const USereneGameInstance* GI = Cast<USereneGameInstance>(GetGameInstance()))
+		{
+			HeadBobComponent->SetEnabled(GI->bHeadBobEnabled);
+			UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - HeadBob enabled: %s"),
+				GI->bHeadBobEnabled ? TEXT("true") : TEXT("false"));
+		}
+	}
+
 	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - Character initialized. WalkSpeed=%.0f, SprintSpeed=%.0f"),
 		WalkSpeed, SprintSpeed);
+}
+
+void ASereneCharacter::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (!FirstPersonCamera)
+	{
+		return;
+	}
+
+	// --- Camera Offset Aggregation ---
+	// HeadBobComponent and LeanComponent each compute offsets independently.
+	// We sum them here and apply once to avoid components fighting over the camera.
+	FVector CameraOffset = FVector::ZeroVector;
+	float CameraRoll = 0.0f;
+
+	if (HeadBobComponent)
+	{
+		CameraOffset += HeadBobComponent->GetCurrentOffset();
+	}
+
+	if (LeanComponent)
+	{
+		CameraOffset += LeanComponent->GetLeanOffset();
+		CameraRoll += LeanComponent->GetLeanRoll();
+	}
+
+	FirstPersonCamera->SetRelativeLocation(BaseCameraLocation + CameraOffset);
+	FirstPersonCamera->SetRelativeRotation(FRotator(0.0f, 0.0f, CameraRoll));
 }
 
 void ASereneCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -95,6 +154,12 @@ void ASereneCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 	// Input is handled on the PlayerController, not here.
 	// This override is intentionally empty.
+}
+
+void ASereneCharacter::OnStaminaDepleted()
+{
+	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::OnStaminaDepleted - Forcing sprint stop due to stamina depletion."));
+	StopSprint();
 }
 
 void ASereneCharacter::StartSprint()
@@ -113,8 +178,20 @@ void ASereneCharacter::StartSprint()
 		return;
 	}
 
+	// Check stamina: exhaustion prevents sprinting
+	if (StaminaComponent && StaminaComponent->IsExhausted())
+	{
+		UE_LOG(LogSerene, Verbose, TEXT("ASereneCharacter::StartSprint - Cannot sprint while exhausted."));
+		return;
+	}
+
 	bIsSprinting = true;
 	GetCharacterMovement()->MaxWalkSpeed = SprintSpeed;
+
+	if (StaminaComponent)
+	{
+		StaminaComponent->SetSprinting(true);
+	}
 
 	UE_LOG(LogSerene, Verbose, TEXT("ASereneCharacter::StartSprint - Sprinting at %.0f cm/s."), SprintSpeed);
 }
@@ -123,6 +200,11 @@ void ASereneCharacter::StopSprint()
 {
 	bIsSprinting = false;
 	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+
+	if (StaminaComponent)
+	{
+		StaminaComponent->SetSprinting(false);
+	}
 
 	UE_LOG(LogSerene, Verbose, TEXT("ASereneCharacter::StopSprint - Restored walk speed %.0f cm/s."), WalkSpeed);
 }

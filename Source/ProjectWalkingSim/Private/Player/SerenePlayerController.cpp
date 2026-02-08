@@ -7,6 +7,7 @@
 #include "InputActionValue.h"
 #include "Player/SereneCharacter.h"
 #include "Player/Components/InteractionComponent.h"
+#include "Player/Components/LeanComponent.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
 
@@ -193,22 +194,48 @@ void ASerenePlayerController::HandleInteract(const FInputActionValue& Value)
 
 void ASerenePlayerController::HandleLeanLeftStart(const FInputActionValue& Value)
 {
-	// LeanComponent does not exist yet (created in Plan 05).
-	// When it exists: GetSereneCharacter()->LeanComponent->SetLeanLeft(true);
-	UE_LOG(LogSerene, Verbose, TEXT("ASerenePlayerController::HandleLeanLeftStart - Lean left started. (LeanComponent not yet created)"));
+	ASereneCharacter* Character = GetSereneCharacter();
+	if (Character)
+	{
+		if (ULeanComponent* LeanComp = Character->FindComponentByClass<ULeanComponent>())
+		{
+			LeanComp->SetLeanLeft(true);
+		}
+	}
 }
 
 void ASerenePlayerController::HandleLeanLeftStop(const FInputActionValue& Value)
 {
-	UE_LOG(LogSerene, Verbose, TEXT("ASerenePlayerController::HandleLeanLeftStop - Lean left stopped. (LeanComponent not yet created)"));
+	ASereneCharacter* Character = GetSereneCharacter();
+	if (Character)
+	{
+		if (ULeanComponent* LeanComp = Character->FindComponentByClass<ULeanComponent>())
+		{
+			LeanComp->SetLeanLeft(false);
+		}
+	}
 }
 
 void ASerenePlayerController::HandleLeanRightStart(const FInputActionValue& Value)
 {
-	UE_LOG(LogSerene, Verbose, TEXT("ASerenePlayerController::HandleLeanRightStart - Lean right started. (LeanComponent not yet created)"));
+	ASereneCharacter* Character = GetSereneCharacter();
+	if (Character)
+	{
+		if (ULeanComponent* LeanComp = Character->FindComponentByClass<ULeanComponent>())
+		{
+			LeanComp->SetLeanRight(true);
+		}
+	}
 }
 
 void ASerenePlayerController::HandleLeanRightStop(const FInputActionValue& Value)
 {
-	UE_LOG(LogSerene, Verbose, TEXT("ASerenePlayerController::HandleLeanRightStop - Lean right stopped. (LeanComponent not yet created)"));
+	ASereneCharacter* Character = GetSereneCharacter();
+	if (Character)
+	{
+		if (ULeanComponent* LeanComp = Character->FindComponentByClass<ULeanComponent>())
+		{
+			LeanComp->SetLeanRight(false);
+		}
+	}
 }
