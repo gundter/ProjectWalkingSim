@@ -47,7 +47,7 @@ Plans:
 
 ### Phase 2: Inventory System
 
-**Goal:** Player can collect, manage, and use items in an 8-slot inventory.
+**Goal:** Player can collect, manage, and use items in an 8-slot real-time inventory with horizontal UI, key/code item types, locked door integration, and two-step combine flow.
 
 **Dependencies:** Phase 1 (interaction system required)
 
@@ -57,9 +57,19 @@ Plans:
 - INVT-03: Discarded items drop into world
 - INVT-04: Item types (key items, healing, flashlight)
 
+**Plans:** 6 plans
+
+Plans:
+- [ ] 02-01-PLAN.md -- Inventory data foundation: types, item data asset, inventory component
+- [ ] 02-02-PLAN.md -- Inventory UI widgets: slot, tooltip, container (C++ base classes)
+- [ ] 02-03-PLAN.md -- Actor integration: PickupActor inventory add, DoorActor locked doors
+- [ ] 02-04-PLAN.md -- HUD + controller wiring: toggle, input mode, delegate binding
+- [ ] 02-05-PLAN.md -- Combine system + keyboard navigation
+- [ ] 02-06-PLAN.md -- Editor setup: input assets, Asset Manager config, UMG Blueprints, verification
+
 **Success Criteria:**
 1. Player can pick up items and see them appear in inventory UI
-2. Player can use items (healing restores health, keys unlock doors)
+2. Player can use items (keys unlock doors)
 3. Player can discard items and see them appear in the world as pickups
 4. Inventory displays item info on hover/selection
 5. Inventory is limited to 8 slots and rejects items when full
@@ -191,7 +201,7 @@ Plans:
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
 | 1 | Foundation | PLYR-01, PLYR-02, PLYR-03, PLYR-04 | Planned (6 plans) |
-| 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | Not Started |
+| 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | Planned (6 plans) |
 | 3 | Hiding System | HIDE-01, HIDE-02 | Not Started |
 | 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | Not Started |
 | 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | Not Started |
