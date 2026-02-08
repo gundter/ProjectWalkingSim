@@ -5,6 +5,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Player/Components/InteractionComponent.h"
 #include "Core/SereneLogChannels.h"
 
 ASereneCharacter::ASereneCharacter()
@@ -41,6 +42,9 @@ ASereneCharacter::ASereneCharacter()
 	WorldRepresentationMesh->SetupAttachment(GetMesh());
 	WorldRepresentationMesh->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::WorldSpaceRepresentation);
 	WorldRepresentationMesh->SetLeaderPoseComponent(GetMesh());
+
+	// --- Interaction Component ---
+	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
 
 	// --- Character Movement Component Configuration ---
 	// Grounded, deliberate horror movement. No jump, no air control.

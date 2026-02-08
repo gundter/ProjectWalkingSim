@@ -6,6 +6,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "Player/SereneCharacter.h"
+#include "Player/Components/InteractionComponent.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
 
@@ -179,9 +180,15 @@ void ASerenePlayerController::HandleCrouchToggle(const FInputActionValue& Value)
 
 void ASerenePlayerController::HandleInteract(const FInputActionValue& Value)
 {
-	// InteractionComponent does not exist yet (created in Plan 04).
-	// When it exists: GetSereneCharacter()->InteractionComponent->TryInteract();
-	UE_LOG(LogSerene, Verbose, TEXT("ASerenePlayerController::HandleInteract - Interact pressed. (InteractionComponent not yet created)"));
+	ASereneCharacter* Character = GetSereneCharacter();
+	if (Character)
+	{
+		UInteractionComponent* InteractionComp = Character->FindComponentByClass<UInteractionComponent>();
+		if (InteractionComp)
+		{
+			InteractionComp->TryInteract();
+		}
+	}
 }
 
 void ASerenePlayerController::HandleLeanLeftStart(const FInputActionValue& Value)
