@@ -110,41 +110,41 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLYR-01 | TBD | Pending |
-| PLYR-02 | TBD | Pending |
-| PLYR-03 | TBD | Pending |
-| PLYR-04 | TBD | Pending |
-| INVT-01 | TBD | Pending |
-| INVT-02 | TBD | Pending |
-| INVT-03 | TBD | Pending |
-| INVT-04 | TBD | Pending |
-| HIDE-01 | TBD | Pending |
-| HIDE-02 | TBD | Pending |
-| WNDG-01 | TBD | Pending |
-| WNDG-02 | TBD | Pending |
-| WNDG-03 | TBD | Pending |
-| WNDG-04 | TBD | Pending |
-| WNDG-05 | TBD | Pending |
-| WNDG-06 | TBD | Pending |
-| WNDG-07 | TBD | Pending |
-| LGHT-01 | TBD | Pending |
-| LGHT-02 | TBD | Pending |
-| AUDO-01 | TBD | Pending |
-| AUDO-02 | TBD | Pending |
-| AUDO-03 | TBD | Pending |
-| AUDO-04 | TBD | Pending |
-| SAVE-01 | TBD | Pending |
-| SAVE-02 | TBD | Pending |
-| DEMO-01 | TBD | Pending |
-| DEMO-02 | TBD | Pending |
-| DEMO-03 | TBD | Pending |
-| DEMO-04 | TBD | Pending |
+| PLYR-01 | Phase 1: Foundation | Pending |
+| PLYR-02 | Phase 1: Foundation | Pending |
+| PLYR-03 | Phase 1: Foundation | Pending |
+| PLYR-04 | Phase 1: Foundation | Pending |
+| INVT-01 | Phase 2: Inventory System | Pending |
+| INVT-02 | Phase 2: Inventory System | Pending |
+| INVT-03 | Phase 2: Inventory System | Pending |
+| INVT-04 | Phase 2: Inventory System | Pending |
+| HIDE-01 | Phase 3: Hiding System | Pending |
+| HIDE-02 | Phase 3: Hiding System | Pending |
+| WNDG-01 | Phase 4: Monster AI Core | Pending |
+| WNDG-02 | Phase 4: Monster AI Core | Pending |
+| WNDG-03 | Phase 5: Monster Behaviors | Pending |
+| WNDG-04 | Phase 5: Monster Behaviors | Pending |
+| WNDG-05 | Phase 5: Monster Behaviors | Pending |
+| WNDG-06 | Phase 5: Monster Behaviors | Pending |
+| WNDG-07 | Phase 4: Monster AI Core | Pending |
+| LGHT-01 | Phase 6: Light and Audio | Pending |
+| LGHT-02 | Phase 6: Light and Audio | Pending |
+| AUDO-01 | Phase 6: Light and Audio | Pending |
+| AUDO-02 | Phase 6: Light and Audio | Pending |
+| AUDO-03 | Phase 6: Light and Audio | Pending |
+| AUDO-04 | Phase 6: Light and Audio | Pending |
+| SAVE-01 | Phase 7: Save System | Pending |
+| SAVE-02 | Phase 7: Save System | Pending |
+| DEMO-01 | Phase 8: Demo Polish | Pending |
+| DEMO-02 | Phase 8: Demo Polish | Pending |
+| DEMO-03 | Phase 8: Demo Polish | Pending |
+| DEMO-04 | Phase 8: Demo Polish | Pending |
 
 **Coverage:**
 - v1 requirements: 29 total
-- Mapped to phases: 0
-- Unmapped: 29 (pending roadmap creation)
+- Mapped to phases: 29
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after initial definition*
+*Last updated: 2026-02-07 after roadmap creation*
