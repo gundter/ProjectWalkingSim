@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 1 in progress. Stamina, head-bob, lean, and interaction systems operational. Core movement feel established.
+**Current Focus:** Phase 1 nearing completion. All 5 character components wired. Stamina HUD, footstep surface detection, and full interaction pipeline operational. One plan remaining (01-06).
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -24,7 +24,7 @@
 **Phase:** 1 of 8 (Foundation)
 **Plan:** 5 of 6 complete
 **Status:** In progress
-**Last activity:** 2026-02-08 - Completed 01-03-PLAN.md (Stamina, Head-Bob, Lean Components)
+**Last activity:** 2026-02-08 - Completed 01-05-PLAN.md (Footsteps, Stamina HUD, Integration)
 
 **Progress:**
 ```
@@ -42,6 +42,7 @@ Overall: [........] 0/8 phases complete
 | 1-02  | 2/6   | 2/2   | ~3m  | 0      |
 | 1-03  | 3/6   | 2/2   | ~5m  | 0      |
 | 1-04  | 4/6   | 2/2   | ~5m  | 0      |
+| 1-05  | 5/6   | 2/2   | ~3m  | 0      |
 
 ---
 
@@ -68,6 +69,9 @@ Overall: [........] 0/8 phases complete
 | Re-broadcast interaction text after TryInteract | Door text changes "Open" to "Close"; HUD needs immediate refresh | 01-04 |
 | Screen-space prompt widget, not world-space UWidgetComponent | Cleaner rendering, no lighting artifacts, still feels world-space via positioning | 01-04 |
 | Door swing direction via dot product | Natural behavior: door opens away from player's approach side | 01-04 |
+| Timer-based footsteps as default, bUseAnimNotify toggle | No animation assets in Phase 1; timer fallback reliable; AnimNotify ready later | 01-05 |
+| StaminaBarWidget auto-hides 2s after full stamina | Matches CONTEXT.md "stamina bar only shows while sprinting then fades" | 01-05 |
+| SereneHUD defers pawn binding via 0.1s timer | BeginPlay timing: pawn may not be possessed yet when HUD initializes | 01-05 |
 
 ### Technical Discoveries
 
@@ -78,7 +82,8 @@ Overall: [........] 0/8 phases complete
 - [x] Plan Phase 1: Foundation
 - [x] Research UE5.7 first-person rendering before Phase 1 plans
 - [x] Execute 01-03-PLAN.md (Stamina, Head-Bob, Lean Components)
-- [ ] Execute remaining Phase 1 plans (01-05 and 01-06)
+- [x] Execute 01-05-PLAN.md (Footsteps, Stamina HUD, Integration)
+- [ ] Execute remaining Phase 1 plan (01-06)
 
 ### Blockers
 
@@ -92,15 +97,15 @@ Overall: [........] 0/8 phases complete
 
 **Date:** 2026-02-08
 **Completed:**
-- Executed 01-03-PLAN.md (Stamina, Head-Bob, Lean Components)
-  - UStaminaComponent: drain 20/s, regen 15/s after 1.5s delay, 20% exhaustion threshold
-  - UHeadBobComponent: sine-wave bob, sprint/crouch multipliers, accessibility toggle
-  - ULeanComponent: 30cm lateral, 5-degree roll, smooth FInterpTo
-  - Camera offset aggregation: character Tick() sums HeadBob + Lean offsets
-  - OnStaminaDepleted bound to StopSprint, StartSprint checks IsExhausted
-  - PlayerController lean handlers wired to LeanComponent
+- Executed 01-05-PLAN.md (Footsteps, Stamina HUD, Integration)
+  - UFootstepComponent: timer-based trigger, surface detection via bReturnPhysicalMaterial, sprint/crouch multipliers, OnFootstep delegate
+  - UStaminaBarWidget: progress bar auto-show/hide with 2s delay, optional FadeAnimation
+  - ASereneHUD: creates widgets, binds StaminaComponent + InteractionComponent delegates
+  - All 5 components created in ASereneCharacter constructor
+  - ASereneGameMode sets HUDClass = ASereneHUD
+  - Component status logging in BeginPlay
 
-**Next:** Execute 01-05-PLAN.md or 01-06-PLAN.md (remaining Foundation plans)
+**Next:** Execute 01-06-PLAN.md (final Foundation plan)
 
 ### Context for Next Session
 
@@ -116,7 +121,7 @@ The roadmap has 8 phases:
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
 
-Phase 1 has 6 plans. Plans 01-01, 01-02, 01-03, and 01-04 complete. The project now has:
+Phase 1 has 6 plans. Plans 01-01 through 01-05 complete. The project now has:
 - Build.cs with EnhancedInput, UMG, GameplayTags, PhysicsCore, Slate, SlateCore
 - IInteractable, IHideable, ISaveable interfaces
 - 11 native gameplay tags (Interaction, Movement, Player categories)
@@ -124,7 +129,7 @@ Phase 1 has 6 plans. Plans 01-01, 01-02, 01-03, and 01-04 complete. The project 
 - USereneGameInstance with accessibility settings (head-bob toggle, crouch mode)
 - ASereneCharacter with FP rendering, head-bone camera, WorldRepMesh, grounded CMC
 - ASerenePlayerController with 7 input bindings (Move, Look, Sprint, Crouch, Interact, LeanLeft, LeanRight)
-- ASereneGameMode in Core/ with character+controller defaults
+- ASereneGameMode in Core/ with character+controller+HUD defaults
 - UStaminaComponent: drain/regen with 1.5s delay, exhaustion threshold, 3 delegates
 - UHeadBobComponent: procedural sine-wave bob, sprint/crouch multipliers, toggleable
 - ULeanComponent: 30cm lateral offset, 5-degree roll, smooth transitions
@@ -133,10 +138,14 @@ Phase 1 has 6 plans. Plans 01-01, 01-02, 01-03, and 01-04 complete. The project 
 - UInteractionPromptWidget: C++ base with BindWidget slots for UMG
 - AInteractableBase: abstract base with IInteractable, InteractionText, InteractionTag, MeshComponent
 - ADoorActor, APickupActor, AReadableActor, ADrawerActor: four interactable types
+- UFootstepComponent: surface detection via downward trace, timer-based trigger, OnFootstep delegate
+- UStaminaBarWidget: progress bar with auto-show/hide and 2s delay
+- ASereneHUD: widget lifecycle manager for StaminaBar + InteractionPrompt
 
+All 5 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep.
 All 29 v1 requirements are mapped. No orphans.
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-08 (01-03 completion)*
+*Last updated: 2026-02-08 (01-05 completion)*
