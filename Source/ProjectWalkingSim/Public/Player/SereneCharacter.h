@@ -6,14 +6,13 @@
 #include "GameFramework/Character.h"
 #include "SereneCharacter.generated.h"
 
-// Components created in Plan 03
+// Components created in Plans 03-05
 #include "Player/Components/StaminaComponent.h"
 #include "Player/Components/HeadBobComponent.h"
 #include "Player/Components/LeanComponent.h"
 
-// Forward declarations for future components
 class UInteractionComponent;   // Created in Plan 04
-class UFootstepComponent;      // Created in Plan 06
+class UFootstepComponent;      // Created in Plan 05
 
 class UCameraComponent;
 class USkeletalMeshComponent;
@@ -25,18 +24,16 @@ class USkeletalMeshComponent;
  * with a WorldRepresentationMesh for shadow casting. Camera is attached to the head
  * bone of the skeletal mesh. Movement is grounded and deliberate (no jump).
  *
- * Attached components:
+ * Attached components (all 5 created in constructor):
  * - StaminaComponent (Plan 03): Stamina drain/regen during sprint
  * - HeadBobComponent (Plan 03): Procedural sine-wave camera bob
  * - LeanComponent (Plan 03): Camera-only lean (Q/E)
+ * - InteractionComponent (Plan 04): Line trace interaction detection
+ * - FootstepComponent (Plan 05): Surface-dependent footstep detection
  *
  * Camera offset aggregation: Tick() reads offsets from HeadBobComponent and
  * LeanComponent, sums them, and applies the combined result to the camera.
  * Components compute offsets only -- they never directly modify the camera.
- *
- * Future components (attached by later plans):
- * - InteractionComponent (Plan 04): Line trace interaction detection
- * - FootstepComponent (Plan 06): Surface-dependent footstep audio
  */
 UCLASS()
 class PROJECTWALKINGSIM_API ASereneCharacter : public ACharacter
@@ -106,13 +103,15 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<ULeanComponent> LeanComponent;
 
-	// --- Future Components (created in later plans) ---
+	// --- Plan 04/05 Components ---
 
+	/** Per-tick camera line trace for detecting IInteractable actors. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UInteractionComponent> InteractionComponent; // Created in Plan 04
+	TObjectPtr<UInteractionComponent> InteractionComponent;
 
+	/** Surface detection via downward trace. Broadcasts footstep events. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<UFootstepComponent> FootstepComponent;     // Created in Plan 06
+	TObjectPtr<UFootstepComponent> FootstepComponent;
 
 	// --- Movement Configuration ---
 

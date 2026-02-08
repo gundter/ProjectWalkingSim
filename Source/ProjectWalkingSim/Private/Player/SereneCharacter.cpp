@@ -6,6 +6,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/Components/InteractionComponent.h"
+#include "Player/Components/FootstepComponent.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
 
@@ -49,8 +50,9 @@ ASereneCharacter::ASereneCharacter()
 	HeadBobComponent = CreateDefaultSubobject<UHeadBobComponent>(TEXT("HeadBobComponent"));
 	LeanComponent = CreateDefaultSubobject<ULeanComponent>(TEXT("LeanComponent"));
 
-	// --- Interaction Component ---
+	// --- Plan 04/05 Components ---
 	InteractionComponent = CreateDefaultSubobject<UInteractionComponent>(TEXT("InteractionComponent"));
+	FootstepComponent = CreateDefaultSubobject<UFootstepComponent>(TEXT("FootstepComponent"));
 
 	// --- Character Movement Component Configuration ---
 	// Grounded, deliberate horror movement. No jump, no air control.
@@ -116,6 +118,14 @@ void ASereneCharacter::BeginPlay()
 
 	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - Character initialized. WalkSpeed=%.0f, SprintSpeed=%.0f"),
 		WalkSpeed, SprintSpeed);
+
+	// Log all 5 component creation status
+	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - Components: Stamina=%s, HeadBob=%s, Lean=%s, Interaction=%s, Footstep=%s"),
+		StaminaComponent ? TEXT("OK") : TEXT("MISSING"),
+		HeadBobComponent ? TEXT("OK") : TEXT("MISSING"),
+		LeanComponent ? TEXT("OK") : TEXT("MISSING"),
+		InteractionComponent ? TEXT("OK") : TEXT("MISSING"),
+		FootstepComponent ? TEXT("OK") : TEXT("MISSING"));
 }
 
 void ASereneCharacter::Tick(float DeltaTime)
