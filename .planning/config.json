@@ -1,0 +1,14 @@
+{
+  "workflow": {
+    "mode": "yolo",
+    "depth": "standard",
+    "parallelization": true,
+    "commit_docs": true
+  },
+  "project": {
+    "name": "The Juniper Tree",
+    "engine": "Unreal Engine 5.7.2",
+    "type": "psychological-horror"
+  },
+  "created": "2026-02-07"
+}
