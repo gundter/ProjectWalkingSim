@@ -111,13 +111,15 @@ ASereneCharacter* ASerenePlayerController::GetSereneCharacter() const
 
 void ASerenePlayerController::HandleMove(const FInputActionValue& Value)
 {
-	ASereneCharacter* Character = GetSereneCharacter();
-	if (!Character)
+	ASereneCharacter* SereneChar = GetSereneCharacter();
+	if (!SereneChar)
 	{
 		return;
 	}
 
 	const FVector2D MoveValue = Value.Get<FVector2D>();
+
+	UE_LOG(LogSerene, Verbose, TEXT("HandleMove - MoveValue: X=%.2f Y=%.2f"), MoveValue.X, MoveValue.Y);
 
 	// Decompose 2D axis into forward/right movement relative to controller yaw.
 	// Only use yaw from controller rotation (ignore pitch/roll for movement direction).
@@ -126,8 +128,8 @@ void ASerenePlayerController::HandleMove(const FInputActionValue& Value)
 	const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
 
 	// MoveValue.Y = forward/backward (W/S), MoveValue.X = left/right (A/D)
-	Character->AddMovementInput(ForwardDirection, MoveValue.Y);
-	Character->AddMovementInput(RightDirection, MoveValue.X);
+	SereneChar->AddMovementInput(ForwardDirection, MoveValue.Y);
+	SereneChar->AddMovementInput(RightDirection, MoveValue.X);
 }
 
 void ASerenePlayerController::HandleLook(const FInputActionValue& Value)
@@ -136,32 +138,33 @@ void ASerenePlayerController::HandleLook(const FInputActionValue& Value)
 
 	// Apply mouse input directly. Sensitivity is handled by Enhanced Input modifiers
 	// on the LookAction asset (scalar modifiers in the IMC).
+	// Pitch is negated: mouse-up (positive Y) should look up (negative pitch in UE).
 	AddYawInput(LookValue.X);
-	AddPitchInput(LookValue.Y);
+	AddPitchInput(-LookValue.Y);
 }
 
 void ASerenePlayerController::HandleSprintStart(const FInputActionValue& Value)
 {
-	ASereneCharacter* Character = GetSereneCharacter();
-	if (Character)
+	ASereneCharacter* SereneChar = GetSereneCharacter();
+	if (SereneChar)
 	{
-		Character->StartSprint();
+		SereneChar->StartSprint();
 	}
 }
 
 void ASerenePlayerController::HandleSprintStop(const FInputActionValue& Value)
 {
-	ASereneCharacter* Character = GetSereneCharacter();
-	if (Character)
+	ASereneCharacter* SereneChar = GetSereneCharacter();
+	if (SereneChar)
 	{
-		Character->StopSprint();
+		SereneChar->StopSprint();
 	}
 }
 
 void ASerenePlayerController::HandleCrouchToggle(const FInputActionValue& Value)
 {
-	ASereneCharacter* Character = GetSereneCharacter();
-	if (!Character)
+	ASereneCharacter* SereneChar = GetSereneCharacter();
+	if (!SereneChar)
 	{
 		return;
 	}
@@ -169,22 +172,22 @@ void ASerenePlayerController::HandleCrouchToggle(const FInputActionValue& Value)
 	// Check GameInstance for crouch mode setting
 	// Default: toggle mode (press to crouch, press again to stand)
 	// TODO: When hold mode is needed, rebind CrouchAction to use Triggered+Completed instead of Started
-	if (Character->GetIsCrouching())
+	if (SereneChar->GetIsCrouching())
 	{
-		Character->StopCrouching();
+		SereneChar->StopCrouching();
 	}
 	else
 	{
-		Character->StartCrouching();
+		SereneChar->StartCrouching();
 	}
 }
 
 void ASerenePlayerController::HandleInteract(const FInputActionValue& Value)
 {
-	ASereneCharacter* Character = GetSereneCharacter();
-	if (Character)
+	ASereneCharacter* SereneChar = GetSereneCharacter();
+	if (SereneChar)
 	{
-		UInteractionComponent* InteractionComp = Character->FindComponentByClass<UInteractionComponent>();
+		UInteractionComponent* InteractionComp = SereneChar->FindComponentByClass<UInteractionComponent>();
 		if (InteractionComp)
 		{
 			InteractionComp->TryInteract();
@@ -194,10 +197,10 @@ void ASerenePlayerController::HandleInteract(const FInputActionValue& Value)
 
 void ASerenePlayerController::HandleLeanLeftStart(const FInputActionValue& Value)
 {
-	ASereneCharacter* Character = GetSereneCharacter();
-	if (Character)
+	ASereneCharacter* SereneChar = GetSereneCharacter();
+	if (SereneChar)
 	{
-		if (ULeanComponent* LeanComp = Character->FindComponentByClass<ULeanComponent>())
+		if (ULeanComponent* LeanComp = SereneChar->FindComponentByClass<ULeanComponent>())
 		{
 			LeanComp->SetLeanLeft(true);
 		}
@@ -206,10 +209,10 @@ void ASerenePlayerController::HandleLeanLeftStart(const FInputActionValue& Value
 
 void ASerenePlayerController::HandleLeanLeftStop(const FInputActionValue& Value)
 {
-	ASereneCharacter* Character = GetSereneCharacter();
-	if (Character)
+	ASereneCharacter* SereneChar = GetSereneCharacter();
+	if (SereneChar)
 	{
-		if (ULeanComponent* LeanComp = Character->FindComponentByClass<ULeanComponent>())
+		if (ULeanComponent* LeanComp = SereneChar->FindComponentByClass<ULeanComponent>())
 		{
 			LeanComp->SetLeanLeft(false);
 		}
@@ -218,10 +221,10 @@ void ASerenePlayerController::HandleLeanLeftStop(const FInputActionValue& Value)
 
 void ASerenePlayerController::HandleLeanRightStart(const FInputActionValue& Value)
 {
-	ASereneCharacter* Character = GetSereneCharacter();
-	if (Character)
+	ASereneCharacter* SereneChar = GetSereneCharacter();
+	if (SereneChar)
 	{
-		if (ULeanComponent* LeanComp = Character->FindComponentByClass<ULeanComponent>())
+		if (ULeanComponent* LeanComp = SereneChar->FindComponentByClass<ULeanComponent>())
 		{
 			LeanComp->SetLeanRight(true);
 		}
@@ -230,10 +233,10 @@ void ASerenePlayerController::HandleLeanRightStart(const FInputActionValue& Valu
 
 void ASerenePlayerController::HandleLeanRightStop(const FInputActionValue& Value)
 {
-	ASereneCharacter* Character = GetSereneCharacter();
-	if (Character)
+	ASereneCharacter* SereneChar = GetSereneCharacter();
+	if (SereneChar)
 	{
-		if (ULeanComponent* LeanComp = Character->FindComponentByClass<ULeanComponent>())
+		if (ULeanComponent* LeanComp = SereneChar->FindComponentByClass<ULeanComponent>())
 		{
 			LeanComp->SetLeanRight(false);
 		}

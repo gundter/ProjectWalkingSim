@@ -3,14 +3,15 @@
 #include "Player/HUD/InteractionPromptWidget.h"
 
 #include "Components/TextBlock.h"
+#include "Components/Image.h"
 
 void UInteractionPromptWidget::UpdatePrompt(AActor* Interactable, const FText& Text)
 {
 	if (Interactable && !Text.IsEmpty())
 	{
-		// Format as "E: {Text}" (e.g., "E: Open", "E: Pick Up", "E: Read")
+		// Format as "F: {Text}" (e.g., "F: Open", "F: Pick Up", "F: Read")
 		const FText FormattedText = FText::Format(
-			NSLOCTEXT("InteractionPrompt", "PromptFormat", "E: {0}"), Text);
+			NSLOCTEXT("InteractionPrompt", "PromptFormat", "F: {0}"), Text);
 
 		if (PromptText)
 		{

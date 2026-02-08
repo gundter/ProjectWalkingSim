@@ -6,20 +6,17 @@
 #include "GameFramework/HUD.h"
 #include "SereneHUD.generated.h"
 
-class UStaminaBarWidget;
-class UInteractionPromptWidget;
+class USereneHUDWidget;
 class ASereneCharacter;
 
 /**
  * HUD class for The Juniper Tree.
  *
- * Creates and manages all screen-space HUD widgets:
- * - StaminaBarWidget: progress bar bound to StaminaComponent::OnStaminaChanged
- * - InteractionPromptWidget: prompt bound to InteractionComponent::OnInteractableChanged
+ * Creates a single root widget (SereneHUDWidget) containing all HUD children
+ * under one Canvas Panel, reducing draw overhead versus separate viewport widgets.
  *
- * Widget classes are set via EditDefaultsOnly properties so designers can
- * assign UMG Blueprint subclasses (WBP_StaminaBar, WBP_InteractionPrompt)
- * without modifying C++.
+ * Widget class is set via EditDefaultsOnly so designers can assign the UMG
+ * Blueprint subclass (WBP_SereneHUD) without modifying C++.
  *
  * Set as HUDClass on ASereneGameMode.
  */
@@ -31,28 +28,18 @@ class PROJECTWALKINGSIM_API ASereneHUD : public AHUD
 protected:
 	virtual void BeginPlay() override;
 
-	/** UMG Blueprint class for the stamina bar widget. Assign WBP_StaminaBar here. */
+	/** UMG Blueprint class for the root HUD widget. Assign WBP_SereneHUD here. */
 	UPROPERTY(EditDefaultsOnly, Category = "HUD")
-	TSubclassOf<UStaminaBarWidget> StaminaBarWidgetClass;
+	TSubclassOf<USereneHUDWidget> HUDWidgetClass;
 
-	/** UMG Blueprint class for the interaction prompt widget. Assign WBP_InteractionPrompt here. */
-	UPROPERTY(EditDefaultsOnly, Category = "HUD")
-	TSubclassOf<UInteractionPromptWidget> InteractionPromptWidgetClass;
+public:
+	/** Bind HUD widgets to the character's component delegates. Called from PossessedBy. */
+	void BindToCharacter(ASereneCharacter* Character);
 
 private:
-	/** Live instance of the stamina bar widget. */
+	/** Live instance of the root HUD widget. */
 	UPROPERTY()
-	TObjectPtr<UStaminaBarWidget> StaminaBarInstance;
-
-	/** Live instance of the interaction prompt widget. */
-	UPROPERTY()
-	TObjectPtr<UInteractionPromptWidget> InteractionPromptInstance;
-
-	/**
-	 * Bind HUD widgets to the character's component delegates.
-	 * Called from BeginPlay once the pawn is valid.
-	 */
-	void BindToCharacter(ASereneCharacter* Character);
+	TObjectPtr<USereneHUDWidget> HUDWidgetInstance;
 
 	// --- Delegate Handlers ---
 

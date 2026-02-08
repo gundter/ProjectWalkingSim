@@ -2,6 +2,7 @@
 
 #include "Player/HUD/SereneHUD.h"
 
+#include "Player/HUD/SereneHUDWidget.h"
 #include "Player/HUD/StaminaBarWidget.h"
 #include "Player/HUD/InteractionPromptWidget.h"
 #include "Player/SereneCharacter.h"
@@ -13,60 +14,18 @@ void ASereneHUD::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Create stamina bar widget.
-	if (StaminaBarWidgetClass)
+	if (HUDWidgetClass)
 	{
-		StaminaBarInstance = CreateWidget<UStaminaBarWidget>(GetOwningPlayerController(), StaminaBarWidgetClass);
-		if (StaminaBarInstance)
+		HUDWidgetInstance = CreateWidget<USereneHUDWidget>(GetOwningPlayerController(), HUDWidgetClass);
+		if (HUDWidgetInstance)
 		{
-			StaminaBarInstance->AddToViewport();
-			StaminaBarInstance->SetVisibility(ESlateVisibility::Collapsed); // Hidden until stamina changes
-			UE_LOG(LogSerene, Log, TEXT("ASereneHUD::BeginPlay - StaminaBarWidget created and added to viewport."));
+			HUDWidgetInstance->AddToViewport();
+			UE_LOG(LogSerene, Log, TEXT("ASereneHUD::BeginPlay - HUDWidget created and added to viewport."));
 		}
 	}
 	else
 	{
-		UE_LOG(LogSerene, Warning, TEXT("ASereneHUD::BeginPlay - StaminaBarWidgetClass not set. Stamina bar will not display."));
-	}
-
-	// Create interaction prompt widget.
-	if (InteractionPromptWidgetClass)
-	{
-		InteractionPromptInstance = CreateWidget<UInteractionPromptWidget>(GetOwningPlayerController(), InteractionPromptWidgetClass);
-		if (InteractionPromptInstance)
-		{
-			InteractionPromptInstance->AddToViewport();
-			UE_LOG(LogSerene, Log, TEXT("ASereneHUD::BeginPlay - InteractionPromptWidget created and added to viewport."));
-		}
-	}
-	else
-	{
-		UE_LOG(LogSerene, Warning, TEXT("ASereneHUD::BeginPlay - InteractionPromptWidgetClass not set. Interaction prompt will not display."));
-	}
-
-	// Bind to the character's component delegates.
-	// Handle timing: pawn may not be possessed yet in BeginPlay.
-	ASereneCharacter* Character = Cast<ASereneCharacter>(GetOwningPawn());
-	if (Character)
-	{
-		BindToCharacter(Character);
-	}
-	else
-	{
-		// Defer binding until pawn is available via a short timer.
-		FTimerHandle BindTimerHandle;
-		GetWorldTimerManager().SetTimer(BindTimerHandle, [this]()
-		{
-			ASereneCharacter* DeferredCharacter = Cast<ASereneCharacter>(GetOwningPawn());
-			if (DeferredCharacter)
-			{
-				BindToCharacter(DeferredCharacter);
-			}
-			else
-			{
-				UE_LOG(LogSerene, Warning, TEXT("ASereneHUD - Deferred bind failed: no pawn available."));
-			}
-		}, 0.1f, false);
+		UE_LOG(LogSerene, Warning, TEXT("ASereneHUD::BeginPlay - HUDWidgetClass not set. HUD will not display."));
 	}
 }
 
@@ -94,16 +53,20 @@ void ASereneHUD::BindToCharacter(ASereneCharacter* Character)
 
 void ASereneHUD::HandleStaminaChanged(float Percent)
 {
-	if (StaminaBarInstance)
+	if (HUDWidgetInstance && HUDWidgetInstance->GetStaminaBarWidget())
 	{
-		StaminaBarInstance->SetStaminaPercent(Percent);
+		HUDWidgetInstance->GetStaminaBarWidget()->SetStaminaPercent(Percent);
+	}
+	else
+	{
+		UE_LOG(LogSerene, Warning, TEXT("ASereneHUD::HandleStaminaChanged - HUDWidgetInstance or StaminaBarWidget is null."));
 	}
 }
 
 void ASereneHUD::HandleInteractableChanged(AActor* NewInteractable, FText InteractionText)
 {
-	if (InteractionPromptInstance)
+	if (HUDWidgetInstance && HUDWidgetInstance->GetInteractionPromptWidget())
 	{
-		InteractionPromptInstance->UpdatePrompt(NewInteractable, InteractionText);
+		HUDWidgetInstance->GetInteractionPromptWidget()->UpdatePrompt(NewInteractable, InteractionText);
 	}
 }

@@ -4,12 +4,25 @@
 
 #include "Components/ProgressBar.h"
 #include "Animation/WidgetAnimation.h"
+#include "Core/SereneLogChannels.h"
+
+void UStaminaBarWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	// Start hidden -- ShowBar will reveal when stamina drops below 100%.
+	SetRenderOpacity(0.0f);
+}
 
 void UStaminaBarWidget::SetStaminaPercent(float Percent)
 {
 	if (StaminaBar)
 	{
 		StaminaBar->SetPercent(Percent);
+	}
+	else
+	{
+		UE_LOG(LogSerene, Warning, TEXT("UStaminaBarWidget::SetStaminaPercent - StaminaBar ProgressBar is null. Check BindWidget name in WBP."));
 	}
 
 	if (Percent < 1.0f)
@@ -40,7 +53,8 @@ void UStaminaBarWidget::ShowBar()
 	bWaitingToHide = false;
 	HideTimer = 0.0f;
 
-	SetVisibility(ESlateVisibility::Visible);
+	SetRenderOpacity(1.0f);
+	UE_LOG(LogSerene, Log, TEXT("UStaminaBarWidget::ShowBar - Bar now visible."));
 
 	if (FadeAnimation)
 	{
@@ -54,14 +68,12 @@ void UStaminaBarWidget::HideBar()
 	bWaitingToHide = false;
 	HideTimer = 0.0f;
 
+	SetRenderOpacity(0.0f);
+
 	if (FadeAnimation)
 	{
 		PlayAnimation(FadeAnimation, 0.0f, 1, EUMGSequencePlayMode::Reverse);
-		// After reverse animation completes, widget is visually hidden.
-		// We still collapse it for hit-test purposes.
 	}
-
-	SetVisibility(ESlateVisibility::Collapsed);
 }
 
 void UStaminaBarWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)

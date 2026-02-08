@@ -4,15 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "SereneCharacter.generated.h"
-
-// Components created in Plans 03-05
 #include "Player/Components/StaminaComponent.h"
 #include "Player/Components/HeadBobComponent.h"
 #include "Player/Components/LeanComponent.h"
+#include "SereneCharacter.generated.h"
 
-class UInteractionComponent;   // Created in Plan 04
-class UFootstepComponent;      // Created in Plan 05
+class UInteractionComponent;
+class UFootstepComponent;
 
 class UCameraComponent;
 class USkeletalMeshComponent;
@@ -68,6 +66,8 @@ public:
 	/** Stop crouching. Wraps ACharacter::UnCrouch(). */
 	UFUNCTION(BlueprintCallable, Category = "Movement")
 	void StopCrouching();
+
+	virtual void PossessedBy(AController* NewController) override;
 
 protected:
 	virtual void BeginPlay() override;
@@ -143,7 +143,16 @@ private:
 	 * Initial camera relative location stored in BeginPlay.
 	 * HeadBob and Lean offsets are added to this base each tick.
 	 */
-	FVector BaseCameraLocation = FVector::ZeroVector;
+	/** Current interpolated crouch camera offset (Z-axis). */
+	float CurrentCrouchCameraOffset = 0.0f;
+
+	/** Target crouch camera Z offset (negative = lower). */
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float CrouchCameraZOffset = -44.0f;
+
+	/** How fast the camera transitions to/from crouch height (cm/s). */
+	UPROPERTY(EditDefaultsOnly, Category = "Movement")
+	float CrouchCameraInterpSpeed = 12.0f;
 
 	/** Callback bound to StaminaComponent::OnStaminaDepleted. Forces sprint stop. */
 	UFUNCTION()

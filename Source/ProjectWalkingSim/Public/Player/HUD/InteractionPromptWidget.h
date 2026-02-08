@@ -7,23 +7,23 @@
 #include "InteractionPromptWidget.generated.h"
 
 class UTextBlock;
+class UImage;
 
 /**
  * HUD widget displaying the interaction prompt (e.g., "E: Open").
  *
  * C++ base class that defines logic for showing/hiding the prompt text.
- * Requires a UMG Blueprint subclass (WBP_InteractionPrompt) with two
- * UTextBlock widgets named exactly:
- *   - "PromptText"   -- displays the interaction action text (e.g., "E: Open")
- *   - "ReticleText"  -- displays the reticle dot (e.g., a centered dot character)
+ * Requires a UMG Blueprint subclass (WBP_InteractionPrompt) with:
+ *   - "PromptText"    (UTextBlock) -- displays the interaction action text
+ *   - "ReticleImage"  (UImage)     -- displays the crosshair/reticle image
  *
  * These must match the BindWidget meta property names. The UMG Blueprint
- * defines the visual layout (positioning, fonts, colors); this C++ class
- * defines the behavior.
+ * defines the visual layout (positioning, fonts, colors, reticle texture);
+ * this C++ class defines the behavior.
  *
  * Usage:
  *   1. Create WBP_InteractionPrompt in the editor (reparent to this class)
- *   2. Add two TextBlock widgets named "PromptText" and "ReticleText"
+ *   2. Add a TextBlock named "PromptText" and an Image named "ReticleImage"
  *   3. Bind InteractionComponent::OnInteractableChanged to UpdatePrompt()
  */
 UCLASS()
@@ -49,7 +49,7 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UTextBlock> PromptText;
 
-	/** The reticle dot text block. Must exist in UMG Blueprint. */
+	/** The reticle/crosshair image. Must exist in UMG Blueprint. */
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UTextBlock> ReticleText;
+	TObjectPtr<UImage> ReticleImage;
 };

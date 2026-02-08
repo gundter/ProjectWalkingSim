@@ -7,6 +7,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Player/Components/InteractionComponent.h"
 #include "Player/Components/FootstepComponent.h"
+#include "Player/HUD/SereneHUD.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
 
@@ -15,23 +16,13 @@ ASereneCharacter::ASereneCharacter()
 	PrimaryActorTick.bCanEverTick = true;
 
 	// --- First Person Camera ---
-	// Attach to head bone for true first-person view that follows animations.
-	// If no mesh is assigned yet, falls back to root component with a warning.
+	// Attached to root component. Position is driven manually in Tick() by
+	// reading the head bone world location and adding actor-space offsets
+	// (crouch, head-bob, lean). This avoids bone-local-space axis confusion.
+	// Rotation is also set manually from the controller + lean roll.
 	FirstPersonCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FirstPersonCamera"));
-
-	if (GetMesh())
-	{
-		FirstPersonCamera->SetupAttachment(GetMesh(), FName(TEXT("head")));
-	}
-	else
-	{
-		FirstPersonCamera->SetupAttachment(GetRootComponent());
-		UE_LOG(LogSerene, Warning, TEXT("ASereneCharacter: No skeletal mesh available. Camera attached to RootComponent instead of head bone."));
-	}
-
-	FirstPersonCamera->bUsePawnControlRotation = true;
-	FirstPersonCamera->bUseFirstPersonFieldOfView = true;
-	FirstPersonCamera->bUseFirstPersonScale = true;
+	FirstPersonCamera->SetupAttachment(GetRootComponent());
+	FirstPersonCamera->bUsePawnControlRotation = false;
 
 	// --- First Person Rendering ---
 	// Main mesh: visible to the owning player in first-person (full body).
@@ -72,7 +63,7 @@ ASereneCharacter::ASereneCharacter()
 
 	// Crouch configuration
 	CMC->NavAgentProps.bCanCrouch = true;
-	CMC->CrouchedHalfHeight = 44.0f;
+	CMC->SetCrouchedHalfHeight(44.0f);
 
 	// No jump -- grounded game
 	CMC->JumpZVelocity = 0.0f;
@@ -89,15 +80,22 @@ ASereneCharacter::ASereneCharacter()
 	bUseControllerRotationRoll = false;
 }
 
+void ASereneCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	if (APlayerController* PC = Cast<APlayerController>(NewController))
+	{
+		if (ASereneHUD* HUD = Cast<ASereneHUD>(PC->GetHUD()))
+		{
+			HUD->BindToCharacter(this);
+		}
+	}
+}
+
 void ASereneCharacter::BeginPlay()
 {
 	Super::BeginPlay();
-
-	// Store initial camera relative location as base for offset aggregation
-	if (FirstPersonCamera)
-	{
-		BaseCameraLocation = FirstPersonCamera->GetRelativeLocation();
-	}
 
 	// Bind stamina depletion to force stop sprint
 	if (StaminaComponent)
@@ -132,30 +130,40 @@ void ASereneCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (!FirstPersonCamera)
+	if (!FirstPersonCamera || !GetMesh())
 	{
 		return;
 	}
 
+	// --- Crouch Camera Offset ---
+	const float TargetCrouchOffset = bIsCrouching ? CrouchCameraZOffset : 0.0f;
+	CurrentCrouchCameraOffset = FMath::FInterpTo(CurrentCrouchCameraOffset, TargetCrouchOffset, DeltaTime, CrouchCameraInterpSpeed);
+
 	// --- Camera Offset Aggregation ---
-	// HeadBobComponent and LeanComponent each compute offsets independently.
-	// We sum them here and apply once to avoid components fighting over the camera.
-	FVector CameraOffset = FVector::ZeroVector;
+	// All offsets are in actor space (X=forward, Y=right, Z=up).
+	FVector ActorSpaceOffset(0.0f, 0.0f, CurrentCrouchCameraOffset);
 	float CameraRoll = 0.0f;
 
 	if (HeadBobComponent)
 	{
-		CameraOffset += HeadBobComponent->GetCurrentOffset();
+		ActorSpaceOffset += HeadBobComponent->GetCurrentOffset();
 	}
 
 	if (LeanComponent)
 	{
-		CameraOffset += LeanComponent->GetLeanOffset();
+		ActorSpaceOffset += LeanComponent->GetLeanOffset();
 		CameraRoll += LeanComponent->GetLeanRoll();
 	}
 
-	FirstPersonCamera->SetRelativeLocation(BaseCameraLocation + CameraOffset);
-	FirstPersonCamera->SetRelativeRotation(FRotator(0.0f, 0.0f, CameraRoll));
+	// --- Position: head bone world location + actor-space offsets ---
+	const FVector HeadWorldPos = GetMesh()->GetSocketLocation(FName(TEXT("head")));
+	const FVector WorldOffset = GetActorRotation().RotateVector(ActorSpaceOffset);
+	FirstPersonCamera->SetWorldLocation(HeadWorldPos + WorldOffset);
+
+	// --- Rotation: controller rotation + lean roll ---
+	FRotator CameraRotation = GetControlRotation();
+	CameraRotation.Roll = CameraRoll;
+	FirstPersonCamera->SetWorldRotation(CameraRotation);
 }
 
 void ASereneCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)

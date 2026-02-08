@@ -51,6 +51,7 @@ public:
 	void HideBar();
 
 protected:
+	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
 	/** The progress bar fill. Must exist in UMG Blueprint with this exact name. */

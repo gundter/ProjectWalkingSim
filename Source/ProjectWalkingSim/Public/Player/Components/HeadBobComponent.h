@@ -48,23 +48,23 @@ protected:
 
 	/** Vertical displacement in cm at walk speed. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Head Bob")
-	float WalkBobAmplitude = 1.5f;
+	float WalkBobAmplitude = 0.4f;
 
 	/** Oscillations per second at walk speed. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Head Bob")
-	float WalkBobFrequency = 8.0f;
+	float WalkBobFrequency = 6.0f;
 
 	/** Amplitude multiplier when the character is sprinting. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Head Bob")
-	float SprintBobMultiplier = 1.8f;
+	float SprintBobMultiplier = 1.5f;
 
 	/** Amplitude multiplier when the character is crouching. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Head Bob")
-	float CrouchBobMultiplier = 0.6f;
+	float CrouchBobMultiplier = 0.5f;
 
 	/** Horizontal sway as fraction of vertical amplitude. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Head Bob")
-	float HorizontalBobRatio = 0.5f;
+	float HorizontalBobRatio = 0.3f;
 
 	/** How quickly bob fades in (when moving) or out (when stopped). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Head Bob")
