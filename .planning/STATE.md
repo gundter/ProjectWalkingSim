@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 1 in progress. Interaction system operational. Character can detect and interact with objects.
+**Current Focus:** Phase 1 in progress. Stamina, head-bob, lean, and interaction systems operational. Core movement feel established.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,13 +22,13 @@
 ## Current Position
 
 **Phase:** 1 of 8 (Foundation)
-**Plan:** 4 of 6 complete
+**Plan:** 5 of 6 complete
 **Status:** In progress
-**Last activity:** 2026-02-08 - Completed 01-04-PLAN.md (Interaction System)
+**Last activity:** 2026-02-08 - Completed 01-03-PLAN.md (Stamina, Head-Bob, Lean Components)
 
 **Progress:**
 ```
-Phase 1: [####..] 4/6 plans complete
+Phase 1: [#####.] 5/6 plans complete
 Overall: [........] 0/8 phases complete
 ```
 
@@ -40,6 +40,7 @@ Overall: [........] 0/8 phases complete
 |-------|-------|-------|------|--------|
 | 1-01  | 1/6   | 2/2   | ~2m  | 0      |
 | 1-02  | 2/6   | 2/2   | ~3m  | 0      |
+| 1-03  | 3/6   | 2/2   | ~5m  | 0      |
 | 1-04  | 4/6   | 2/2   | ~5m  | 0      |
 
 ---
@@ -60,6 +61,10 @@ Overall: [........] 0/8 phases complete
 | Camera directly on head bone, no spring arm | First-person camera must track head animations; spring arm is third-person pattern | 01-02 |
 | Mouse sensitivity via Enhanced Input modifiers | Data-driven; designers can tune without code changes; supports remapping | 01-02 |
 | Crouch defaults to toggle mode | Matches plan spec; hold mode ready via GameInstance bCrouchToggleMode | 01-02 |
+| Camera offset aggregation pattern | Components compute offsets, character Tick() applies combined result | 01-03 |
+| ExhaustionThreshold at 20% before re-sprint | Prevents sprint-tap spam at low stamina; creates genuine chase tension | 01-03 |
+| OnStaminaChanged fires only on actual change | KINDA_SMALL_NUMBER threshold avoids unnecessary broadcasts at idle | 01-03 |
+| Sprint detection via MaxWalkSpeed > 400 | HeadBob reads CMC state without direct character class coupling | 01-03 |
 | Re-broadcast interaction text after TryInteract | Door text changes "Open" to "Close"; HUD needs immediate refresh | 01-04 |
 | Screen-space prompt widget, not world-space UWidgetComponent | Cleaner rendering, no lighting artifacts, still feels world-space via positioning | 01-04 |
 | Door swing direction via dot product | Natural behavior: door opens away from player's approach side | 01-04 |
@@ -72,6 +77,7 @@ Overall: [........] 0/8 phases complete
 
 - [x] Plan Phase 1: Foundation
 - [x] Research UE5.7 first-person rendering before Phase 1 plans
+- [x] Execute 01-03-PLAN.md (Stamina, Head-Bob, Lean Components)
 - [ ] Execute remaining Phase 1 plans (01-05 and 01-06)
 
 ### Blockers
@@ -86,18 +92,15 @@ Overall: [........] 0/8 phases complete
 
 **Date:** 2026-02-08
 **Completed:**
-- Executed 01-04-PLAN.md (Interaction System)
-  - UInteractionComponent: camera-center line trace at 150cm, focus management, OnInteractableChanged delegate
-  - UInteractionPromptWidget: C++ base with BindWidget PromptText + ReticleText
-  - AInteractableBase: abstract base with IInteractable defaults, InteractionText, InteractionTag
-  - ADoorActor: DoorMesh rotates via FInterpTo, player-side-aware swing direction
-  - APickupActor: logs + destroys on pickup (Phase 2 inventory stub)
-  - AReadableActor: logs title on interact (future text display deferred)
-  - ADrawerActor: DrawerMesh slides along local X via FInterpTo
-  - Wired InteractionComponent into ASereneCharacter constructor
-  - Wired HandleInteract in PlayerController to call TryInteract
+- Executed 01-03-PLAN.md (Stamina, Head-Bob, Lean Components)
+  - UStaminaComponent: drain 20/s, regen 15/s after 1.5s delay, 20% exhaustion threshold
+  - UHeadBobComponent: sine-wave bob, sprint/crouch multipliers, accessibility toggle
+  - ULeanComponent: 30cm lateral, 5-degree roll, smooth FInterpTo
+  - Camera offset aggregation: character Tick() sums HeadBob + Lean offsets
+  - OnStaminaDepleted bound to StopSprint, StartSprint checks IsExhausted
+  - PlayerController lean handlers wired to LeanComponent
 
-**Next:** Execute 01-05-PLAN.md (Lean Component)
+**Next:** Execute 01-05-PLAN.md or 01-06-PLAN.md (remaining Foundation plans)
 
 ### Context for Next Session
 
@@ -113,7 +116,7 @@ The roadmap has 8 phases:
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
 
-Phase 1 has 6 plans. Plans 01-01, 01-02, and 01-04 complete. The project now has:
+Phase 1 has 6 plans. Plans 01-01, 01-02, 01-03, and 01-04 complete. The project now has:
 - Build.cs with EnhancedInput, UMG, GameplayTags, PhysicsCore, Slate, SlateCore
 - IInteractable, IHideable, ISaveable interfaces
 - 11 native gameplay tags (Interaction, Movement, Player categories)
@@ -122,6 +125,10 @@ Phase 1 has 6 plans. Plans 01-01, 01-02, and 01-04 complete. The project now has
 - ASereneCharacter with FP rendering, head-bone camera, WorldRepMesh, grounded CMC
 - ASerenePlayerController with 7 input bindings (Move, Look, Sprint, Crouch, Interact, LeanLeft, LeanRight)
 - ASereneGameMode in Core/ with character+controller defaults
+- UStaminaComponent: drain/regen with 1.5s delay, exhaustion threshold, 3 delegates
+- UHeadBobComponent: procedural sine-wave bob, sprint/crouch multipliers, toggleable
+- ULeanComponent: 30cm lateral offset, 5-degree roll, smooth transitions
+- Camera offset aggregation in character Tick() for HeadBob + Lean coexistence
 - UInteractionComponent: per-tick camera line trace, focus management, OnInteractableChanged delegate
 - UInteractionPromptWidget: C++ base with BindWidget slots for UMG
 - AInteractableBase: abstract base with IInteractable, InteractionText, InteractionTag, MeshComponent
@@ -132,4 +139,4 @@ All 29 v1 requirements are mapped. No orphans.
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-08*
+*Last updated: 2026-02-08 (01-03 completion)*
