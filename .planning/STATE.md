@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 1 in progress. Scaffolding complete, ready for character and components.
+**Current Focus:** Phase 1 in progress. Character and input operational, ready for components.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,13 +22,13 @@
 ## Current Position
 
 **Phase:** 1 of 8 (Foundation)
-**Plan:** 1 of 6 complete
+**Plan:** 2 of 6 complete
 **Status:** In progress
-**Last activity:** 2026-02-08 - Completed 01-01-PLAN.md (Project Scaffolding)
+**Last activity:** 2026-02-08 - Completed 01-02-PLAN.md (Character and Player Controller)
 
 **Progress:**
 ```
-Phase 1: [#.....] 1/6 plans complete
+Phase 1: [##....] 2/6 plans complete
 Overall: [........] 0/8 phases complete
 ```
 
@@ -39,6 +39,7 @@ Overall: [........] 0/8 phases complete
 | Phase | Plans | Tasks | Time | Issues |
 |-------|-------|-------|------|--------|
 | 1-01  | 1/6   | 2/2   | ~2m  | 0      |
+| 1-02  | 2/6   | 2/2   | ~3m  | 0      |
 
 ---
 
@@ -55,6 +56,9 @@ Overall: [........] 0/8 phases complete
 | USaveGame for settings persistence | Simple, engine-standard, separate slot from gameplay saves | 01-01 |
 | All interfaces BlueprintNativeEvent + BlueprintCallable | Allows C++ and Blueprint implementation; Execute_ wrappers auto-generated | 01-01 |
 | Single LogSerene category | Small project scope; avoids fragmentation; can split later | 01-01 |
+| Camera directly on head bone, no spring arm | First-person camera must track head animations; spring arm is third-person pattern | 01-02 |
+| Mouse sensitivity via Enhanced Input modifiers | Data-driven; designers can tune without code changes; supports remapping | 01-02 |
+| Crouch defaults to toggle mode | Matches plan spec; hold mode ready via GameInstance bCrouchToggleMode | 01-02 |
 
 ### Technical Discoveries
 
@@ -64,7 +68,7 @@ Overall: [........] 0/8 phases complete
 
 - [x] Plan Phase 1: Foundation
 - [x] Research UE5.7 first-person rendering before Phase 1 plans
-- [ ] Execute remaining Phase 1 plans (01-02 through 01-06)
+- [ ] Execute remaining Phase 1 plans (01-03 through 01-06)
 
 ### Blockers
 
@@ -78,15 +82,18 @@ Overall: [........] 0/8 phases complete
 
 **Date:** 2026-02-08
 **Completed:**
-- Executed 01-01-PLAN.md (Project Scaffolding)
-  - Updated Build.cs with Phase 1 module dependencies
-  - Created directory structure (Core, Player, Interaction, Tags)
-  - Created SereneLogChannels (LogSerene)
-  - Created SereneGameInstance with settings persistence
-  - Created IInteractable (5 methods), IHideable (3 methods stub), ISaveable (3 methods stub)
-  - Created 11 native gameplay tags in SereneTags namespace
+- Executed 01-02-PLAN.md (Character and Player Controller)
+  - Created ASereneCharacter with FP camera on head bone, WorldRepMesh for shadows
+  - CMC configured: 250 walk, 500 sprint, 130 crouch, no jump
+  - Sprint/crouch state management with mutual exclusion
+  - Forward declarations for 5 future components (Stamina, HeadBob, Interaction, Lean, Footstep)
+  - Created ASerenePlayerController with 7 Enhanced Input action bindings
+  - HandleMove decomposes Axis2D via controller yaw rotation
+  - HandleLook with pitch clamp +/-80 degrees
+  - Sprint hold, crouch toggle, interact/lean stubbed
+  - Relocated ASereneGameMode to Core/ with character+controller defaults
 
-**Next:** Execute 01-02-PLAN.md (Character and Player Controller)
+**Next:** Execute 01-03-PLAN.md (Stamina and Head-Bob Components)
 
 ### Context for Next Session
 
@@ -102,12 +109,15 @@ The roadmap has 8 phases:
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
 
-Phase 1 has 6 plans. Plan 01 (scaffolding) is complete. The project now has:
+Phase 1 has 6 plans. Plans 01-02 complete. The project now has:
 - Build.cs with EnhancedInput, UMG, GameplayTags, PhysicsCore, Slate, SlateCore
 - IInteractable, IHideable, ISaveable interfaces
 - 11 native gameplay tags (Interaction, Movement, Player categories)
 - LogSerene log category
 - USereneGameInstance with accessibility settings (head-bob toggle, crouch mode)
+- ASereneCharacter with FP rendering, head-bone camera, WorldRepMesh, grounded CMC
+- ASerenePlayerController with 7 input bindings (Move, Look, Sprint, Crouch, Interact, LeanLeft, LeanRight)
+- ASereneGameMode in Core/ with character+controller defaults
 
 All 29 v1 requirements are mapped. No orphans.
 
