@@ -1,0 +1,125 @@
+// Copyright Null Lantern.
+
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/Character.h"
+#include "SereneCharacter.generated.h"
+
+// Forward declarations for future components
+class UStaminaComponent;       // Created in Plan 03
+class UHeadBobComponent;       // Created in Plan 03
+class UInteractionComponent;   // Created in Plan 04
+class ULeanComponent;          // Created in Plan 05
+class UFootstepComponent;      // Created in Plan 06
+
+class UCameraComponent;
+class USkeletalMeshComponent;
+
+/**
+ * First-person player character for The Juniper Tree.
+ *
+ * Uses UE5 First Person Rendering for full-body visibility (arms, torso, legs, feet)
+ * with a WorldRepresentationMesh for shadow casting. Camera is attached to the head
+ * bone of the skeletal mesh. Movement is grounded and deliberate (no jump).
+ *
+ * Components are attached by later plans:
+ * - StaminaComponent (Plan 03): Stamina drain/regen during sprint
+ * - HeadBobComponent (Plan 03): Procedural sine-wave camera bob
+ * - InteractionComponent (Plan 04): Line trace interaction detection
+ * - LeanComponent (Plan 05): Camera-only lean (Q/E)
+ * - FootstepComponent (Plan 06): Surface-dependent footstep audio
+ */
+UCLASS()
+class PROJECTWALKINGSIM_API ASereneCharacter : public ACharacter
+{
+	GENERATED_BODY()
+
+public:
+	ASereneCharacter();
+
+	// --- Movement State Queries ---
+
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	bool GetIsSprinting() const { return bIsSprinting; }
+
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	bool GetIsCrouching() const { return bIsCrouching; }
+
+	// --- Movement Actions (called by PlayerController) ---
+
+	/** Begin sprinting. Only if not crouching and has movement velocity. */
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void StartSprint();
+
+	/** Stop sprinting and restore walk speed. */
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void StopSprint();
+
+	/** Begin crouching. Stops sprint if active. Wraps ACharacter::Crouch(). */
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void StartCrouching();
+
+	/** Stop crouching. Wraps ACharacter::UnCrouch(). */
+	UFUNCTION(BlueprintCallable, Category = "Movement")
+	void StopCrouching();
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	// --- Camera ---
+
+	/** First-person camera attached to head bone. Uses FP FOV and FP scale. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
+	TObjectPtr<UCameraComponent> FirstPersonCamera;
+
+	// --- Mesh ---
+
+	/**
+	 * Shadow/reflection mesh. Invisible to the owning camera but casts shadows
+	 * and appears in reflections. Follows the main mesh via SetLeaderPoseComponent.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Mesh")
+	TObjectPtr<USkeletalMeshComponent> WorldRepresentationMesh;
+
+	// --- Future Components (created in later plans) ---
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaminaComponent> StaminaComponent;       // Created in Plan 03
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UHeadBobComponent> HeadBobComponent;       // Created in Plan 03
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UInteractionComponent> InteractionComponent; // Created in Plan 04
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<ULeanComponent> LeanComponent;             // Created in Plan 05
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UFootstepComponent> FootstepComponent;     // Created in Plan 06
+
+	// --- Movement Configuration ---
+
+	/** Base walking speed (cm/s). Deliberate pace for horror atmosphere. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float WalkSpeed = 250.0f;
+
+	/** Sprint speed (cm/s). ~2x walk speed for urgent bursts. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Movement")
+	float SprintSpeed = 500.0f;
+
+	// --- Movement State ---
+
+	/** True while the player is holding sprint and actively sprinting. */
+	UPROPERTY(BlueprintReadOnly, Category = "Movement")
+	bool bIsSprinting = false;
+
+	/**
+	 * Tracked separately from CMC crouch state for component notification purposes.
+	 * Other components (StaminaComponent, FootstepComponent) read this directly.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category = "Movement")
+	bool bIsCrouching = false;
+};
