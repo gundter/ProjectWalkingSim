@@ -11,6 +11,7 @@
 
 class UInteractionComponent;
 class UFootstepComponent;
+class UInventoryComponent;
 
 class UCameraComponent;
 class USkeletalMeshComponent;
@@ -22,12 +23,13 @@ class USkeletalMeshComponent;
  * with a WorldRepresentationMesh for shadow casting. Camera is attached to the head
  * bone of the skeletal mesh. Movement is grounded and deliberate (no jump).
  *
- * Attached components (all 5 created in constructor):
+ * Attached components (all 6 created in constructor):
  * - StaminaComponent (Plan 03): Stamina drain/regen during sprint
  * - HeadBobComponent (Plan 03): Procedural sine-wave camera bob
  * - LeanComponent (Plan 03): Camera-only lean (Q/E)
  * - InteractionComponent (Plan 04): Line trace interaction detection
  * - FootstepComponent (Plan 05): Surface-dependent footstep detection
+ * - InventoryComponent (Phase 02): 8-slot item inventory
  *
  * Camera offset aggregation: Tick() reads offsets from HeadBobComponent and
  * LeanComponent, sums them, and applies the combined result to the camera.
@@ -112,6 +114,12 @@ protected:
 	/** Surface detection via downward trace. Broadcasts footstep events. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UFootstepComponent> FootstepComponent;
+
+	// --- Phase 02 Components ---
+
+	/** 8-slot inventory for items. Added in Phase 2. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UInventoryComponent> InventoryComponent;
 
 	// --- Movement Configuration ---
 

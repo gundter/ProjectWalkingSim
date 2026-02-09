@@ -8,6 +8,7 @@
 #include "Player/SereneCharacter.h"
 #include "Player/Components/InteractionComponent.h"
 #include "Player/Components/LeanComponent.h"
+#include "Player/HUD/SereneHUD.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
 
@@ -99,6 +100,13 @@ void ASerenePlayerController::SetupInputComponent()
 	{
 		EnhancedInput->BindAction(LeanRightAction, ETriggerEvent::Triggered, this, &ASerenePlayerController::HandleLeanRightStart);
 		EnhancedInput->BindAction(LeanRightAction, ETriggerEvent::Completed, this, &ASerenePlayerController::HandleLeanRightStop);
+	}
+
+	// Inventory toggle
+	if (ToggleInventoryAction)
+	{
+		EnhancedInput->BindAction(ToggleInventoryAction, ETriggerEvent::Started,
+			this, &ASerenePlayerController::HandleToggleInventory);
 	}
 
 	UE_LOG(LogSerene, Log, TEXT("ASerenePlayerController::SetupInputComponent - Enhanced Input bindings configured."));
@@ -241,4 +249,57 @@ void ASerenePlayerController::HandleLeanRightStop(const FInputActionValue& Value
 			LeanComp->SetLeanRight(false);
 		}
 	}
+}
+
+void ASerenePlayerController::HandleToggleInventory(const FInputActionValue& Value)
+{
+	if (bIsInventoryOpen)
+	{
+		CloseInventory();
+	}
+	else
+	{
+		OpenInventory();
+	}
+}
+
+void ASerenePlayerController::OpenInventory()
+{
+	bIsInventoryOpen = true;
+
+	// Switch to game and UI input mode with visible cursor
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	SetInputMode(InputMode);
+
+	SetShowMouseCursor(true);
+	SetIgnoreLookInput(true);
+
+	// Notify HUD
+	if (ASereneHUD* HUD = Cast<ASereneHUD>(GetHUD()))
+	{
+		HUD->ShowInventory();
+	}
+
+	UE_LOG(LogSerene, Verbose, TEXT("ASerenePlayerController::OpenInventory - Inventory opened, input mode set to GameAndUI."));
+}
+
+void ASerenePlayerController::CloseInventory()
+{
+	bIsInventoryOpen = false;
+
+	// Switch back to game-only input mode
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+
+	SetShowMouseCursor(false);
+	SetIgnoreLookInput(false);
+
+	// Notify HUD
+	if (ASereneHUD* HUD = Cast<ASereneHUD>(GetHUD()))
+	{
+		HUD->HideInventory();
+	}
+
+	UE_LOG(LogSerene, Verbose, TEXT("ASerenePlayerController::CloseInventory - Inventory closed, input mode set to GameOnly."));
 }

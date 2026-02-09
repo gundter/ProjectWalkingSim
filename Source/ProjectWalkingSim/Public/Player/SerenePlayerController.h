@@ -9,6 +9,7 @@
 class UInputMappingContext;
 class UInputAction;
 class ASereneCharacter;
+class ASereneHUD;
 struct FInputActionValue;
 
 /**
@@ -69,6 +70,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> LeanRightAction;
 
+	/** Bool: Tab (or assigned key) to toggle inventory. */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> ToggleInventoryAction;
+
 private:
 	// --- Input Handlers ---
 
@@ -85,4 +90,13 @@ private:
 
 	/** Cached pointer to the controlled SereneCharacter. Updated on Possess. */
 	ASereneCharacter* GetSereneCharacter() const;
+
+	// --- Inventory Toggle ---
+
+	/** Whether the inventory UI is currently open. */
+	bool bIsInventoryOpen = false;
+
+	void HandleToggleInventory(const FInputActionValue& Value);
+	void OpenInventory();
+	void CloseInventory();
 };
