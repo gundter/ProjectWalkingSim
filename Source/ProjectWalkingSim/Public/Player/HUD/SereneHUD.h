@@ -8,6 +8,7 @@
 
 class USereneHUDWidget;
 class ASereneCharacter;
+class UInventoryComponent;
 
 /**
  * HUD class for The Juniper Tree.
@@ -36,6 +37,12 @@ public:
 	/** Bind HUD widgets to the character's component delegates. Called from PossessedBy. */
 	void BindToCharacter(ASereneCharacter* Character);
 
+	/** Show the inventory UI. Called by PlayerController. */
+	void ShowInventory();
+
+	/** Hide the inventory UI. Called by PlayerController. */
+	void HideInventory();
+
 private:
 	/** Live instance of the root HUD widget. */
 	UPROPERTY()
@@ -50,4 +57,20 @@ private:
 	/** Forwards interactable changes to the InteractionPromptWidget. */
 	UFUNCTION()
 	void HandleInteractableChanged(AActor* NewInteractable, FText InteractionText);
+
+	/** Forwards inventory changes to the InventoryWidget for refresh. */
+	UFUNCTION()
+	void HandleInventoryChanged();
+
+	/** Handles tooltip Use action from InventoryWidget. */
+	UFUNCTION()
+	void HandleUseRequested(int32 SlotIndex);
+
+	/** Handles tooltip Discard action from InventoryWidget. */
+	UFUNCTION()
+	void HandleDiscardRequested(int32 SlotIndex);
+
+	/** Cached pointer to the character's inventory component. Set in BindToCharacter. */
+	UPROPERTY()
+	TObjectPtr<UInventoryComponent> CachedInventoryComp;
 };

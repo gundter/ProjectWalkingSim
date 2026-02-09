@@ -8,6 +8,7 @@
 
 class UStaminaBarWidget;
 class UInteractionPromptWidget;
+class UInventoryWidget;
 
 /**
  * Root HUD container widget.
@@ -27,6 +28,7 @@ class PROJECTWALKINGSIM_API USereneHUDWidget : public UUserWidget
 public:
 	UStaminaBarWidget* GetStaminaBarWidget() const { return StaminaBarWidget; }
 	UInteractionPromptWidget* GetInteractionPromptWidget() const { return InteractionPromptWidget; }
+	UInventoryWidget* GetInventoryWidget() const { return InventoryWidget; }
 
 protected:
 	/** Stamina bar child widget. Name must match in UMG Blueprint. */
@@ -36,4 +38,8 @@ protected:
 	/** Interaction prompt child widget. Name must match in UMG Blueprint. */
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UInteractionPromptWidget> InteractionPromptWidget;
+
+	/** Inventory container widget. Name must match in UMG Blueprint. */
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UInventoryWidget> InventoryWidget;
 };
