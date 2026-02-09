@@ -22,15 +22,15 @@
 ## Current Position
 
 **Phase:** 2 of 8 (Inventory System)
-**Plan:** 3 of 6 (completed)
+**Plan:** 4 of 6 (completed)
 **Status:** In progress
-**Last activity:** 2026-02-09 - Completed 02-03-PLAN.md (Interactable Actor Integration)
+**Last activity:** 2026-02-09 - Completed 02-04-PLAN.md (Player Integration)
 
 **Progress:**
 ```
 Phase 1: [######] 6/6 plans complete
-Phase 2: [###...] 3/6 plans executed
-Overall: [█.......] 1/8 phases complete (9/48 plans)
+Phase 2: [####..] 4/6 plans executed
+Overall: [█.......] 1/8 phases complete (10/48 plans)
 ```
 
 ---
@@ -48,6 +48,7 @@ Overall: [█.......] 1/8 phases complete (9/48 plans)
 | 2-01  | 1/6   | 2/2   | ~12m | 0      |
 | 2-02  | 2/6   | 2/2   | ~4m  | 0      |
 | 2-03  | 3/6   | 2/2   | ~6m  | 0      |
+| 2-04  | 4/6   | 2/2   | ~3m  | 0      |
 
 *Task 2 of 01-06 is human-verify checkpoint
 
@@ -89,6 +90,8 @@ Overall: [█.......] 1/8 phases complete (9/48 plans)
 | mutable bInventoryFullOnLastCheck | CanInteract is const but must signal state to GetInteractionText | 02-03 |
 | Allow locked door interaction attempts | Player gets "Locked" feedback; matches horror game convention | 02-03 |
 | Key consumed on unlock, door opens immediately | Single interaction to unlock and open; no separate steps | 02-03 |
+| SetIgnoreLookInput for inventory open | Prevents camera rotation from mouse while WASD still works | 02-04 |
+| Immediate HandleInventoryChanged on ShowInventory | Ensures slots are current when panel opens | 02-04 |
 
 ### Technical Discoveries
 
@@ -115,7 +118,8 @@ Overall: [█.......] 1/8 phases complete (9/48 plans)
 - [x] Execute 02-01-PLAN.md (Inventory Data Foundation)
 - [x] Execute 02-02-PLAN.md (Inventory UI Widgets)
 - [x] Execute 02-03-PLAN.md (Interactable Actor Integration)
-- [ ] Execute 02-04-PLAN.md through 02-06-PLAN.md
+- [x] Execute 02-04-PLAN.md (Player Integration)
+- [ ] Execute 02-05-PLAN.md and 02-06-PLAN.md
 
 ### Blockers
 
@@ -129,15 +133,16 @@ None — Phase 2 in progress, ready for next plan.
 
 **Date:** 2026-02-09
 **Completed:**
-- Executed 02-03-PLAN.md (Interactable Actor Integration)
-- Extended PickupActor with CanInteract, GetInteractionText overrides for inventory integration
-- Extended PickupActor::InitFromItemData to load mesh and set interaction text
-- Added DoorActor RequiredItemId, bIsLocked, LockedText for key-lock mechanics
-- Door consumes key via RemoveItemByName on unlock
+- Executed 02-04-PLAN.md (Player Integration)
+- Added InventoryComponent as 6th component on SereneCharacter
+- Added ToggleInventoryAction with OpenInventory/CloseInventory input mode switching
+- Wired HUD ShowInventory/HideInventory routing to InventoryWidget
+- Connected OnInventoryChanged delegate to RefreshSlots
+- Routed tooltip Use/Discard actions to InventoryComponent
 
-**Stopped at:** Completed 02-03-PLAN.md
+**Stopped at:** Completed 02-04-PLAN.md
 
-**Next:** Execute 02-04-PLAN.md (Item Combine Logic)
+**Next:** Execute 02-05-PLAN.md (Item Combine Logic)
 
 ### Context for Next Session
 
@@ -159,8 +164,8 @@ Phase 1 has 6 plans. All 6 plans executed. The project now has:
 - 11 native gameplay tags (Interaction, Movement, Player categories)
 - LogSerene log category
 - USereneGameInstance with accessibility settings (head-bob toggle, crouch mode)
-- ASereneCharacter with FP rendering, head-bone camera, WorldRepMesh, grounded CMC
-- ASerenePlayerController with 7 input bindings (Move, Look, Sprint, Crouch, Interact, LeanLeft, LeanRight)
+- ASereneCharacter with FP rendering, head-bone camera, WorldRepMesh, grounded CMC, 6 components
+- ASerenePlayerController with 8 input bindings (Move, Look, Sprint, Crouch, Interact, LeanLeft, LeanRight, ToggleInventory)
 - ASereneGameMode in Core/ with character+controller+HUD defaults
 - UStaminaComponent: drain/regen with 1.5s delay, exhaustion threshold, 3 delegates
 - UHeadBobComponent: procedural sine-wave bob, sprint/crouch multipliers, toggleable
@@ -172,17 +177,18 @@ Phase 1 has 6 plans. All 6 plans executed. The project now has:
 - ADoorActor, APickupActor, AReadableActor, ADrawerActor: four interactable types
 - UFootstepComponent: surface detection via downward trace, timer-based trigger, OnFootstep delegate
 - UStaminaBarWidget: progress bar with auto-show/hide and 2s delay
-- ASereneHUD: widget lifecycle manager for StaminaBar + InteractionPrompt
+- ASereneHUD: widget lifecycle manager for StaminaBar + InteractionPrompt + Inventory
 - 7 Input Action assets (IA_Move, IA_Look, IA_Sprint, IA_Crouch, IA_Interact, IA_LeanLeft, IA_LeanRight)
 - IMC_Default with 10 key bindings (WASD, Mouse, Shift, Ctrl, E-press, Q, E-hold)
 - EnhancedInput + PythonScriptPlugin plugins enabled
 
-Phase 2 progress (3/6 plans):
+Phase 2 progress (4/6 plans):
 - Plan 01: InventoryTypes.h, ItemDataAsset.h, InventoryComponent.h with 8-slot management
 - Plan 02: InventorySlotWidget, ItemTooltipWidget, InventoryWidget (C++ bases for UMG)
 - Plan 03: PickupActor inventory integration, DoorActor key-lock mechanics
+- Plan 04: InventoryComponent on character, inventory toggle, HUD delegate routing
 
-All 5 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep.
+All 6 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep, Inventory.
 All 29 v1 requirements are mapped. No orphans.
 
 **Phase 2 delivers:**
@@ -195,4 +201,4 @@ All 29 v1 requirements are mapped. No orphans.
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-09 (Completed 02-03-PLAN.md)*
+*Last updated: 2026-02-09 (Completed 02-04-PLAN.md)*
