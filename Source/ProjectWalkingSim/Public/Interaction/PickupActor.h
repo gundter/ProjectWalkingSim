@@ -11,9 +11,9 @@ class UItemDataAsset;
 /**
  * Generic pickup actor for items in The Juniper Tree.
  *
- * Placeholder for Phase 2 inventory integration. Currently logs the pickup
- * and optionally destroys itself. When the inventory system exists (Phase 2),
- * OnInteract will add the item to the player's inventory before destroying.
+ * Integrates with the inventory system via UInventoryComponent. On interaction,
+ * attempts to add the item to the player's inventory. Only destroys on successful
+ * pickup. Shows "Inventory Full" when the player cannot pick up the item.
  *
  * Designers set ItemId and Quantity per instance. The mesh represents the
  * physical item in the world.
@@ -28,7 +28,7 @@ public:
 
 	/**
 	 * Initialize this pickup from item data. Used when spawning discarded items.
-	 * Minimal version: sets ItemId and Quantity. Plan 03 extends this with mesh loading.
+	 * Sets ItemId, Quantity, loads WorldMesh if available, and updates InteractionText.
 	 * @param InItemId Item identifier
 	 * @param InQuantity Item quantity
 	 * @param ItemData Item data asset (may be null if item not in registry)
@@ -37,6 +37,8 @@ public:
 
 protected:
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
+	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
+	virtual FText GetInteractionText_Implementation() const override;
 
 	/** Identifier for the inventory system. Matched to item data in Phase 2. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pickup")
@@ -49,4 +51,8 @@ protected:
 	/** If true, the actor is destroyed after successful pickup. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pickup")
 	bool bDestroyOnPickup = true;
+
+private:
+	/** Cached state from CanInteract for GetInteractionText. Mutable because CanInteract is const. */
+	mutable bool bInventoryFullOnLastCheck = false;
 };
