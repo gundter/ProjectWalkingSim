@@ -31,6 +31,8 @@ void ASereneHUD::BeginPlay()
 				UInventoryWidget* InvWidget = HUDWidgetInstance->GetInventoryWidget();
 				InvWidget->OnUseRequested.AddDynamic(this, &ASereneHUD::HandleUseRequested);
 				InvWidget->OnDiscardRequested.AddDynamic(this, &ASereneHUD::HandleDiscardRequested);
+				InvWidget->OnCombineRequested.AddDynamic(this, &ASereneHUD::HandleCombineButtonClicked);
+				InvWidget->OnCombineSlotSelected.AddDynamic(this, &ASereneHUD::HandleCombineSlotSelected);
 			}
 		}
 	}
@@ -149,4 +151,23 @@ void ASereneHUD::HandleDiscardRequested(int32 SlotIndex)
 	}
 
 	CachedInventoryComp->DiscardItem(SlotIndex);
+}
+
+void ASereneHUD::HandleCombineButtonClicked(int32 SlotIndex)
+{
+	if (HUDWidgetInstance && HUDWidgetInstance->GetInventoryWidget())
+	{
+		HUDWidgetInstance->GetInventoryWidget()->EnterCombineMode(SlotIndex);
+	}
+}
+
+void ASereneHUD::HandleCombineSlotSelected(int32 SlotIndexA, int32 SlotIndexB)
+{
+	if (!CachedInventoryComp)
+	{
+		return;
+	}
+
+	CachedInventoryComp->TryCombineItems(SlotIndexA, SlotIndexB);
+	// Inventory change delegate will auto-refresh the UI
 }

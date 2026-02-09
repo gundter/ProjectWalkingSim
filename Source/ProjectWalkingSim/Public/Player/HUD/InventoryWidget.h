@@ -89,8 +89,29 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
 	FOnTooltipAction OnDiscardRequested;
 
+	/** Broadcast when combine mode completes with both slots selected. */
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCombineSlotSelected, int32, SlotIndexA, int32, SlotIndexB);
+
+	UPROPERTY(BlueprintAssignable, Category = "Inventory")
+	FOnCombineSlotSelected OnCombineSlotSelected;
+
+	// --- Combine Mode ---
+
+	/** Enter combine mode: first item selected, waiting for second. */
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void EnterCombineMode(int32 SourceSlotIndex);
+
+	/** Exit combine mode without combining. */
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void ExitCombineMode();
+
+	/** Returns true if in combine mode. */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory")
+	bool IsInCombineMode() const { return bInCombineMode; }
+
 protected:
 	virtual void NativeConstruct() override;
+	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	/** Horizontal box container for slot widgets. Must exist in UMG Blueprint. */
 	UPROPERTY(meta = (BindWidget))
@@ -115,6 +136,12 @@ private:
 	/** Whether inventory panel is currently visible. */
 	bool bIsVisible = false;
 
+	/** Whether in combine mode (waiting for second slot selection). */
+	bool bInCombineMode = false;
+
+	/** Source slot index for combine mode. */
+	int32 CombineSourceSlotIndex = -1;
+
 	/** Cached reference to inventory component for data lookup. */
 	UPROPERTY()
 	TObjectPtr<const UInventoryComponent> CachedInventoryComp;
@@ -132,4 +159,7 @@ private:
 
 	UFUNCTION()
 	void HandleDiscardClicked(int32 SlotIndex);
+
+	/** Navigate slots left (-1) or right (+1) with wraparound. */
+	void NavigateSlot(int32 Direction);
 };

@@ -70,6 +70,14 @@ private:
 	UFUNCTION()
 	void HandleDiscardRequested(int32 SlotIndex);
 
+	/** Handles combine button click from tooltip: enters combine mode on InventoryWidget. */
+	UFUNCTION()
+	void HandleCombineButtonClicked(int32 SlotIndex);
+
+	/** Handles combine slot selection from InventoryWidget: calls TryCombineItems. */
+	UFUNCTION()
+	void HandleCombineSlotSelected(int32 SlotIndexA, int32 SlotIndexB);
+
 	/** Cached pointer to the character's inventory component. Set in BindToCharacter. */
 	UPROPERTY()
 	TObjectPtr<UInventoryComponent> CachedInventoryComp;
