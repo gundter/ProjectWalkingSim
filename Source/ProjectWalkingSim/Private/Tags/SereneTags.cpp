@@ -19,4 +19,11 @@ namespace SereneTags
 	UE_DEFINE_GAMEPLAY_TAG(TAG_Player_Exhausted, "Player.Exhausted");
 	UE_DEFINE_GAMEPLAY_TAG(TAG_Player_Leaning, "Player.Leaning");
 	UE_DEFINE_GAMEPLAY_TAG(TAG_Player_InTransition, "Player.InTransition");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_Player_InventoryOpen, "Player.InventoryOpen");
+
+	// Item types
+	UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Key, "Item.Key");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Consumable, "Item.Consumable");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Tool, "Item.Tool");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Puzzle, "Item.Puzzle");
 }
