@@ -22,15 +22,15 @@
 ## Current Position
 
 **Phase:** 2 of 8 (Inventory System)
-**Plan:** 2 of 6 (completed)
+**Plan:** 3 of 6 (completed)
 **Status:** In progress
-**Last activity:** 2026-02-09 - Completed 02-02-PLAN.md (Inventory UI Widgets)
+**Last activity:** 2026-02-09 - Completed 02-03-PLAN.md (Interactable Actor Integration)
 
 **Progress:**
 ```
 Phase 1: [######] 6/6 plans complete
-Phase 2: [##....] 2/6 plans executed
-Overall: [█.......] 1/8 phases complete (8/48 plans)
+Phase 2: [###...] 3/6 plans executed
+Overall: [█.......] 1/8 phases complete (9/48 plans)
 ```
 
 ---
@@ -47,8 +47,9 @@ Overall: [█.......] 1/8 phases complete (8/48 plans)
 | 1-06  | 6/6   | 1/2*  | ~13m | 0      |
 | 2-01  | 1/6   | 2/2   | ~12m | 0      |
 | 2-02  | 2/6   | 2/2   | ~4m  | 0      |
+| 2-03  | 3/6   | 2/2   | ~6m  | 0      |
 
-*Task 2 is human-verify checkpoint
+*Task 2 of 01-06 is human-verify checkpoint
 
 ---
 
@@ -85,6 +86,9 @@ Overall: [█.......] 1/8 phases complete (8/48 plans)
 | GetPrimaryAssetPath().TryLoad() for asset loading | LoadPrimaryAsset returns FStreamableHandle not UObject*; TryLoad is synchronous | 02-01 |
 | PythonScriptPlugin kept as editor-only | Useful for future automation; no runtime cost with TargetAllowList = Editor | 01-06 |
 | ItemTooltip BindWidget member name | Linter enforced; matches UMG child widget naming convention | 02-02 |
+| mutable bInventoryFullOnLastCheck | CanInteract is const but must signal state to GetInteractionText | 02-03 |
+| Allow locked door interaction attempts | Player gets "Locked" feedback; matches horror game convention | 02-03 |
+| Key consumed on unlock, door opens immediately | Single interaction to unlock and open; no separate steps | 02-03 |
 
 ### Technical Discoveries
 
@@ -110,7 +114,8 @@ Overall: [█.......] 1/8 phases complete (8/48 plans)
 - [x] Plan Phase 2: Inventory
 - [x] Execute 02-01-PLAN.md (Inventory Data Foundation)
 - [x] Execute 02-02-PLAN.md (Inventory UI Widgets)
-- [ ] Execute 02-03-PLAN.md through 02-06-PLAN.md
+- [x] Execute 02-03-PLAN.md (Interactable Actor Integration)
+- [ ] Execute 02-04-PLAN.md through 02-06-PLAN.md
 
 ### Blockers
 
@@ -124,14 +129,15 @@ None — Phase 2 in progress, ready for next plan.
 
 **Date:** 2026-02-09
 **Completed:**
-- Executed 02-02-PLAN.md (Inventory UI Widgets)
-- Created InventorySlotWidget.h/cpp (4 BindWidget properties, OnSlotClicked delegate)
-- Created ItemTooltipWidget.h/cpp (6 BindWidget properties, 4 action delegates)
-- Created InventoryWidget.h/cpp (8 dynamic slots, tooltip management, delegate re-broadcasting)
+- Executed 02-03-PLAN.md (Interactable Actor Integration)
+- Extended PickupActor with CanInteract, GetInteractionText overrides for inventory integration
+- Extended PickupActor::InitFromItemData to load mesh and set interaction text
+- Added DoorActor RequiredItemId, bIsLocked, LockedText for key-lock mechanics
+- Door consumes key via RemoveItemByName on unlock
 
-**Stopped at:** Completed 02-02-PLAN.md
+**Stopped at:** Completed 02-03-PLAN.md
 
-**Next:** Execute 02-03-PLAN.md (HUD Integration)
+**Next:** Execute 02-04-PLAN.md (Item Combine Logic)
 
 ### Context for Next Session
 
@@ -171,9 +177,10 @@ Phase 1 has 6 plans. All 6 plans executed. The project now has:
 - IMC_Default with 10 key bindings (WASD, Mouse, Shift, Ctrl, E-press, Q, E-hold)
 - EnhancedInput + PythonScriptPlugin plugins enabled
 
-Phase 2 progress (2/6 plans):
+Phase 2 progress (3/6 plans):
 - Plan 01: InventoryTypes.h, ItemDataAsset.h, InventoryComponent.h with 8-slot management
 - Plan 02: InventorySlotWidget, ItemTooltipWidget, InventoryWidget (C++ bases for UMG)
+- Plan 03: PickupActor inventory integration, DoorActor key-lock mechanics
 
 All 5 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep.
 All 29 v1 requirements are mapped. No orphans.
@@ -188,4 +195,4 @@ All 29 v1 requirements are mapped. No orphans.
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-09 (Completed 02-02-PLAN.md)*
+*Last updated: 2026-02-09 (Completed 02-03-PLAN.md)*
