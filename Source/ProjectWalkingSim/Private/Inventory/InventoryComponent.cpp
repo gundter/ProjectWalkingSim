@@ -22,6 +22,7 @@ void UInventoryComponent::BeginPlay()
 	Super::BeginPlay();
 
 	LoadItemRegistry();
+	InitCombineRecipes();
 }
 
 void UInventoryComponent::LoadItemRegistry()
@@ -281,4 +282,72 @@ int32 UInventoryComponent::FindSlotWithItem(FName ItemId) const
 		}
 	}
 	return -1;
+}
+
+void UInventoryComponent::InitCombineRecipes()
+{
+	// Add recipes here as the demo expands. Format: {ItemA, ItemB} -> Result
+	// Example (commented out until actual items exist):
+	// CombineRecipes.Add(TPair<FName,FName>(FName("Fuse"), FName("FuseBox")), FName("PoweredFuseBox"));
+
+	UE_LOG(LogSerene, Log, TEXT("UInventoryComponent::InitCombineRecipes - %d recipes loaded."), CombineRecipes.Num());
+}
+
+bool UInventoryComponent::TryCombineItems(int32 SlotIndexA, int32 SlotIndexB)
+{
+	// Validate slot indices
+	if (!Slots.IsValidIndex(SlotIndexA) || !Slots.IsValidIndex(SlotIndexB))
+	{
+		UE_LOG(LogSerene, Warning, TEXT("UInventoryComponent::TryCombineItems - Invalid slot index (A=%d, B=%d)"), SlotIndexA, SlotIndexB);
+		return false;
+	}
+
+	// Ensure slots are not the same
+	if (SlotIndexA == SlotIndexB)
+	{
+		UE_LOG(LogSerene, Warning, TEXT("UInventoryComponent::TryCombineItems - Cannot combine slot with itself (slot %d)"), SlotIndexA);
+		return false;
+	}
+
+	// Ensure neither slot is empty
+	if (Slots[SlotIndexA].IsEmpty() || Slots[SlotIndexB].IsEmpty())
+	{
+		UE_LOG(LogSerene, Warning, TEXT("UInventoryComponent::TryCombineItems - Cannot combine empty slots (A=%d empty=%d, B=%d empty=%d)"),
+			SlotIndexA, Slots[SlotIndexA].IsEmpty(), SlotIndexB, Slots[SlotIndexB].IsEmpty());
+		return false;
+	}
+
+	const FName ItemIdA = Slots[SlotIndexA].ItemId;
+	const FName ItemIdB = Slots[SlotIndexB].ItemId;
+
+	// Check recipe map with both orderings (order-independent)
+	FName* ResultItem = CombineRecipes.Find(TPair<FName, FName>(ItemIdA, ItemIdB));
+	if (!ResultItem)
+	{
+		ResultItem = CombineRecipes.Find(TPair<FName, FName>(ItemIdB, ItemIdA));
+	}
+
+	if (ResultItem)
+	{
+		// Recipe found - perform combination
+		UE_LOG(LogSerene, Log, TEXT("UInventoryComponent::TryCombineItems - Combining %s + %s = %s"),
+			*ItemIdA.ToString(), *ItemIdB.ToString(), *ResultItem->ToString());
+
+		// Remove 1 quantity from both source slots
+		RemoveItem(SlotIndexA, 1);
+		RemoveItem(SlotIndexB, 1);
+
+		// Add the result item
+		TryAddItem(*ResultItem, 1);
+
+		// Note: RemoveItem and TryAddItem already broadcast OnInventoryChanged
+		return true;
+	}
+
+	// No recipe found
+	UE_LOG(LogSerene, Log, TEXT("UInventoryComponent::TryCombineItems - No recipe for %s + %s"),
+		*ItemIdA.ToString(), *ItemIdB.ToString());
+
+	OnCombineFailed.Broadcast(NSLOCTEXT("Inventory", "CombineFailed", "These items cannot be combined"));
+	return false;
 }

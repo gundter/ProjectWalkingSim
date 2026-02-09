@@ -44,3 +44,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChanged);
 
 /** Broadcast when an inventory action fails (e.g., inventory full). */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnInventoryActionFailed, FName, ItemId, FText, Reason);
+
+/** Broadcast when an item combination fails (no recipe exists). */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCombineFailed, FText, Reason);

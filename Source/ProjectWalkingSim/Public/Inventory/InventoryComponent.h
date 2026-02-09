@@ -135,6 +135,15 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory")
 	int32 FindSlotWithItem(FName ItemId) const;
 
+	/**
+	 * Attempt to combine items from two slots.
+	 * @param SlotIndexA First item slot
+	 * @param SlotIndexB Second item slot
+	 * @return true if combination succeeded, false if no recipe exists
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool TryCombineItems(int32 SlotIndexA, int32 SlotIndexB);
+
 	// --- Delegates ---
 
 	/** Broadcast when any slot changes (add, remove, modify). */
@@ -144,6 +153,10 @@ public:
 	/** Broadcast when an inventory action fails (e.g., inventory full). */
 	UPROPERTY(BlueprintAssignable, Category = "Inventory")
 	FOnInventoryActionFailed OnInventoryActionFailed;
+
+	/** Broadcast when an item combination fails (no recipe exists). */
+	UPROPERTY(BlueprintAssignable, Category = "Inventory")
+	FOnCombineFailed OnCombineFailed;
 
 protected:
 	/** Inventory slots array. Initialized to MaxSlots empty slots. */
@@ -157,4 +170,10 @@ protected:
 private:
 	/** Load all UItemDataAsset instances from Asset Manager. */
 	void LoadItemRegistry();
+
+	/** Combine recipes: {ItemA, ItemB} -> ResultItem. Order-independent (both permutations checked). */
+	TMap<TPair<FName, FName>, FName> CombineRecipes;
+
+	/** Initialize combine recipes. Called in BeginPlay after registry load. */
+	void InitCombineRecipes();
 };
