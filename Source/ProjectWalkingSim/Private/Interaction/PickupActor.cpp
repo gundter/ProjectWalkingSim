@@ -2,6 +2,7 @@
 
 #include "Interaction/PickupActor.h"
 
+#include "Inventory/ItemDataAsset.h"
 #include "Tags/SereneTags.h"
 #include "Core/SereneLogChannels.h"
 
@@ -23,4 +24,14 @@ void APickupActor::OnInteract_Implementation(AActor* Interactor)
 	{
 		Destroy();
 	}
+}
+
+void APickupActor::InitFromItemData(FName InItemId, int32 InQuantity, const UItemDataAsset* ItemData)
+{
+	ItemId = InItemId;
+	Quantity = InQuantity;
+
+	// Mesh loading and interaction text update added in Plan 03
+	UE_LOG(LogSerene, Log, TEXT("APickupActor::InitFromItemData - Initialized with ItemId=%s, Quantity=%d"),
+		*InItemId.ToString(), InQuantity);
 }

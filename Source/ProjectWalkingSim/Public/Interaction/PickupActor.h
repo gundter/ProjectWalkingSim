@@ -6,6 +6,8 @@
 #include "Interaction/InteractableBase.h"
 #include "PickupActor.generated.h"
 
+class UItemDataAsset;
+
 /**
  * Generic pickup actor for items in The Juniper Tree.
  *
@@ -23,6 +25,15 @@ class PROJECTWALKINGSIM_API APickupActor : public AInteractableBase
 
 public:
 	APickupActor();
+
+	/**
+	 * Initialize this pickup from item data. Used when spawning discarded items.
+	 * Minimal version: sets ItemId and Quantity. Plan 03 extends this with mesh loading.
+	 * @param InItemId Item identifier
+	 * @param InQuantity Item quantity
+	 * @param ItemData Item data asset (may be null if item not in registry)
+	 */
+	void InitFromItemData(FName InItemId, int32 InQuantity, const UItemDataAsset* ItemData);
 
 protected:
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
