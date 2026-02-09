@@ -2,6 +2,7 @@
 
 #include "Interaction/DoorActor.h"
 
+#include "Inventory/InventoryComponent.h"
 #include "Tags/SereneTags.h"
 #include "Core/SereneLogChannels.h"
 
@@ -15,10 +16,65 @@ ADoorActor::ADoorActor()
 
 	InteractionText = NSLOCTEXT("Interaction", "DoorOpen", "Open");
 	InteractionTag = SereneTags::TAG_Interaction_Door;
+	LockedText = NSLOCTEXT("Interaction", "DoorLocked", "Locked");
+}
+
+bool ADoorActor::CanInteract_Implementation(AActor* Interactor) const
+{
+	// Check base enable flag
+	if (!bCanBeInteracted)
+	{
+		return false;
+	}
+
+	// Always allow interaction attempt for locked doors (player gets feedback)
+	return true;
+}
+
+FText ADoorActor::GetInteractionText_Implementation() const
+{
+	if (bIsLocked)
+	{
+		return LockedText;
+	}
+
+	return Super::GetInteractionText_Implementation();
 }
 
 void ADoorActor::OnInteract_Implementation(AActor* Interactor)
 {
+	// Handle locked door first
+	if (bIsLocked)
+	{
+		// Check if player has the required key
+		UInventoryComponent* Inventory = Interactor ? Interactor->FindComponentByClass<UInventoryComponent>() : nullptr;
+
+		if (Inventory && Inventory->HasItem(RequiredItemId))
+		{
+			// Consume the key
+			Inventory->RemoveItemByName(RequiredItemId);
+
+			// Unlock the door
+			bIsLocked = false;
+
+			UE_LOG(LogSerene, Log, TEXT("ADoorActor::OnInteract - Door unlocked using %s"),
+				*RequiredItemId.ToString());
+
+			// Update interaction text to "Open" (will show on next frame)
+			InteractionText = NSLOCTEXT("Interaction", "DoorOpen", "Open");
+
+			// Fall through to open the door
+		}
+		else
+		{
+			// No key, door stays locked
+			UE_LOG(LogSerene, Log, TEXT("ADoorActor::OnInteract - Door is locked, requires %s"),
+				*RequiredItemId.ToString());
+			return;
+		}
+	}
+
+	// Existing open/close toggle logic
 	bIsOpen = !bIsOpen;
 
 	if (bIsOpen)

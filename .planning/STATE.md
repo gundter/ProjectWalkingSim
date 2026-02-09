@@ -22,15 +22,15 @@
 ## Current Position
 
 **Phase:** 2 of 8 (Inventory System)
-**Plan:** 1 of 6 (in progress)
+**Plan:** 2 of 6 (completed)
 **Status:** In progress
-**Last activity:** 2026-02-09 - Completed 02-01-PLAN.md (Inventory Data Foundation)
+**Last activity:** 2026-02-09 - Completed 02-02-PLAN.md (Inventory UI Widgets)
 
 **Progress:**
 ```
 Phase 1: [######] 6/6 plans complete
-Phase 2: [#.....] 1/6 plans executed
-Overall: [█.......] 1/8 phases complete (7/48 plans)
+Phase 2: [##....] 2/6 plans executed
+Overall: [█.......] 1/8 phases complete (8/48 plans)
 ```
 
 ---
@@ -46,6 +46,7 @@ Overall: [█.......] 1/8 phases complete (7/48 plans)
 | 1-05  | 5/6   | 2/2   | ~3m  | 0      |
 | 1-06  | 6/6   | 1/2*  | ~13m | 0      |
 | 2-01  | 1/6   | 2/2   | ~12m | 0      |
+| 2-02  | 2/6   | 2/2   | ~4m  | 0      |
 
 *Task 2 is human-verify checkpoint
 
@@ -83,6 +84,7 @@ Overall: [█.......] 1/8 phases complete (7/48 plans)
 | UPrimaryDataAsset for item definitions | Small item count benefits from per-asset editing in Content Browser | 02-01 |
 | GetPrimaryAssetPath().TryLoad() for asset loading | LoadPrimaryAsset returns FStreamableHandle not UObject*; TryLoad is synchronous | 02-01 |
 | PythonScriptPlugin kept as editor-only | Useful for future automation; no runtime cost with TargetAllowList = Editor | 01-06 |
+| ItemTooltip BindWidget member name | Linter enforced; matches UMG child widget naming convention | 02-02 |
 
 ### Technical Discoveries
 
@@ -94,6 +96,7 @@ Overall: [█.......] 1/8 phases complete (7/48 plans)
 | Custom UCLASS without Blueprintable not accessible in Python commandlet | Only SereneGameMode was loadable; others returned None | 01-06 |
 | IMC.mappings deprecated in UE5.7 in favor of default_key_mappings | Property still works but triggers DeprecationWarning | 01-06 |
 | UAssetManager::LoadPrimaryAsset returns FStreamableHandle | Not UObject* as expected; use GetPrimaryAssetPath().TryLoad() for sync load | 02-01 |
+| UWidget::Slot member shadows local variable names | MSVC C4458 warning-as-error; use SlotData instead of Slot in loops | 02-02 |
 
 ### TODOs
 
@@ -106,11 +109,12 @@ Overall: [█.......] 1/8 phases complete (7/48 plans)
 - [x] PIE verification of all Phase 1 features (01-06 checkpoint)
 - [x] Plan Phase 2: Inventory
 - [x] Execute 02-01-PLAN.md (Inventory Data Foundation)
-- [ ] Execute 02-02-PLAN.md through 02-06-PLAN.md
+- [x] Execute 02-02-PLAN.md (Inventory UI Widgets)
+- [ ] Execute 02-03-PLAN.md through 02-06-PLAN.md
 
 ### Blockers
 
-None — Phase 1 complete, Phase 2 ready to execute.
+None — Phase 2 in progress, ready for next plan.
 
 ---
 
@@ -120,16 +124,14 @@ None — Phase 1 complete, Phase 2 ready to execute.
 
 **Date:** 2026-02-09
 **Completed:**
-- Executed 02-01-PLAN.md (Inventory Data Foundation)
-- Created InventoryTypes.h (EItemType, FInventorySlot, delegates)
-- Created ItemDataAsset.h (UPrimaryDataAsset with item properties)
-- Created InventoryComponent.h (8-slot inventory management)
-- Added InitFromItemData to PickupActor
-- Extended SereneTags with 5 new gameplay tags
+- Executed 02-02-PLAN.md (Inventory UI Widgets)
+- Created InventorySlotWidget.h/cpp (4 BindWidget properties, OnSlotClicked delegate)
+- Created ItemTooltipWidget.h/cpp (6 BindWidget properties, 4 action delegates)
+- Created InventoryWidget.h/cpp (8 dynamic slots, tooltip management, delegate re-broadcasting)
 
-**Stopped at:** Completed 02-01-PLAN.md
+**Stopped at:** Completed 02-02-PLAN.md
 
-**Next:** Execute 02-02-PLAN.md (Inventory UI Widgets)
+**Next:** Execute 02-03-PLAN.md (HUD Integration)
 
 ### Context for Next Session
 
@@ -169,6 +171,10 @@ Phase 1 has 6 plans. All 6 plans executed. The project now has:
 - IMC_Default with 10 key bindings (WASD, Mouse, Shift, Ctrl, E-press, Q, E-hold)
 - EnhancedInput + PythonScriptPlugin plugins enabled
 
+Phase 2 progress (2/6 plans):
+- Plan 01: InventoryTypes.h, ItemDataAsset.h, InventoryComponent.h with 8-slot management
+- Plan 02: InventorySlotWidget, ItemTooltipWidget, InventoryWidget (C++ bases for UMG)
+
 All 5 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep.
 All 29 v1 requirements are mapped. No orphans.
 
@@ -182,4 +188,4 @@ All 29 v1 requirements are mapped. No orphans.
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-09 (Completed 02-01-PLAN.md)*
+*Last updated: 2026-02-09 (Completed 02-02-PLAN.md)*
