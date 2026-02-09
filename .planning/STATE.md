@@ -22,15 +22,15 @@
 ## Current Position
 
 **Phase:** 2 of 8 (Inventory System)
-**Plan:** 4 of 6 (completed)
+**Plan:** 5 of 6 (completed)
 **Status:** In progress
-**Last activity:** 2026-02-09 - Completed 02-04-PLAN.md (Player Integration)
+**Last activity:** 2026-02-09 - Completed 02-05-PLAN.md (Item Combine Logic)
 
 **Progress:**
 ```
 Phase 1: [######] 6/6 plans complete
-Phase 2: [####..] 4/6 plans executed
-Overall: [█.......] 1/8 phases complete (10/48 plans)
+Phase 2: [#####.] 5/6 plans executed
+Overall: [█.......] 1/8 phases complete (11/48 plans)
 ```
 
 ---
@@ -49,6 +49,7 @@ Overall: [█.......] 1/8 phases complete (10/48 plans)
 | 2-02  | 2/6   | 2/2   | ~4m  | 0      |
 | 2-03  | 3/6   | 2/2   | ~6m  | 0      |
 | 2-04  | 4/6   | 2/2   | ~3m  | 0      |
+| 2-05  | 5/6   | 2/2   | ~5m  | 0      |
 
 *Task 2 of 01-06 is human-verify checkpoint
 
@@ -92,6 +93,10 @@ Overall: [█.......] 1/8 phases complete (10/48 plans)
 | Key consumed on unlock, door opens immediately | Single interaction to unlock and open; no separate steps | 02-03 |
 | SetIgnoreLookInput for inventory open | Prevents camera rotation from mouse while WASD still works | 02-04 |
 | Immediate HandleInventoryChanged on ShowInventory | Ensures slots are current when panel opens | 02-04 |
+| Empty recipe TMap for demo | InitCombineRecipes placeholder ready for expansion; UI flow works end-to-end | 02-05 |
+| Order-independent recipe lookup | TryCombineItems checks both (A,B) and (B,A) permutations | 02-05 |
+| SetKeyboardFocus on ShowInventory | Ensures NativeOnKeyDown receives input when inventory opens | 02-05 |
+| Super::NativeOnKeyDown pass-through | Unhandled keys (WASD) fall through to game input for movement | 02-05 |
 
 ### Technical Discoveries
 
@@ -119,7 +124,8 @@ Overall: [█.......] 1/8 phases complete (10/48 plans)
 - [x] Execute 02-02-PLAN.md (Inventory UI Widgets)
 - [x] Execute 02-03-PLAN.md (Interactable Actor Integration)
 - [x] Execute 02-04-PLAN.md (Player Integration)
-- [ ] Execute 02-05-PLAN.md and 02-06-PLAN.md
+- [x] Execute 02-05-PLAN.md (Item Combine Logic)
+- [ ] Execute 02-06-PLAN.md
 
 ### Blockers
 
@@ -133,16 +139,16 @@ None — Phase 2 in progress, ready for next plan.
 
 **Date:** 2026-02-09
 **Completed:**
-- Executed 02-04-PLAN.md (Player Integration)
-- Added InventoryComponent as 6th component on SereneCharacter
-- Added ToggleInventoryAction with OpenInventory/CloseInventory input mode switching
-- Wired HUD ShowInventory/HideInventory routing to InventoryWidget
-- Connected OnInventoryChanged delegate to RefreshSlots
-- Routed tooltip Use/Discard actions to InventoryComponent
+- Executed 02-05-PLAN.md (Item Combine Logic)
+- Added TryCombineItems with recipe TMap and order-independent lookup
+- Added OnCombineFailed delegate for combine feedback
+- Added combine mode UI flow (EnterCombineMode/ExitCombineMode)
+- Added keyboard navigation (1-8 number keys, arrows, Escape, Delete)
+- Wired complete combine delegate chain through SereneHUD
 
-**Stopped at:** Completed 02-04-PLAN.md
+**Stopped at:** Completed 02-05-PLAN.md
 
-**Next:** Execute 02-05-PLAN.md (Item Combine Logic)
+**Next:** Execute 02-06-PLAN.md
 
 ### Context for Next Session
 
@@ -182,11 +188,12 @@ Phase 1 has 6 plans. All 6 plans executed. The project now has:
 - IMC_Default with 10 key bindings (WASD, Mouse, Shift, Ctrl, E-press, Q, E-hold)
 - EnhancedInput + PythonScriptPlugin plugins enabled
 
-Phase 2 progress (4/6 plans):
+Phase 2 progress (5/6 plans):
 - Plan 01: InventoryTypes.h, ItemDataAsset.h, InventoryComponent.h with 8-slot management
 - Plan 02: InventorySlotWidget, ItemTooltipWidget, InventoryWidget (C++ bases for UMG)
 - Plan 03: PickupActor inventory integration, DoorActor key-lock mechanics
 - Plan 04: InventoryComponent on character, inventory toggle, HUD delegate routing
+- Plan 05: TryCombineItems with recipe TMap, combine mode UI, keyboard navigation
 
 All 6 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep, Inventory.
 All 29 v1 requirements are mapped. No orphans.
@@ -201,4 +208,4 @@ All 29 v1 requirements are mapped. No orphans.
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-09 (Completed 02-04-PLAN.md)*
+*Last updated: 2026-02-09 (Completed 02-05-PLAN.md)*
