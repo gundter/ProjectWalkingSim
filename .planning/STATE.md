@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 1 code complete. All C++ classes, components, and data assets created. Awaiting manual editor setup (Blueprint subclasses, UMG widgets, TestMap) and PIE verification before closing Phase 1.
+**Current Focus:** Phase 2 in progress. Executing Inventory System — 8-slot inventory with horizontal UI, item actions, and locked door integration.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -21,15 +21,16 @@
 
 ## Current Position
 
-**Phase:** 1 of 8 (Foundation)
-**Plan:** 6 of 6 (Task 1 complete, awaiting human verification checkpoint)
-**Status:** Awaiting editor setup + PIE verification
-**Last activity:** 2026-02-08 - Executed 01-06-PLAN.md Task 1 (Input Assets, IMC, editor setup guide)
+**Phase:** 2 of 8 (Inventory System)
+**Plan:** 1 of 6 (in progress)
+**Status:** In progress
+**Last activity:** 2026-02-09 - Completed 02-01-PLAN.md (Inventory Data Foundation)
 
 **Progress:**
 ```
-Phase 1: [######] 6/6 plans executed (pending verification)
-Overall: [........] 0/8 phases complete
+Phase 1: [######] 6/6 plans complete
+Phase 2: [#.....] 1/6 plans executed
+Overall: [█.......] 1/8 phases complete (7/48 plans)
 ```
 
 ---
@@ -44,6 +45,7 @@ Overall: [........] 0/8 phases complete
 | 1-04  | 4/6   | 2/2   | ~5m  | 0      |
 | 1-05  | 5/6   | 2/2   | ~3m  | 0      |
 | 1-06  | 6/6   | 1/2*  | ~13m | 0      |
+| 2-01  | 1/6   | 2/2   | ~12m | 0      |
 
 *Task 2 is human-verify checkpoint
 
@@ -77,6 +79,9 @@ Overall: [........] 0/8 phases complete
 | SereneHUD defers pawn binding via 0.1s timer | BeginPlay timing: pawn may not be possessed yet when HUD initializes | 01-05 |
 | Python editor scripting for IA/IMC creation | Reproducible, version-controllable, avoids manual binary asset creation errors | 01-06 |
 | Manual Blueprint creation required | Custom C++ classes not accessible in Python commandlet; only Blueprintable classes get Python bindings | 01-06 |
+| TArray<FInventorySlot> over TMap | Preserves slot ordering required for UI display (8 fixed positions) | 02-01 |
+| UPrimaryDataAsset for item definitions | Small item count benefits from per-asset editing in Content Browser | 02-01 |
+| GetPrimaryAssetPath().TryLoad() for asset loading | LoadPrimaryAsset returns FStreamableHandle not UObject*; TryLoad is synchronous | 02-01 |
 | PythonScriptPlugin kept as editor-only | Useful for future automation; no runtime cost with TargetAllowList = Editor | 01-06 |
 
 ### Technical Discoveries
@@ -88,6 +93,7 @@ Overall: [........] 0/8 phases complete
 | IMC.map_key(action, key) returns mutable EnhancedActionKeyMapping | Correct API for adding bindings with modifiers/triggers | 01-06 |
 | Custom UCLASS without Blueprintable not accessible in Python commandlet | Only SereneGameMode was loadable; others returned None | 01-06 |
 | IMC.mappings deprecated in UE5.7 in favor of default_key_mappings | Property still works but triggers DeprecationWarning | 01-06 |
+| UAssetManager::LoadPrimaryAsset returns FStreamableHandle | Not UObject* as expected; use GetPrimaryAssetPath().TryLoad() for sync load | 02-01 |
 
 ### TODOs
 
@@ -96,13 +102,15 @@ Overall: [........] 0/8 phases complete
 - [x] Execute 01-03-PLAN.md (Stamina, Head-Bob, Lean Components)
 - [x] Execute 01-05-PLAN.md (Footsteps, Stamina HUD, Integration)
 - [x] Execute 01-06-PLAN.md Task 1 (Input Assets, IMC, editor setup)
-- [ ] Complete manual editor setup (see Scripts/EDITOR_SETUP.md)
-- [ ] PIE verification of all Phase 1 features (01-06 checkpoint)
-- [ ] Plan Phase 2: Inventory
+- [x] Complete manual editor setup (see Scripts/EDITOR_SETUP.md)
+- [x] PIE verification of all Phase 1 features (01-06 checkpoint)
+- [x] Plan Phase 2: Inventory
+- [x] Execute 02-01-PLAN.md (Inventory Data Foundation)
+- [ ] Execute 02-02-PLAN.md through 02-06-PLAN.md
 
 ### Blockers
 
-- **Manual editor setup required:** Blueprint subclasses, UMG widgets, and TestMap must be configured in Unreal Editor before PIE verification can proceed. See `Scripts/EDITOR_SETUP.md` for step-by-step instructions.
+None — Phase 1 complete, Phase 2 ready to execute.
 
 ---
 
@@ -110,18 +118,18 @@ Overall: [........] 0/8 phases complete
 
 ### Last Session
 
-**Date:** 2026-02-08
+**Date:** 2026-02-09
 **Completed:**
-- Executed 01-06-PLAN.md Task 1 (Input Assets, IMC, Editor Setup Guide)
-  - 7 Input Action assets: IA_Move, IA_Look, IA_Sprint, IA_Crouch, IA_Interact, IA_LeanLeft, IA_LeanRight
-  - IMC_Default with 10 key mappings (WASD+Mouse+Shift+Ctrl+E+Q+E-hold)
-  - Python automation script (Scripts/create_phase1_assets.py)
-  - Editor setup guide (Scripts/EDITOR_SETUP.md)
-  - EnhancedInput + PythonScriptPlugin enabled in .uproject
+- Executed 02-01-PLAN.md (Inventory Data Foundation)
+- Created InventoryTypes.h (EItemType, FInventorySlot, delegates)
+- Created ItemDataAsset.h (UPrimaryDataAsset with item properties)
+- Created InventoryComponent.h (8-slot inventory management)
+- Added InitFromItemData to PickupActor
+- Extended SereneTags with 5 new gameplay tags
 
-**Stopped at:** Checkpoint - human-verify (Task 2 of 01-06-PLAN.md)
+**Stopped at:** Completed 02-01-PLAN.md
 
-**Next:** User completes manual editor setup, then approves or reports issues at checkpoint
+**Next:** Execute 02-02-PLAN.md (Inventory UI Widgets)
 
 ### Context for Next Session
 
@@ -164,12 +172,14 @@ Phase 1 has 6 plans. All 6 plans executed. The project now has:
 All 5 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep.
 All 29 v1 requirements are mapped. No orphans.
 
-**Remaining before Phase 1 closure:**
-1. Manual editor setup: Create BP_SereneCharacter, BP_SerenePlayerController, BP_SereneHUD, BP_SereneGameMode, WBP_StaminaBar, WBP_InteractionPrompt (see Scripts/EDITOR_SETUP.md)
-2. TestMap configuration: GameMode override, floor, lights, PlayerStart, test interactables
-3. PIE verification: 22-point checklist
+**Phase 2 delivers:**
+- 8-slot inventory with horizontal UI
+- Item pickup and inventory integration
+- Key items that unlock doors
+- Two-step combine flow
+- Item discard back to world
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-08 (01-06 Task 1 completion, awaiting checkpoint)*
+*Last updated: 2026-02-09 (Completed 02-01-PLAN.md)*
