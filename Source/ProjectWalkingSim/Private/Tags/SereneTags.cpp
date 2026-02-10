@@ -26,4 +26,11 @@ namespace SereneTags
 	UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Consumable, "Item.Consumable");
 	UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Tool, "Item.Tool");
 	UE_DEFINE_GAMEPLAY_TAG(TAG_Item_Puzzle, "Item.Puzzle");
+
+	// Hiding system
+	UE_DEFINE_GAMEPLAY_TAG(TAG_Player_Hiding, "Player.Hiding");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_Interaction_HidingSpot, "Interaction.HidingSpot");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_HidingSpot_Locker, "HidingSpot.Locker");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_HidingSpot_Closet, "HidingSpot.Closet");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_HidingSpot_UnderBed, "HidingSpot.UnderBed");
 }
