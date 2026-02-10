@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 2 complete. Ready for Phase 3 (Hiding System) — context-sensitive hiding spots and visibility mechanics.
+**Current Focus:** Phase 3 in progress (Hiding System) — foundation types complete, building hiding spots and visibility mechanics.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,15 +22,16 @@
 ## Current Position
 
 **Phase:** 3 of 8 (Hiding System)
-**Plan:** 0 of ? (not yet planned)
-**Status:** Ready to plan Phase 3
-**Last activity:** 2026-02-09 - Phase 2 complete, all features verified
+**Plan:** 1 of 6 complete
+**Status:** In progress
+**Last activity:** 2026-02-10 - Completed 03-01-PLAN.md (Hiding Foundation Types)
 
 **Progress:**
 ```
-Phase 1: [######] 6/6 plans complete ✓
-Phase 2: [######] 6/6 plans complete ✓
-Overall: [██......] 2/8 phases complete
+Phase 1: [######] 6/6 plans complete
+Phase 2: [######] 6/6 plans complete
+Phase 3: [#.....] 1/6 plans complete
+Overall: [████████░░░░░░░░░░░░░░░░] 13/18 plans (72%) | 2.2/8 phases
 ```
 
 ---
@@ -51,6 +52,7 @@ Overall: [██......] 2/8 phases complete
 | 2-04  | 4/6   | 2/2   | ~7m  | 0      |
 | 2-05  | 5/6   | 2/2   | ~7m  | 0      |
 | 2-06  | 6/6   | 2/3*  | ~4m  | 0      |
+| 3-01  | 1/6   | 2/2   | ~2m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -102,6 +104,9 @@ Overall: [██......] 2/8 phases complete
 | Two-click discard for key items | Safety against accidental key item loss; show warning on first click | 02-06 |
 | SetVisibility for tooltip show/hide | RenderOpacity allows Tab focus on hidden buttons; Visibility blocks input properly | 02-06 |
 | Tab key handled in InventoryWidget | Widget has focus for keyboard nav; must explicitly handle Tab to close | 02-06 |
+| TObjectPtr for data asset references (not TSoftObjectPtr) | Data assets always loaded when referenced; no need for async load | 03-01 |
+| NSLOCTEXT for default hiding interaction text | Supports future localization; "Hide" and "Exit" as defaults | 03-01 |
+| Forward declarations in interface headers | Avoids heavy includes (UAnimMontage, UCameraComponent) in widely-included headers | 03-01 |
 
 ### Technical Discoveries
 
@@ -123,12 +128,12 @@ Overall: [██......] 2/8 phases complete
 - [x] Execute Phase 1 (all 6 plans)
 - [x] Plan Phase 2: Inventory
 - [x] Execute Phase 2 (all 6 plans)
-- [ ] Plan Phase 3: Hiding System
-- [ ] Execute Phase 3
+- [x] Plan Phase 3: Hiding System
+- [ ] Execute Phase 3 (1/6 plans complete)
 
 ### Blockers
 
-None — Phase 2 complete, ready for Phase 3.
+None — Phase 3 execution in progress.
 
 ---
 
@@ -136,58 +141,34 @@ None — Phase 2 complete, ready for Phase 3.
 
 ### Last Session
 
-**Date:** 2026-02-09
+**Date:** 2026-02-10
 **Completed:**
-- Executed all 6 Phase 2 plans
-- Verified complete inventory system via PIE testing
-- Fixed multiple verification bugs:
-  - TSoftObjectPtr IsNull() vs IsValid() for icon loading
-  - PickupActor BeginPlay item data lookup for interaction text
-  - Key item two-click discard confirmation
-  - ItemTooltip Visibility vs RenderOpacity for input blocking
-  - Tab key handling in InventoryWidget for close
-- Committed all Phase 2 code and assets
+- Executed Phase 3 Plan 01 (Hiding Foundation Types)
+- Created EHidingState enum, FOnHidingStateChanged delegate
+- Created UHidingSpotDataAsset with 13 per-type config properties
+- Expanded IHideable from 3 stub to 8 full methods
+- Registered 5 hiding gameplay tags
 
-**Stopped at:** Phase 2 complete
+**Stopped at:** Completed 03-01-PLAN.md
 
-**Next:** Plan Phase 3 (Hiding System)
+**Next:** Execute 03-02-PLAN.md (next plan in Phase 3)
 
 ### Context for Next Session
 
-The Juniper Tree is a psychological horror game demo. The player is a detective investigating a missing boy, eventually discovering they ARE the murdered boy. A Wendigo (the father transformed by cannibalism) stalks the player.
+Phase 3 Plan 01 complete. The hiding system foundation is in place:
+- EHidingState enum (Free/Entering/Hidden/Exiting) with FOnHidingStateChanged delegate
+- UHidingSpotDataAsset with 13 properties (montages, camera blend/limits, peek material, interaction text, visibility reduction)
+- IHideable expanded to 8 methods (CanHide, OnEnterHiding, OnExitHiding, GetHidingCamera, GetSpotData, IsOccupied, MarkDiscovered, WasDiscovered)
+- 5 gameplay tags: Player.Hiding, Interaction.HidingSpot, HidingSpot.Locker/Closet/UnderBed
 
-The roadmap has 8 phases:
-1. Foundation - Player controller, movement, interaction ✓
-2. Inventory - 8-slot system with items ✓
-3. Hiding - Hide spots and visibility
-4. Monster AI Core - State Tree, patrol, perception
-5. Monster Behaviors - Chase, investigate, search, spawns
-6. Light and Audio - Flashlight, Lumen, spatial audio
-7. Save System - Checkpoints and manual saves
-8. Demo Polish - Environment, story, optimization
-
-Phase 2 complete. The project now has:
-- All Phase 1 features (character, movement, interaction, HUD)
-- UInventoryComponent: 8-slot inventory with add/remove/combine/discard
-- UItemDataAsset: primary data asset with Asset Manager integration
-- 3 inventory UI widgets: InventoryWidget, InventorySlotWidget, ItemTooltipWidget
-- PickupActor: TryAddItem integration, "Inventory Full" feedback
-- DoorActor: RequiredItemId lock system with key consumption
-- SerenePlayerController: Tab toggle with input mode switching
-- SereneHUD: inventory delegate routing, key item discard confirmation
-- Keyboard navigation: 1-8 slot select, arrows cycle, Escape/Delete
-- 3 demo items: DA_Key_FrontDoor, DA_Key_Basement, DA_Code_Safe
-- IA_ToggleInventory input action, F for interact
-
-All 7 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep, Inventory, Camera.
-All 29 v1 requirements are mapped. No orphans.
-
-**Phase 3 delivers:**
-- Context-sensitive hiding spots (lockers, closets, under beds)
-- Line of sight / darkness concealment
-- IHideable interface implementation
+**Phase 3 remaining plans:**
+- 03-02: VisibilityComponent (light sampling, darkness concealment)
+- 03-03: HidingSpotActor (IHideable implementation, camera, data asset)
+- 03-04: HidingComponent (player-side hiding state machine)
+- 03-05: Hiding spot integration (interaction, input, HUD)
+- 03-06: Verification and polish
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-09 (Phase 2 complete)*
+*Last updated: 2026-02-10 (Phase 3, Plan 01 complete)*
