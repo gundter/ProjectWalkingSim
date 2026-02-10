@@ -29,12 +29,12 @@ This roadmap delivers a playable horror demo through 8 phases that build from co
 **Plans:** 6 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- Project scaffolding, Build.cs, interfaces, tags, log channels
-- [ ] 01-02-PLAN.md -- Character with First Person Rendering, PlayerController, Enhanced Input
-- [ ] 01-03-PLAN.md -- Stamina, head-bob, and lean components
-- [ ] 01-04-PLAN.md -- Interaction component and four interactable actor types
-- [ ] 01-05-PLAN.md -- Footstep component, stamina HUD, full system wiring
-- [ ] 01-06-PLAN.md -- Data assets, Blueprint subclasses, UMG widgets, integration test
+- [x] 01-01-PLAN.md -- Project scaffolding, Build.cs, interfaces, tags, log channels
+- [x] 01-02-PLAN.md -- Character with First Person Rendering, PlayerController, Enhanced Input
+- [x] 01-03-PLAN.md -- Stamina, head-bob, and lean components
+- [x] 01-04-PLAN.md -- Interaction component and four interactable actor types
+- [x] 01-05-PLAN.md -- Footstep component, stamina HUD, full system wiring
+- [x] 01-06-PLAN.md -- Data assets, Blueprint subclasses, UMG widgets, integration test
 
 **Success Criteria:**
 1. Player can walk, run, crouch in first-person with visible arms/hands when looking down
@@ -60,12 +60,12 @@ Plans:
 **Plans:** 6 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Inventory data foundation: types, item data asset, inventory component
-- [ ] 02-02-PLAN.md -- Inventory UI widgets: slot, tooltip, container (C++ base classes)
-- [ ] 02-03-PLAN.md -- Actor integration: PickupActor inventory add, DoorActor locked doors
-- [ ] 02-04-PLAN.md -- HUD + controller wiring: toggle, input mode, delegate binding
-- [ ] 02-05-PLAN.md -- Combine system + keyboard navigation
-- [ ] 02-06-PLAN.md -- Editor setup: input assets, Asset Manager config, UMG Blueprints, verification
+- [x] 02-01-PLAN.md -- Inventory data foundation: types, item data asset, inventory component
+- [x] 02-02-PLAN.md -- Inventory UI widgets: slot, tooltip, container (C++ base classes)
+- [x] 02-03-PLAN.md -- Actor integration: PickupActor inventory add, DoorActor locked doors
+- [x] 02-04-PLAN.md -- HUD + controller wiring: toggle, input mode, delegate binding
+- [x] 02-05-PLAN.md -- Combine system + keyboard navigation
+- [x] 02-06-PLAN.md -- Editor setup: input assets, Asset Manager config, UMG Blueprints, verification
 
 **Success Criteria:**
 1. Player can pick up items and see them appear in inventory UI
@@ -200,8 +200,8 @@ Plans:
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 1 | Foundation | PLYR-01, PLYR-02, PLYR-03, PLYR-04 | Planned (6 plans) |
-| 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | Planned (6 plans) |
+| 1 | Foundation | PLYR-01, PLYR-02, PLYR-03, PLYR-04 | ✓ Complete |
+| 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | ✓ Complete |
 | 3 | Hiding System | HIDE-01, HIDE-02 | Not Started |
 | 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | Not Started |
 | 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | Not Started |
@@ -214,4 +214,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-02-07*
-*Last updated: 2026-02-08*
+*Last updated: 2026-02-09 (Phase 2 complete)*

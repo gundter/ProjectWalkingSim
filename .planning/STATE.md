@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 2 in progress. Executing Inventory System — 8-slot inventory with horizontal UI, item actions, and locked door integration.
+**Current Focus:** Phase 2 complete. Ready for Phase 3 (Hiding System) — context-sensitive hiding spots and visibility mechanics.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -21,16 +21,16 @@
 
 ## Current Position
 
-**Phase:** 2 of 8 (Inventory System)
-**Plan:** 5 of 6 (completed)
-**Status:** In progress
-**Last activity:** 2026-02-09 - Completed 02-05-PLAN.md (Item Combine Logic)
+**Phase:** 3 of 8 (Hiding System)
+**Plan:** 0 of ? (not yet planned)
+**Status:** Ready to plan Phase 3
+**Last activity:** 2026-02-09 - Phase 2 complete, all features verified
 
 **Progress:**
 ```
-Phase 1: [######] 6/6 plans complete
-Phase 2: [#####.] 5/6 plans executed
-Overall: [█.......] 1/8 phases complete (11/48 plans)
+Phase 1: [######] 6/6 plans complete ✓
+Phase 2: [######] 6/6 plans complete ✓
+Overall: [██......] 2/8 phases complete
 ```
 
 ---
@@ -46,12 +46,13 @@ Overall: [█.......] 1/8 phases complete (11/48 plans)
 | 1-05  | 5/6   | 2/2   | ~3m  | 0      |
 | 1-06  | 6/6   | 1/2*  | ~13m | 0      |
 | 2-01  | 1/6   | 2/2   | ~12m | 0      |
-| 2-02  | 2/6   | 2/2   | ~4m  | 0      |
-| 2-03  | 3/6   | 2/2   | ~6m  | 0      |
-| 2-04  | 4/6   | 2/2   | ~3m  | 0      |
-| 2-05  | 5/6   | 2/2   | ~5m  | 0      |
+| 2-02  | 2/6   | 2/2   | ~7m  | 0      |
+| 2-03  | 3/6   | 2/2   | ~9m  | 0      |
+| 2-04  | 4/6   | 2/2   | ~7m  | 0      |
+| 2-05  | 5/6   | 2/2   | ~7m  | 0      |
+| 2-06  | 6/6   | 2/3*  | ~4m  | 0      |
 
-*Task 2 of 01-06 is human-verify checkpoint
+*Checkpoint tasks require human verification
 
 ---
 
@@ -97,6 +98,10 @@ Overall: [█.......] 1/8 phases complete (11/48 plans)
 | Order-independent recipe lookup | TryCombineItems checks both (A,B) and (B,A) permutations | 02-05 |
 | SetKeyboardFocus on ShowInventory | Ensures NativeOnKeyDown receives input when inventory opens | 02-05 |
 | Super::NativeOnKeyDown pass-through | Unhandled keys (WASD) fall through to game input for movement | 02-05 |
+| Use !IsNull() for TSoftObjectPtr check | IsValid() checks if loaded; IsNull() checks if path set; need path check before LoadSynchronous | 02-06 |
+| Two-click discard for key items | Safety against accidental key item loss; show warning on first click | 02-06 |
+| SetVisibility for tooltip show/hide | RenderOpacity allows Tab focus on hidden buttons; Visibility blocks input properly | 02-06 |
+| Tab key handled in InventoryWidget | Widget has focus for keyboard nav; must explicitly handle Tab to close | 02-06 |
 
 ### Technical Discoveries
 
@@ -109,27 +114,21 @@ Overall: [█.......] 1/8 phases complete (11/48 plans)
 | IMC.mappings deprecated in UE5.7 in favor of default_key_mappings | Property still works but triggers DeprecationWarning | 01-06 |
 | UAssetManager::LoadPrimaryAsset returns FStreamableHandle | Not UObject* as expected; use GetPrimaryAssetPath().TryLoad() for sync load | 02-01 |
 | UWidget::Slot member shadows local variable names | MSVC C4458 warning-as-error; use SlotData instead of Slot in loops | 02-02 |
+| Asset Manager config needs Project Settings UI | DefaultEngine.ini config alone may not work; use Editor UI to configure | 02-06 |
 
 ### TODOs
 
 - [x] Plan Phase 1: Foundation
 - [x] Research UE5.7 first-person rendering before Phase 1 plans
-- [x] Execute 01-03-PLAN.md (Stamina, Head-Bob, Lean Components)
-- [x] Execute 01-05-PLAN.md (Footsteps, Stamina HUD, Integration)
-- [x] Execute 01-06-PLAN.md Task 1 (Input Assets, IMC, editor setup)
-- [x] Complete manual editor setup (see Scripts/EDITOR_SETUP.md)
-- [x] PIE verification of all Phase 1 features (01-06 checkpoint)
+- [x] Execute Phase 1 (all 6 plans)
 - [x] Plan Phase 2: Inventory
-- [x] Execute 02-01-PLAN.md (Inventory Data Foundation)
-- [x] Execute 02-02-PLAN.md (Inventory UI Widgets)
-- [x] Execute 02-03-PLAN.md (Interactable Actor Integration)
-- [x] Execute 02-04-PLAN.md (Player Integration)
-- [x] Execute 02-05-PLAN.md (Item Combine Logic)
-- [ ] Execute 02-06-PLAN.md
+- [x] Execute Phase 2 (all 6 plans)
+- [ ] Plan Phase 3: Hiding System
+- [ ] Execute Phase 3
 
 ### Blockers
 
-None — Phase 2 in progress, ready for next plan.
+None — Phase 2 complete, ready for Phase 3.
 
 ---
 
@@ -139,24 +138,27 @@ None — Phase 2 in progress, ready for next plan.
 
 **Date:** 2026-02-09
 **Completed:**
-- Executed 02-05-PLAN.md (Item Combine Logic)
-- Added TryCombineItems with recipe TMap and order-independent lookup
-- Added OnCombineFailed delegate for combine feedback
-- Added combine mode UI flow (EnterCombineMode/ExitCombineMode)
-- Added keyboard navigation (1-8 number keys, arrows, Escape, Delete)
-- Wired complete combine delegate chain through SereneHUD
+- Executed all 6 Phase 2 plans
+- Verified complete inventory system via PIE testing
+- Fixed multiple verification bugs:
+  - TSoftObjectPtr IsNull() vs IsValid() for icon loading
+  - PickupActor BeginPlay item data lookup for interaction text
+  - Key item two-click discard confirmation
+  - ItemTooltip Visibility vs RenderOpacity for input blocking
+  - Tab key handling in InventoryWidget for close
+- Committed all Phase 2 code and assets
 
-**Stopped at:** Completed 02-05-PLAN.md
+**Stopped at:** Phase 2 complete
 
-**Next:** Execute 02-06-PLAN.md
+**Next:** Plan Phase 3 (Hiding System)
 
 ### Context for Next Session
 
 The Juniper Tree is a psychological horror game demo. The player is a detective investigating a missing boy, eventually discovering they ARE the murdered boy. A Wendigo (the father transformed by cannibalism) stalks the player.
 
 The roadmap has 8 phases:
-1. Foundation - Player controller, movement, interaction
-2. Inventory - 8-slot system with items
+1. Foundation - Player controller, movement, interaction ✓
+2. Inventory - 8-slot system with items ✓
 3. Hiding - Hide spots and visibility
 4. Monster AI Core - State Tree, patrol, perception
 5. Monster Behaviors - Chase, investigate, search, spawns
@@ -164,48 +166,28 @@ The roadmap has 8 phases:
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
 
-Phase 1 has 6 plans. All 6 plans executed. The project now has:
-- Build.cs with EnhancedInput, UMG, GameplayTags, PhysicsCore, Slate, SlateCore
-- IInteractable, IHideable, ISaveable interfaces
-- 11 native gameplay tags (Interaction, Movement, Player categories)
-- LogSerene log category
-- USereneGameInstance with accessibility settings (head-bob toggle, crouch mode)
-- ASereneCharacter with FP rendering, head-bone camera, WorldRepMesh, grounded CMC, 6 components
-- ASerenePlayerController with 8 input bindings (Move, Look, Sprint, Crouch, Interact, LeanLeft, LeanRight, ToggleInventory)
-- ASereneGameMode in Core/ with character+controller+HUD defaults
-- UStaminaComponent: drain/regen with 1.5s delay, exhaustion threshold, 3 delegates
-- UHeadBobComponent: procedural sine-wave bob, sprint/crouch multipliers, toggleable
-- ULeanComponent: 30cm lateral offset, 5-degree roll, smooth transitions
-- Camera offset aggregation in character Tick() for HeadBob + Lean coexistence
-- UInteractionComponent: per-tick camera line trace, focus management, OnInteractableChanged delegate
-- UInteractionPromptWidget: C++ base with BindWidget slots for UMG
-- AInteractableBase: abstract base with IInteractable, InteractionText, InteractionTag, MeshComponent
-- ADoorActor, APickupActor, AReadableActor, ADrawerActor: four interactable types
-- UFootstepComponent: surface detection via downward trace, timer-based trigger, OnFootstep delegate
-- UStaminaBarWidget: progress bar with auto-show/hide and 2s delay
-- ASereneHUD: widget lifecycle manager for StaminaBar + InteractionPrompt + Inventory
-- 7 Input Action assets (IA_Move, IA_Look, IA_Sprint, IA_Crouch, IA_Interact, IA_LeanLeft, IA_LeanRight)
-- IMC_Default with 10 key bindings (WASD, Mouse, Shift, Ctrl, E-press, Q, E-hold)
-- EnhancedInput + PythonScriptPlugin plugins enabled
+Phase 2 complete. The project now has:
+- All Phase 1 features (character, movement, interaction, HUD)
+- UInventoryComponent: 8-slot inventory with add/remove/combine/discard
+- UItemDataAsset: primary data asset with Asset Manager integration
+- 3 inventory UI widgets: InventoryWidget, InventorySlotWidget, ItemTooltipWidget
+- PickupActor: TryAddItem integration, "Inventory Full" feedback
+- DoorActor: RequiredItemId lock system with key consumption
+- SerenePlayerController: Tab toggle with input mode switching
+- SereneHUD: inventory delegate routing, key item discard confirmation
+- Keyboard navigation: 1-8 slot select, arrows cycle, Escape/Delete
+- 3 demo items: DA_Key_FrontDoor, DA_Key_Basement, DA_Code_Safe
+- IA_ToggleInventory input action, F for interact
 
-Phase 2 progress (5/6 plans):
-- Plan 01: InventoryTypes.h, ItemDataAsset.h, InventoryComponent.h with 8-slot management
-- Plan 02: InventorySlotWidget, ItemTooltipWidget, InventoryWidget (C++ bases for UMG)
-- Plan 03: PickupActor inventory integration, DoorActor key-lock mechanics
-- Plan 04: InventoryComponent on character, inventory toggle, HUD delegate routing
-- Plan 05: TryCombineItems with recipe TMap, combine mode UI, keyboard navigation
-
-All 6 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep, Inventory.
+All 7 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep, Inventory, Camera.
 All 29 v1 requirements are mapped. No orphans.
 
-**Phase 2 delivers:**
-- 8-slot inventory with horizontal UI
-- Item pickup and inventory integration
-- Key items that unlock doors
-- Two-step combine flow
-- Item discard back to world
+**Phase 3 delivers:**
+- Context-sensitive hiding spots (lockers, closets, under beds)
+- Line of sight / darkness concealment
+- IHideable interface implementation
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-09 (Completed 02-05-PLAN.md)*
+*Last updated: 2026-02-09 (Phase 2 complete)*
