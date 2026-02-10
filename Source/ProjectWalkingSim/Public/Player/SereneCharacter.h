@@ -12,6 +12,8 @@
 class UInteractionComponent;
 class UFootstepComponent;
 class UInventoryComponent;
+class UHidingComponent;
+class UVisibilityScoreComponent;
 
 class UCameraComponent;
 class USkeletalMeshComponent;
@@ -23,13 +25,15 @@ class USkeletalMeshComponent;
  * with a WorldRepresentationMesh for shadow casting. Camera is attached to the head
  * bone of the skeletal mesh. Movement is grounded and deliberate (no jump).
  *
- * Attached components (all 6 created in constructor):
+ * Attached components (all 8 created in constructor, 9 total with camera):
  * - StaminaComponent (Plan 03): Stamina drain/regen during sprint
  * - HeadBobComponent (Plan 03): Procedural sine-wave camera bob
  * - LeanComponent (Plan 03): Camera-only lean (Q/E)
  * - InteractionComponent (Plan 04): Line trace interaction detection
  * - FootstepComponent (Plan 05): Surface-dependent footstep detection
  * - InventoryComponent (Phase 02): 8-slot item inventory
+ * - HidingComponent (Phase 03): Hiding state machine and lifecycle
+ * - VisibilityScoreComponent (Phase 03): Ambient light sampling for AI visibility
  *
  * Camera offset aggregation: Tick() reads offsets from HeadBobComponent and
  * LeanComponent, sums them, and applies the combined result to the camera.
@@ -120,6 +124,16 @@ protected:
 	/** 8-slot inventory for items. Added in Phase 2. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UInventoryComponent> InventoryComponent;
+
+	// --- Phase 03 Components ---
+
+	/** Hiding state machine. Manages enter/exit, camera, look constraints. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UHidingComponent> HidingComponent;
+
+	/** Ambient light sampling for visibility scoring. AI reads this in Phase 4. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UVisibilityScoreComponent> VisibilityScoreComponent;
 
 	// --- Movement Configuration ---
 
