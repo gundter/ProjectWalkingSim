@@ -67,20 +67,21 @@ This widget displays a single inventory slot with item icon and quantity.
   |     - Anchors: Center
   |     - Size: 64x64 (or 56x56 for padding)
   |     - Alignment: 0.5, 0.5
-  |     - Visibility: Hidden by default (shown when item present)
+  |     - Visibility: Visible (C++ controls show/hide via SetVisibility)
+  |     - Color and Opacity: White (1,1,1,1)
   |
   +-- [TextBlock] "QuantityText"
   |     - Anchors: Bottom-Right
   |     - Position: -4, -4 offset from anchor
   |     - Font Size: 12
   |     - Color: White
-  |     - Visibility: Hidden by default (shown when quantity > 1)
+  |     - Visibility: Visible (C++ hides when quantity <= 1)
   |
   +-- [Image] "SelectionHighlight" (optional but recommended)
         - Anchors: Stretch
         - Size: Fill parent
         - Brush: Solid color, yellow (#FFCC0044) or light blue
-        - Visibility: Hidden by default (shown when slot selected)
+        - Visibility: Visible (C++ controls show/hide based on selection)
 ```
 
 **Size Hint**: Set Canvas Panel size to 80x80 pixels for consistent slot sizing.
@@ -161,7 +162,7 @@ This is the main inventory container that holds slots and tooltip.
   |     - Position: Y offset -20 (above screen edge)
   |
   |     +-- [Widget] "TooltipWidget" (instance of WBP_ItemTooltip)
-  |     |     - Visibility: Hidden (shown when item selected)
+  |     |     - Visibility: Visible (C++ controls show/hide based on selection)
   |     |     - Margin Bottom: 8
   |     |
   |     +-- [HorizontalBox] "SlotContainer"
@@ -183,17 +184,14 @@ This is the main inventory container that holds slots and tooltip.
 Add the inventory widget to the existing HUD.
 
 1. Open `Content/Blueprints/UI/WBP_SereneHUD` (or wherever your HUD is located)
-2. In the UMG Designer, add `WBP_InventoryWidget` as a child
-3. Name it exactly `InventoryWidget`
+2. In the UMG Designer, add `WBP_InventoryWidget` as a child of the Canvas Panel
+3. Name it exactly `InventoryWidget` (must match the C++ BindWidget property)
 4. Configure placement:
    - Anchors: Full screen stretch (or center-bottom if preferred)
    - The inventory widget manages its own positioning internally
-5. Set initial Visibility to **Hidden**
+5. Keep Visibility set to **Visible** (the C++ code uses SetRenderOpacity for show/hide, NOT Visibility)
 
-**Class Defaults** (if not already set):
-1. Go to Class Defaults
-2. Find **InventoryWidgetClass** property
-3. Set it to `WBP_InventoryWidget`
+**Note**: There is no `InventoryWidgetClass` property to set. The `InventoryWidget` is a BindWidget — it binds by matching the widget name in the UMG hierarchy to the C++ property name.
 
 ---
 
@@ -359,36 +357,36 @@ This frees up E-press for future use while keeping E-hold for lean right.
 After completing all setup steps, run Play In Editor and verify:
 
 **Inventory Toggle**
-- [ ] Press Tab: inventory UI appears at bottom of screen, mouse cursor shows
-- [ ] Press Tab again: inventory closes, cursor hidden, camera rotates normally
-- [ ] WASD movement works while inventory is open
+- [x] Press Tab: inventory UI appears at bottom of screen, mouse cursor shows
+- [x] Press Tab again: inventory closes, cursor hidden, camera rotates normally
+- [x] WASD movement works while inventory is open
 
 **Item Pickup**
-- [ ] Look at PickupActor: "F: Pick up [item name]" prompt appears
-- [ ] Press F: item added to inventory, pickup disappears
-- [ ] Item icon appears in leftmost empty slot
+- [x] Look at PickupActor: "F: Pick up [item name]" prompt appears
+- [x] Press F: item added to inventory, pickup disappears
+- [x] Item icon appears in leftmost empty slot
 
 **Inventory Interaction**
-- [ ] Click on slot: item selected, tooltip appears with name/description
-- [ ] Click Discard: item drops in front of player
-- [ ] Pick up dropped item: returns to inventory
+- [x] Click on slot: item selected, tooltip appears with name/description
+- [x] Click Discard: item drops in front of player
+- [x] Pick up dropped item: returns to inventory
 
 **Keyboard Navigation**
-- [ ] Number keys 1-8 select corresponding slot
-- [ ] Arrow left/right cycle through slots
-- [ ] Escape deselects current slot
-- [ ] Delete discards selected item
+- [x] Number keys 1-8 select corresponding slot
+- [x] Arrow left/right cycle through slots
+- [x] Escape deselects current slot
+- [x] Delete discards selected item
 
 **Locked Door**
-- [ ] Look at locked door: "F: Locked" text appears
-- [ ] Pick up front door key
-- [ ] Look at locked door again: prompt shows key available
-- [ ] Press F: door unlocks and opens, key consumed from inventory
+- [x] Look at locked door: "F: Locked" text appears
+- [x] Pick up front door key
+- [x] Look at locked door again: prompt shows key available
+- [x] Press F: door unlocks and opens, key consumed from inventory
 
 **Full Inventory**
-- [ ] Fill all 8 slots with items
-- [ ] Try to pick up another item: "Inventory Full" prompt appears
-- [ ] Item remains in world (not picked up)
+- [x] Fill all 8 slots with items
+- [x] Try to pick up another item: "Inventory Full" prompt appears
+- [x] Item remains in world (not picked up)
 
 ---
 
