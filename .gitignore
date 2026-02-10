@@ -15,3 +15,6 @@ Build
 *.suo
 *.xcodeproj
 *.xcworkspace
+
+__pycache__/
+*.pyc
