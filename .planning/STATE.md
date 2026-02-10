@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 3 in progress (Hiding System) — foundation types complete, building hiding spots and visibility mechanics.
+**Current Focus:** Phase 3 in progress (Hiding System) — foundation types and visibility scoring complete, building hiding spots and integration.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,16 +22,16 @@
 ## Current Position
 
 **Phase:** 3 of 8 (Hiding System)
-**Plan:** 1 of 6 complete
+**Plan:** 2 of 6 complete
 **Status:** In progress
-**Last activity:** 2026-02-10 - Completed 03-01-PLAN.md (Hiding Foundation Types)
+**Last activity:** 2026-02-10 - Completed 03-02-PLAN.md (Visibility Score Component)
 
 **Progress:**
 ```
 Phase 1: [######] 6/6 plans complete
 Phase 2: [######] 6/6 plans complete
-Phase 3: [#.....] 1/6 plans complete
-Overall: [████████░░░░░░░░░░░░░░░░] 13/18 plans (72%) | 2.2/8 phases
+Phase 3: [##....] 2/6 plans complete
+Overall: [█████████░░░░░░░░░░░░░░░] 14/18 plans (78%) | 2.3/8 phases
 ```
 
 ---
@@ -53,6 +53,7 @@ Overall: [████████░░░░░░░░░░░░░░░�
 | 2-05  | 5/6   | 2/2   | ~7m  | 0      |
 | 2-06  | 6/6   | 2/3*  | ~4m  | 0      |
 | 3-01  | 1/6   | 2/2   | ~2m  | 0      |
+| 3-02  | 2/6   | 2/2   | ~3m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -107,6 +108,10 @@ Overall: [████████░░░░░░░░░░░░░░░�
 | TObjectPtr for data asset references (not TSoftObjectPtr) | Data assets always loaded when referenced; no need for async load | 03-01 |
 | NSLOCTEXT for default hiding interaction text | Supports future localization; "Hide" and "Exit" as defaults | 03-01 |
 | Forward declarations in interface headers | Avoids heavy includes (UAnimMontage, UCameraComponent) in widely-included headers | 03-01 |
+| UActorComponent for VisibilityScore (not USceneComponent) | SceneCapture is a child of the owning actor, not of this component | 03-02 |
+| bIsCrouched from ACharacter base for crouch detection | Avoids circular dependency between Visibility/ and Player/ directories | 03-02 |
+| 8x8 HDR render target for light sampling | 64 pixels sufficient for luminance average; trivially cheap to render and read | 03-02 |
+| ShowFlags optimization on SceneCapture | Disable Bloom/MotionBlur/Particles/Fog/PostProcessing; keep GI and Reflections | 03-02 |
 
 ### Technical Discoveries
 
@@ -129,7 +134,7 @@ Overall: [████████░░░░░░░░░░░░░░░�
 - [x] Plan Phase 2: Inventory
 - [x] Execute Phase 2 (all 6 plans)
 - [x] Plan Phase 3: Hiding System
-- [ ] Execute Phase 3 (1/6 plans complete)
+- [ ] Execute Phase 3 (2/6 plans complete)
 
 ### Blockers
 
@@ -143,26 +148,28 @@ None — Phase 3 execution in progress.
 
 **Date:** 2026-02-10
 **Completed:**
-- Executed Phase 3 Plan 01 (Hiding Foundation Types)
-- Created EHidingState enum, FOnHidingStateChanged delegate
-- Created UHidingSpotDataAsset with 13 per-type config properties
-- Expanded IHideable from 3 stub to 8 full methods
-- Registered 5 hiding gameplay tags
+- Executed Phase 3 Plan 02 (Visibility Score Component)
+- Created UVisibilityScoreComponent with SceneCaptureComponent2D light sampling
+- 8x8 RGBA16f render target with 0.25s timer-based capture
+- ReadFloat16Pixels with Rec.709 luminance averaging
+- Crouch and hiding modifiers reduce score (0.0-1.0 output)
+- Added RenderCore and RHI module dependencies to Build.cs
 
-**Stopped at:** Completed 03-01-PLAN.md
+**Stopped at:** Completed 03-02-PLAN.md
 
-**Next:** Execute 03-02-PLAN.md (next plan in Phase 3)
+**Next:** Execute 03-03-PLAN.md (HidingSpotActor)
 
 ### Context for Next Session
 
-Phase 3 Plan 01 complete. The hiding system foundation is in place:
+Phase 3 Plans 01-02 complete. The hiding system now has:
 - EHidingState enum (Free/Entering/Hidden/Exiting) with FOnHidingStateChanged delegate
-- UHidingSpotDataAsset with 13 properties (montages, camera blend/limits, peek material, interaction text, visibility reduction)
-- IHideable expanded to 8 methods (CanHide, OnEnterHiding, OnExitHiding, GetHidingCamera, GetSpotData, IsOccupied, MarkDiscovered, WasDiscovered)
+- UHidingSpotDataAsset with 13 properties (montages, camera, visibility reduction)
+- IHideable expanded to 8 methods
 - 5 gameplay tags: Player.Hiding, Interaction.HidingSpot, HidingSpot.Locker/Closet/UnderBed
+- UVisibilityScoreComponent: SceneCapture light sampling, GetVisibilityScore() 0.0-1.0
+- SetHidingReduction() API ready for HidingComponent integration
 
 **Phase 3 remaining plans:**
-- 03-02: VisibilityComponent (light sampling, darkness concealment)
 - 03-03: HidingSpotActor (IHideable implementation, camera, data asset)
 - 03-04: HidingComponent (player-side hiding state machine)
 - 03-05: Hiding spot integration (interaction, input, HUD)
@@ -171,4 +178,4 @@ Phase 3 Plan 01 complete. The hiding system foundation is in place:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-10 (Phase 3, Plan 01 complete)*
+*Last updated: 2026-02-10 (Phase 3, Plan 02 complete)*
