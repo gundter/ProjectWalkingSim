@@ -54,7 +54,7 @@ Overall: [████████████░░░░░░░░░░░�
 | 2-06  | 6/6   | 2/3*  | ~4m  | 0      |
 | 3-01  | 1/6   | 2/2   | ~2m  | 0      |
 | 3-02  | 2/6   | 2/2   | ~3m  | 0      |
-| 3-03  | 3/6   | -/-   | -    | -      |
+| 3-03  | 3/6   | 1/1   | ~5m  | 0      |
 | 3-04  | 4/6   | 1/1   | ~4m  | 0      |
 
 *Checkpoint tasks require human verification
@@ -114,6 +114,9 @@ Overall: [████████████░░░░░░░░░░░�
 | bIsCrouched from ACharacter base for crouch detection | Avoids circular dependency between Visibility/ and Player/ directories | 03-02 |
 | 8x8 HDR render target for light sampling | 64 pixels sufficient for luminance average; trivially cheap to render and read | 03-02 |
 | ShowFlags optimization on SceneCapture | Disable Bloom/MotionBlur/Particles/Fog/PostProcessing; keep GI and Reflections | 03-02 |
+| No BoxComponent trigger on HidingSpotActor | SpotMesh BlockAll collision is the trace target; simpler actor | 03-03 |
+| PostProcessSettings.WeightedBlendables for peek overlay | Per-camera blendable avoids separate UPostProcessComponent | 03-03 |
+| Commented HidingComponent delegation in OnInteract | Maintains plan boundary isolation; activates in 03-04 | 03-03 |
 | Event-driven hiding state machine (no tick) | Montage delegates drive transitions; PrimaryComponentTick disabled | 03-04 |
 | DefaultMappingContext UPROPERTY on HidingComponent | Avoids accessing protected member on SerenePlayerController | 03-04 |
 | GetComponents iteration for mesh hide | Covers main mesh + WorldRepresentationMesh without protected access | 03-04 |
@@ -184,4 +187,4 @@ Phase 3 Plans 01-04 complete. The hiding system now has:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-10 (Phase 3, Plan 04 complete)*
+*Last updated: 2026-02-10 (Phase 3, Plans 03+04 complete)*
