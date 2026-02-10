@@ -8,6 +8,7 @@
 #include "Player/SereneCharacter.h"
 #include "Player/Components/InteractionComponent.h"
 #include "Player/Components/LeanComponent.h"
+#include "Hiding/HidingComponent.h"
 #include "Player/HUD/SereneHUD.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
@@ -193,13 +194,25 @@ void ASerenePlayerController::HandleCrouchToggle(const FInputActionValue& Value)
 void ASerenePlayerController::HandleInteract(const FInputActionValue& Value)
 {
 	ASereneCharacter* SereneChar = GetSereneCharacter();
-	if (SereneChar)
+	if (!SereneChar)
 	{
-		UInteractionComponent* InteractionComp = SereneChar->FindComponentByClass<UInteractionComponent>();
-		if (InteractionComp)
+		return;
+	}
+
+	// If hiding, pressing interact exits the hiding spot
+	if (UHidingComponent* HidingComp = SereneChar->FindComponentByClass<UHidingComponent>())
+	{
+		if (HidingComp->IsHiding())
 		{
-			InteractionComp->TryInteract();
+			HidingComp->ExitHidingSpot();
+			return;
 		}
+	}
+
+	// Normal interaction
+	if (UInteractionComponent* InteractionComp = SereneChar->FindComponentByClass<UInteractionComponent>())
+	{
+		InteractionComp->TryInteract();
 	}
 }
 
