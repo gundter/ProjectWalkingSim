@@ -16,7 +16,9 @@ public class ProjectWalkingSim : ModuleRules
 			"EnhancedInput",
 			"UMG",
 			"GameplayTags",
-			"PhysicsCore"
+			"PhysicsCore",
+			"RenderCore",
+			"RHI"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
