@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 3 in progress (Hiding System) — foundation types, visibility scoring, hiding spots, and player-side hiding component complete. Integration next.
+**Current Focus:** Phase 3 in progress (Hiding System) — foundation types, visibility scoring, hiding spots, player-side hiding component, and character integration complete. Verification next.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,16 +22,16 @@
 ## Current Position
 
 **Phase:** 3 of 8 (Hiding System)
-**Plan:** 4 of 6 complete
+**Plan:** 5 of 6 complete
 **Status:** In progress
-**Last activity:** 2026-02-10 - Completed 03-04-PLAN.md (HidingComponent)
+**Last activity:** 2026-02-10 - Completed 03-05-PLAN.md (Character Integration)
 
 **Progress:**
 ```
 Phase 1: [######] 6/6 plans complete
 Phase 2: [######] 6/6 plans complete
-Phase 3: [####..] 4/6 plans complete
-Overall: [████████████░░░░░░░░░░░░] 16/18 plans (89%) | 2.7/8 phases
+Phase 3: [#####.] 5/6 plans complete
+Overall: [█████████████░░░░░░░░░░░] 17/18 plans (94%) | 2.8/8 phases
 ```
 
 ---
@@ -56,6 +56,7 @@ Overall: [████████████░░░░░░░░░░░�
 | 3-02  | 2/6   | 2/2   | ~3m  | 0      |
 | 3-03  | 3/6   | 1/1   | ~5m  | 0      |
 | 3-04  | 4/6   | 1/1   | ~4m  | 0      |
+| 3-05  | 5/6   | 2/2   | ~3m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -121,6 +122,9 @@ Overall: [████████████░░░░░░░░░░░�
 | DefaultMappingContext UPROPERTY on HidingComponent | Avoids accessing protected member on SerenePlayerController | 03-04 |
 | GetComponents iteration for mesh hide | Covers main mesh + WorldRepresentationMesh without protected access | 03-04 |
 | Exit input binding always present, IMC-gated | Enhanced Input pattern: binding exists but IA only fires when IMC active | 03-04 |
+| Tick early-return when HidingState != Free | Prevents camera offset aggregation from fighting SetViewTargetWithBlend | 03-05 |
+| F key routes to ExitHidingSpot via HandleInteract check | Code-driven approach simpler than adding F to HidingMappingContext | 03-05 |
+| Inventory accessible while hiding | Per CONTEXT.md; HandleToggleInventory not gated by hiding state | 03-05 |
 
 ### Technical Discoveries
 
@@ -143,7 +147,7 @@ Overall: [████████████░░░░░░░░░░░�
 - [x] Plan Phase 2: Inventory
 - [x] Execute Phase 2 (all 6 plans)
 - [x] Plan Phase 3: Hiding System
-- [ ] Execute Phase 3 (4/6 plans complete)
+- [ ] Execute Phase 3 (5/6 plans complete)
 
 ### Blockers
 
@@ -157,21 +161,19 @@ None — Phase 3 execution in progress.
 
 **Date:** 2026-02-10
 **Completed:**
-- Executed Phase 3 Plan 04 (HidingComponent)
-- Created UHidingComponent with 4-state machine (Free/Entering/Hidden/Exiting)
-- EnterHidingSpot/ExitHidingSpot with montage playback and camera blend
-- Montage completion delegates drive transitions (event-driven, no tick)
-- Look constraints relative to hiding spot world yaw
-- Input context switching (remove default IMC, add hiding IMC)
-- Player system disable/restore (movement, interaction, headbob, lean, footstep)
+- Executed Phase 3 Plan 05 (Character Integration)
+- Integrated HidingComponent and VisibilityScoreComponent into ASereneCharacter (9 total components)
+- Added Tick early-return when HidingState != Free (prevents camera jitter during hiding blend)
+- Wired F key to ExitHidingSpot via HandleInteract hiding check on SerenePlayerController
+- Inventory toggle remains accessible while hiding per CONTEXT.md
 
-**Stopped at:** Completed 03-04-PLAN.md
+**Stopped at:** Completed 03-05-PLAN.md
 
-**Next:** Execute 03-05-PLAN.md (Hiding Spot Integration)
+**Next:** Execute 03-06-PLAN.md (Verification and Polish)
 
 ### Context for Next Session
 
-Phase 3 Plans 01-04 complete. The hiding system now has:
+Phase 3 Plans 01-05 complete. The hiding system is now fully wired end-to-end:
 - EHidingState enum (Free/Entering/Hidden/Exiting) with FOnHidingStateChanged delegate
 - UHidingSpotDataAsset with 13 properties (montages, camera, visibility reduction)
 - IHideable expanded to 8 methods
@@ -179,12 +181,15 @@ Phase 3 Plans 01-04 complete. The hiding system now has:
 - UVisibilityScoreComponent: SceneCapture light sampling, GetVisibilityScore() 0.0-1.0
 - AHidingSpotActor implementing IHideable and IInteractable
 - UHidingComponent: complete player-side hiding lifecycle with montage, camera, input context
+- ASereneCharacter: 9 components, Tick camera bypass when hiding
+- ASerenePlayerController: F key routes to ExitHidingSpot when hidden
+
+**Full flow:** InteractionComponent traces -> HidingSpotActor::OnInteract -> HidingComponent::EnterHidingSpot -> state machine -> F key exits -> back to Free
 
 **Phase 3 remaining plans:**
-- 03-05: Hiding spot integration (interaction, input, HUD)
 - 03-06: Verification and polish
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-10 (Phase 3, Plans 03+04 complete)*
+*Last updated: 2026-02-10 (Phase 3, Plan 05 complete)*
