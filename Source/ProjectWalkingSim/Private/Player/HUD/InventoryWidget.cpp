@@ -6,6 +6,7 @@
 #include "Components/HorizontalBoxSlot.h"
 #include "Player/HUD/InventorySlotWidget.h"
 #include "Player/HUD/ItemTooltipWidget.h"
+#include "Player/SerenePlayerController.h"
 #include "Inventory/InventoryTypes.h"
 #include "Inventory/InventoryComponent.h"
 #include "Inventory/ItemDataAsset.h"
@@ -74,6 +75,9 @@ void UInventoryWidget::RefreshSlots(const TArray<FInventorySlot>& Slots, const U
 {
 	CachedInventoryComp = InventoryComp;
 
+	UE_LOG(LogSerene, Log, TEXT("UInventoryWidget::RefreshSlots - Slots.Num()=%d, SlotWidgets.Num()=%d, InventoryComp=%s"),
+		Slots.Num(), SlotWidgets.Num(), InventoryComp ? TEXT("valid") : TEXT("null"));
+
 	const int32 NumSlots = FMath::Min(Slots.Num(), SlotWidgets.Num());
 
 	for (int32 i = 0; i < NumSlots; ++i)
@@ -83,6 +87,7 @@ void UInventoryWidget::RefreshSlots(const TArray<FInventorySlot>& Slots, const U
 
 		if (!SlotWidget)
 		{
+			UE_LOG(LogSerene, Warning, TEXT("  Slot %d: SlotWidget is null"), i);
 			continue;
 		}
 
@@ -98,6 +103,7 @@ void UInventoryWidget::RefreshSlots(const TArray<FInventorySlot>& Slots, const U
 		}
 		else
 		{
+			UE_LOG(LogSerene, Log, TEXT("  Slot %d: ItemId=%s, Quantity=%d"), i, *SlotData.ItemId.ToString(), SlotData.Quantity);
 			const UItemDataAsset* ItemData = InventoryComp ? InventoryComp->GetItemData(SlotData.ItemId) : nullptr;
 			SlotWidget->SetSlotData(SlotData, ItemData);
 		}
@@ -273,6 +279,14 @@ void UInventoryWidget::ExitCombineMode()
 	UE_LOG(LogSerene, Verbose, TEXT("UInventoryWidget::ExitCombineMode - Exited combine mode"));
 }
 
+void UInventoryWidget::SetTooltipDiscardConfirmMode(bool bConfirmMode, const UItemDataAsset* ItemData)
+{
+	if (ItemTooltip)
+	{
+		ItemTooltip->SetDiscardConfirmMode(bConfirmMode, ItemData);
+	}
+}
+
 FReply UInventoryWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
 	const FKey Key = InKeyEvent.GetKey();
@@ -322,6 +336,17 @@ FReply UInventoryWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKey
 			DeselectSlot();
 		}
 		return FReply::Handled();
+	}
+
+	// Tab key to close inventory (pass through to controller)
+	if (Key == EKeys::Tab)
+	{
+		if (ASerenePlayerController* PC = Cast<ASerenePlayerController>(GetOwningPlayer()))
+		{
+			UE_LOG(LogSerene, Verbose, TEXT("UInventoryWidget::NativeOnKeyDown - Tab pressed, closing inventory"));
+			PC->CloseInventory();
+			return FReply::Handled();
+		}
 	}
 
 	// Delete key for discard

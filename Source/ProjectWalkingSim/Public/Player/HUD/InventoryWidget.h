@@ -109,6 +109,14 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory")
 	bool IsInCombineMode() const { return bInCombineMode; }
 
+	/**
+	 * Set the tooltip's discard confirmation mode.
+	 * @param bConfirmMode If true, show key item warning; if false, restore normal display.
+	 * @param ItemData Item data for restoring description.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void SetTooltipDiscardConfirmMode(bool bConfirmMode, const UItemDataAsset* ItemData = nullptr);
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;

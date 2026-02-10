@@ -5,12 +5,13 @@
 #include "Player/HUD/SereneHUDWidget.h"
 #include "Player/HUD/StaminaBarWidget.h"
 #include "Player/HUD/InteractionPromptWidget.h"
+#include "Player/HUD/InventoryWidget.h"
+#include "Player/HUD/ItemTooltipWidget.h"
 #include "Player/SereneCharacter.h"
 #include "Player/Components/StaminaComponent.h"
 #include "Player/Components/InteractionComponent.h"
 #include "Inventory/InventoryComponent.h"
 #include "Inventory/ItemDataAsset.h"
-#include "Player/HUD/InventoryWidget.h"
 #include "Core/SereneLogChannels.h"
 
 void ASereneHUD::BeginPlay()
@@ -94,6 +95,11 @@ void ASereneHUD::HandleInteractableChanged(AActor* NewInteractable, FText Intera
 
 void ASereneHUD::HandleInventoryChanged()
 {
+	UE_LOG(LogSerene, Log, TEXT("ASereneHUD::HandleInventoryChanged - HUDWidgetInstance=%s, GetInventoryWidget=%s, CachedInventoryComp=%s"),
+		HUDWidgetInstance ? TEXT("valid") : TEXT("null"),
+		(HUDWidgetInstance && HUDWidgetInstance->GetInventoryWidget()) ? TEXT("valid") : TEXT("null"),
+		CachedInventoryComp ? TEXT("valid") : TEXT("null"));
+
 	if (HUDWidgetInstance && HUDWidgetInstance->GetInventoryWidget() && CachedInventoryComp)
 	{
 		HUDWidgetInstance->GetInventoryWidget()->RefreshSlots(
@@ -103,6 +109,8 @@ void ASereneHUD::HandleInventoryChanged()
 
 void ASereneHUD::ShowInventory()
 {
+	UE_LOG(LogSerene, Log, TEXT("ASereneHUD::ShowInventory called"));
+
 	if (HUDWidgetInstance && HUDWidgetInstance->GetInventoryWidget())
 	{
 		HUDWidgetInstance->GetInventoryWidget()->ShowInventory();
@@ -113,6 +121,8 @@ void ASereneHUD::ShowInventory()
 
 void ASereneHUD::HideInventory()
 {
+	ClearPendingDiscard();
+
 	if (HUDWidgetInstance && HUDWidgetInstance->GetInventoryWidget())
 	{
 		HUDWidgetInstance->GetInventoryWidget()->HideInventory();
@@ -142,15 +152,54 @@ void ASereneHUD::HandleDiscardRequested(int32 SlotIndex)
 
 	const UItemDataAsset* ItemData = CachedInventoryComp->GetItemData(Slots[SlotIndex].ItemId);
 
-	// Key item warning: log warning but still allow discard (per CONTEXT: "CAN be discarded with strong warning")
+	// Key item confirmation flow: require two clicks to discard
 	if (ItemData && ItemData->bIsKeyItem)
 	{
-		UE_LOG(LogSerene, Warning, TEXT("ASereneHUD::HandleDiscardRequested - Discarding KEY ITEM at slot %d: %s"),
-			SlotIndex, *Slots[SlotIndex].ItemId.ToString());
-		// TODO: Show confirmation dialog in future iteration
+		// Check if this is a confirmation click (same slot was already pending)
+		if (PendingDiscardSlotIndex == SlotIndex)
+		{
+			// Second click - confirmed, proceed with discard
+			UE_LOG(LogSerene, Warning, TEXT("ASereneHUD::HandleDiscardRequested - Confirmed discard of KEY ITEM at slot %d: %s"),
+				SlotIndex, *Slots[SlotIndex].ItemId.ToString());
+			ClearPendingDiscard();
+			CachedInventoryComp->DiscardItem(SlotIndex);
+			return;
+		}
+
+		// First click on key item - enter confirmation mode
+		PendingDiscardSlotIndex = SlotIndex;
+		UE_LOG(LogSerene, Log, TEXT("ASereneHUD::HandleDiscardRequested - Key item discard pending confirmation for slot %d"), SlotIndex);
+
+		// Update tooltip to show warning
+		if (HUDWidgetInstance && HUDWidgetInstance->GetInventoryWidget())
+		{
+			HUDWidgetInstance->GetInventoryWidget()->SetTooltipDiscardConfirmMode(true, ItemData);
+		}
+
+		return;
 	}
 
+	// Non-key item - discard immediately
+	ClearPendingDiscard();
 	CachedInventoryComp->DiscardItem(SlotIndex);
+}
+
+void ASereneHUD::ClearPendingDiscard()
+{
+	if (PendingDiscardSlotIndex >= 0)
+	{
+		// Restore tooltip to normal state
+		if (HUDWidgetInstance && HUDWidgetInstance->GetInventoryWidget() && CachedInventoryComp)
+		{
+			const TArray<FInventorySlot>& Slots = CachedInventoryComp->GetSlots();
+			if (Slots.IsValidIndex(PendingDiscardSlotIndex) && !Slots[PendingDiscardSlotIndex].IsEmpty())
+			{
+				const UItemDataAsset* ItemData = CachedInventoryComp->GetItemData(Slots[PendingDiscardSlotIndex].ItemId);
+				HUDWidgetInstance->GetInventoryWidget()->SetTooltipDiscardConfirmMode(false, ItemData);
+			}
+		}
+		PendingDiscardSlotIndex = -1;
+	}
 }
 
 void ASereneHUD::HandleCombineButtonClicked(int32 SlotIndex)

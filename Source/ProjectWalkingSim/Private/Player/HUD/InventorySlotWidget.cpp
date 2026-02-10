@@ -25,14 +25,23 @@ void UInventorySlotWidget::SetSlotData(const FInventorySlot& SlotData, const UIt
 		return;
 	}
 
+	UE_LOG(LogSerene, Log, TEXT("UInventorySlotWidget::SetSlotData - Slot %d: ItemId=%s, DisplayName=%s"),
+		SlotIndex, *ItemData->ItemId.ToString(), *ItemData->DisplayName.ToString());
+
 	// Load and set icon
 	if (ItemIcon)
 	{
-		if (ItemData->Icon.IsValid())
+		UE_LOG(LogSerene, Log, TEXT("  ItemIcon widget exists. Icon.IsValid()=%s, Icon.IsNull()=%s, Icon.ToString()=%s"),
+			ItemData->Icon.IsValid() ? TEXT("true") : TEXT("false"),
+			ItemData->Icon.IsNull() ? TEXT("true") : TEXT("false"),
+			*ItemData->Icon.ToString());
+
+		if (!ItemData->Icon.IsNull())
 		{
 			UTexture2D* IconTex = ItemData->Icon.LoadSynchronous();
 			if (IconTex)
 			{
+				UE_LOG(LogSerene, Log, TEXT("  Icon loaded successfully: %s"), *IconTex->GetName());
 				ItemIcon->SetBrushFromTexture(IconTex);
 				ItemIcon->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 			}
@@ -44,8 +53,13 @@ void UInventorySlotWidget::SetSlotData(const FInventorySlot& SlotData, const UIt
 		}
 		else
 		{
+			UE_LOG(LogSerene, Log, TEXT("  Icon is null/not set, collapsing"));
 			ItemIcon->SetVisibility(ESlateVisibility::Collapsed);
 		}
+	}
+	else
+	{
+		UE_LOG(LogSerene, Warning, TEXT("UInventorySlotWidget::SetSlotData - ItemIcon widget is null! Check BindWidget in WBP_InventorySlot"));
 	}
 
 	// Set quantity text (show only when quantity > 1)

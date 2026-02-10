@@ -81,4 +81,10 @@ private:
 	/** Cached pointer to the character's inventory component. Set in BindToCharacter. */
 	UPROPERTY()
 	TObjectPtr<UInventoryComponent> CachedInventoryComp;
+
+	/** Slot index pending discard confirmation for key items. -1 if none. */
+	int32 PendingDiscardSlotIndex = -1;
+
+	/** Clear any pending discard confirmation state. */
+	void ClearPendingDiscard();
 };

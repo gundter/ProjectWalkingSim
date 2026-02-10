@@ -36,6 +36,7 @@ public:
 	void InitFromItemData(FName InItemId, int32 InQuantity, const UItemDataAsset* ItemData);
 
 protected:
+	virtual void BeginPlay() override;
 	virtual void OnInteract_Implementation(AActor* Interactor) override;
 	virtual bool CanInteract_Implementation(AActor* Interactor) const override;
 	virtual FText GetInteractionText_Implementation() const override;

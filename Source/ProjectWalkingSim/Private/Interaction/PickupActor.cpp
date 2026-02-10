@@ -6,11 +6,56 @@
 #include "Inventory/ItemDataAsset.h"
 #include "Tags/SereneTags.h"
 #include "Core/SereneLogChannels.h"
+#include "Engine/AssetManager.h"
 
 APickupActor::APickupActor()
 {
 	InteractionText = NSLOCTEXT("Interaction", "PickUp", "Pick Up");
 	InteractionTag = SereneTags::TAG_Interaction_Pickup;
+}
+
+void APickupActor::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Look up item data to set proper interaction text with item name
+	if (ItemId != NAME_None)
+	{
+		UAssetManager& AssetManager = UAssetManager::Get();
+
+		// Get all registered Item assets and find the one with matching ItemId
+		TArray<FPrimaryAssetId> AssetList;
+		AssetManager.GetPrimaryAssetIdList(FPrimaryAssetType("Item"), AssetList);
+
+		for (const FPrimaryAssetId& AssetId : AssetList)
+		{
+			UObject* LoadedObject = AssetManager.GetPrimaryAssetObject(AssetId);
+			if (!LoadedObject)
+			{
+				FSoftObjectPath AssetPath = AssetManager.GetPrimaryAssetPath(AssetId);
+				if (!AssetPath.IsNull())
+				{
+					LoadedObject = AssetPath.TryLoad();
+				}
+			}
+
+			if (const UItemDataAsset* ItemData = Cast<UItemDataAsset>(LoadedObject))
+			{
+				if (ItemData->ItemId == ItemId)
+				{
+					if (!ItemData->DisplayName.IsEmpty())
+					{
+						InteractionText = FText::Format(
+							NSLOCTEXT("Interaction", "PickUpItem", "Pick Up {0}"),
+							ItemData->DisplayName);
+					}
+					return; // Found our item, done
+				}
+			}
+		}
+
+		UE_LOG(LogSerene, Warning, TEXT("APickupActor::BeginPlay - Item '%s' not found in Asset Manager"), *ItemId.ToString());
+	}
 }
 
 bool APickupActor::CanInteract_Implementation(AActor* Interactor) const
@@ -99,13 +144,17 @@ void APickupActor::InitFromItemData(FName InItemId, int32 InQuantity, const UIte
 	Quantity = InQuantity;
 
 	// Load and set world mesh if available
-	if (ItemData && ItemData->WorldMesh.IsValid())
+	if (ItemData && !ItemData->WorldMesh.IsNull())
 	{
 		UStaticMesh* Mesh = ItemData->WorldMesh.LoadSynchronous();
 		if (Mesh && MeshComponent)
 		{
 			MeshComponent->SetStaticMesh(Mesh);
 		}
+	}
+	else if (ItemData)
+	{
+		UE_LOG(LogSerene, Warning, TEXT("APickupActor::InitFromItemData - WorldMesh is null for item '%s'. Discarded item will be invisible."), *InItemId.ToString());
 	}
 
 	// Set interaction text from item display name or fallback

@@ -32,6 +32,10 @@ class PROJECTWALKINGSIM_API ASerenePlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
+public:
+	/** Close the inventory UI. Public so widgets can call it for Tab key handling. */
+	void CloseInventory();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -98,5 +102,4 @@ private:
 
 	void HandleToggleInventory(const FInputActionValue& Value);
 	void OpenInventory();
-	void CloseInventory();
 };

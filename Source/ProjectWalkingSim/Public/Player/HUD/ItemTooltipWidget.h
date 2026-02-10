@@ -52,6 +52,19 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void ShowTooltip();
 
+	/**
+	 * Show discard confirmation warning for key items.
+	 * Changes description text to warn user and requires second click.
+	 * @param bConfirmMode If true, show warning; if false, restore normal display.
+	 * @param ItemData Item data to restore description when exiting confirm mode.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void SetDiscardConfirmMode(bool bConfirmMode, const UItemDataAsset* ItemData = nullptr);
+
+	/** Returns true if currently in discard confirmation mode. */
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Inventory")
+	bool IsInDiscardConfirmMode() const { return bInDiscardConfirmMode; }
+
 	/** Which slot this tooltip is currently showing for. */
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	int32 BoundSlotIndex = -1;
@@ -100,6 +113,13 @@ protected:
 	TObjectPtr<UButton> DiscardButton;
 
 private:
+	/** Whether currently in discard confirmation mode. */
+	bool bInDiscardConfirmMode = false;
+
+	/** Cached item data for restoring description after confirm mode. */
+	UPROPERTY()
+	TObjectPtr<const UItemDataAsset> CachedItemData;
+
 	/** Internal handler for Use button click. */
 	UFUNCTION()
 	void HandleUseClicked();

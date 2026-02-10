@@ -11,8 +11,8 @@ void UItemTooltipWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
 
-	// Start hidden
-	SetRenderOpacity(0.0f);
+	// Start hidden (use Visibility to prevent input when hidden)
+	SetVisibility(ESlateVisibility::Collapsed);
 
 	// Bind button click events
 	if (UseButton)
@@ -39,6 +39,10 @@ void UItemTooltipWidget::NativeConstruct()
 void UItemTooltipWidget::SetTooltipData(int32 InSlotIndex, const UItemDataAsset* ItemData)
 {
 	BoundSlotIndex = InSlotIndex;
+	CachedItemData = ItemData;
+
+	// Clear any pending confirm mode when new data is set
+	bInDiscardConfirmMode = false;
 
 	if (!ItemData)
 	{
@@ -57,14 +61,39 @@ void UItemTooltipWidget::SetTooltipData(int32 InSlotIndex, const UItemDataAsset*
 	}
 }
 
+void UItemTooltipWidget::SetDiscardConfirmMode(bool bConfirmMode, const UItemDataAsset* ItemData)
+{
+	bInDiscardConfirmMode = bConfirmMode;
+
+	if (ItemDescriptionText)
+	{
+		if (bConfirmMode)
+		{
+			// Show warning message - this is a key item
+			ItemDescriptionText->SetText(NSLOCTEXT("Inventory", "DiscardKeyItemWarning",
+				"WARNING: This is a KEY ITEM needed for progression.\n\nClick Discard again to confirm."));
+		}
+		else if (ItemData)
+		{
+			// Restore normal description
+			ItemDescriptionText->SetText(ItemData->Description);
+		}
+		else if (CachedItemData)
+		{
+			// Fallback to cached data
+			ItemDescriptionText->SetText(CachedItemData->Description);
+		}
+	}
+}
+
 void UItemTooltipWidget::HideTooltip()
 {
-	SetRenderOpacity(0.0f);
+	SetVisibility(ESlateVisibility::Collapsed);
 }
 
 void UItemTooltipWidget::ShowTooltip()
 {
-	SetRenderOpacity(1.0f);
+	SetVisibility(ESlateVisibility::SelfHitTestInvisible);
 }
 
 void UItemTooltipWidget::HandleUseClicked()
