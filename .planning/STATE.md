@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plan 04-01 complete.
+**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plans 04-01 through 04-03 complete.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,16 +22,16 @@
 ## Current Position
 
 **Phase:** 4 of 8 (Monster AI Core)
-**Plan:** 1 of ? (in progress)
+**Plan:** 3 of ? (in progress)
 **Status:** In progress
-**Last activity:** 2026-02-11 - Completed 04-01-PLAN.md (AI foundation types)
+**Last activity:** 2026-02-11 - Completed 04-03-PLAN.md (Wendigo AI controller)
 
 **Progress:**
 ```
 Phase 1: [######] 6/6 plans complete
 Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
-Phase 4: [#.....] 1/? plans complete
+Phase 4: [###...] 3/? plans complete
 Overall: [███.....] 3/8 phases complete
 ```
 
@@ -60,6 +60,7 @@ Overall: [███.....] 3/8 phases complete
 | 3-05  | 5/6   | 2/2   | ~3m  | 0      |
 | 3-06  | 6/6   | 2/2*  | ~15m | 4      |
 | 4-01  | 1/?   | 2/2   | ~2m  | 0      |
+| 4-03  | 3/?   | 1/1   | ~4m  | 2      |
 
 *Checkpoint tasks require human verification
 
@@ -116,6 +117,8 @@ Overall: [███.....] 3/8 phases complete
 | Activate hiding camera (no bAutoActivate=false) | CalcCamera only reads active camera components; inactive camera falls back to fixed actor rotation | 03-06 |
 | Mirror controller rotation to hiding camera via tick | SetViewTargetWithBlend locks view to camera component; controller rotation needs explicit sync | 03-06 |
 | Notify hiding spot before montage block | TransitionToFreeState clears CurrentHidingSpot; OnExitHiding must fire before pointer nulled | 03-06 |
+| Renamed AITypes.h to MonsterAITypes.h | UHT error: project header name conflicted with engine AIModule/Classes/AITypes.h | 04-03 |
+| UAISense::GetSenseID<T>() for sense identification | Cleaner and type-safe vs FAIPerceptionSystem::GetSenseClassForStimulus | 04-03 |
 
 ### Technical Discoveries
 
@@ -132,6 +135,9 @@ Overall: [███.....] 3/8 phases complete
 | AActor::CalcCamera skips inactive UCameraComponents | bAutoActivate=false means CalcCamera falls back to GetActorEyesViewPoint; camera component rotation changes ignored | 03-06 |
 | SetViewTargetWithBlend uses actor CalcCamera, not controller rotation | When view target is non-pawn, controller AddYawInput/AddPitchInput don't affect the view | 03-06 |
 | Parallel plan execution can leave cross-references commented out | Plans 03-03 and 03-04 ran simultaneously; OnInteract delegation to HidingComponent was stubbed | 03-06 |
+| Project header names must not collide with engine module headers | AITypes.h conflicted with AIModule/Classes/AITypes.h; UHT rejects duplicate names | 04-03 |
+| Two-flag guard required for StateTree StartLogic | bBeginPlayCalled + bPossessCalled; bStartLogicAutomatically reportedly fails | 04-03 |
+| Perception delegates must bind in BeginPlay, not constructor | Delegates don't work from constructor; binding in BeginPlay is safe | 04-03 |
 
 ### TODOs
 
@@ -143,7 +149,7 @@ Overall: [███.....] 3/8 phases complete
 - [x] Plan Phase 3: Hiding System
 - [x] Execute Phase 3 (all 6 plans)
 - [x] Plan Phase 4: Monster AI Core
-- [ ] Execute Phase 4 (04-01 complete)
+- [ ] Execute Phase 4 (04-01 through 04-03 complete)
 
 ### Blockers
 
@@ -157,15 +163,16 @@ None — Phase 4 in progress.
 
 **Date:** 2026-02-11
 **Completed:**
-- Executed 04-01 (AI foundation types) - 2 tasks, ~2 minutes
-- Added AIModule, NavigationSystem, StateTreeModule, GameplayStateTreeModule to Build.cs
-- Enabled StateTree and GameplayStateTree plugins in .uproject
-- Created AITypes.h: EAlertLevel enum, FOnAlertLevelChanged delegate, AIConstants namespace (11 tuning params)
-- Added 5 AI gameplay tags to SereneTags (3 alert levels + 2 stimulus types)
+- Executed 04-03 (Wendigo AI controller) - 1 task, ~4 minutes
+- AWendigoAIController with UStateTreeAIComponent and UAIPerceptionComponent
+- Sight (2500cm, 90deg FOV) + Hearing (2000cm) perception senses configured
+- Two-flag StartLogic guard for safe State Tree initialization
+- Renamed AITypes.h to MonsterAITypes.h (engine header name conflict fix)
+- Committed uncommitted SuspicionComponent from plan 04-02
 
-**Stopped at:** Completed 04-01-PLAN.md
+**Stopped at:** Completed 04-03-PLAN.md
 
-**Next:** Continue Phase 4 execution (04-02 onward)
+**Next:** Continue Phase 4 execution (04-04 onward)
 
 ### Context for Next Session
 
@@ -175,27 +182,28 @@ The roadmap has 8 phases:
 1. Foundation - Player controller, movement, interaction - complete
 2. Inventory - 8-slot system with items - complete
 3. Hiding - Hide spots and visibility - complete
-4. Monster AI Core - State Tree, patrol, perception - in progress (04-01 done)
+4. Monster AI Core - State Tree, patrol, perception - in progress (04-01 through 04-03 done)
 5. Monster Behaviors - Chase, investigate, search, spawns
 6. Light and Audio - Flashlight, Lumen, spatial audio
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
 
-Phase 4 foundation laid. The project now has:
+Phase 4 AI core building. The project now has:
 - All Phase 1-3 features (character, movement, interaction, HUD, inventory, hiding)
 - AI module dependencies: AIModule, NavigationSystem, StateTreeModule, GameplayStateTreeModule
-- AI types: EAlertLevel (Patrol/Suspicious/Alert), FOnAlertLevelChanged delegate
-- AIConstants: 11 tuning parameters (visibility, suspicion, movement, perception ranges)
+- MonsterAITypes.h: EAlertLevel (Patrol/Suspicious/Alert), FOnAlertLevelChanged delegate, AIConstants
+- USuspicionComponent: suspicion accumulation/decay with alert level transitions
+- AWendigoAIController: StateTreeAIComponent, AIPerceptionComponent (sight+hearing), StartLogic guard
 - 5 AI gameplay tags: AI.Alert.Patrol/Suspicious/Alert, AI.Stimulus.Sight/Hearing
 
 **Phase 4 remaining:**
-- Wendigo AI controller with StateTreeAIComponent and Perception
-- Wendigo character pawn with SuspicionComponent
+- Wendigo character pawn (ACharacter with SuspicionComponent, tall capsule)
 - Custom State Tree tasks (patrol, idle, investigate)
 - PatrolRouteActor for waypoint-based patrol
+- Perception-to-suspicion wiring in AI controller
 - Editor assets and PIE verification
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-11 (Phase 4 plan 04-01 complete)*
+*Last updated: 2026-02-11 (Phase 4 plan 04-03 complete)*
