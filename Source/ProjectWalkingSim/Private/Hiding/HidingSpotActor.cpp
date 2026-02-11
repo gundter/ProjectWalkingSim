@@ -6,9 +6,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Core/SereneLogChannels.h"
 
-// HidingComponent is created in 03-04; forward declared in header.
-// Include added here so OnInteract can call EnterHidingSpot.
-// #include "Hiding/HidingComponent.h"
+#include "Hiding/HidingComponent.h"
 
 AHidingSpotActor::AHidingSpotActor()
 {
@@ -82,16 +80,13 @@ bool AHidingSpotActor::CanInteract_Implementation(AActor* Interactor) const
 		return false;
 	}
 
-	// Verify the interactor is not already hiding (check for HidingComponent in Free state).
-	// HidingComponent does not exist yet (03-04), so this check is deferred.
-	// When HidingComponent is implemented, uncomment:
-	// if (UHidingComponent* HidingComp = Interactor->FindComponentByClass<UHidingComponent>())
-	// {
-	//     if (HidingComp->GetHidingState() != EHidingState::Free)
-	//     {
-	//         return false;
-	//     }
-	// }
+	if (UHidingComponent* HidingComp = Interactor->FindComponentByClass<UHidingComponent>())
+	{
+		if (HidingComp->GetHidingState() != EHidingState::Free)
+		{
+			return false;
+		}
+	}
 
 	return true;
 }
@@ -108,19 +103,14 @@ void AHidingSpotActor::OnInteract_Implementation(AActor* Interactor)
 		return;
 	}
 
-	// Find HidingComponent on the interactor and delegate the hiding flow.
-	// HidingComponent does not exist yet (03-04). When implemented, uncomment:
-	// UHidingComponent* HidingComp = Interactor->FindComponentByClass<UHidingComponent>();
-	// if (!HidingComp)
-	// {
-	//     UE_LOG(LogSerene, Warning, TEXT("HidingSpot [%s]: Interactor [%s] has no HidingComponent"),
-	//         *GetName(), *Interactor->GetName());
-	//     return;
-	// }
-	// HidingComp->EnterHidingSpot(this);
-
-	UE_LOG(LogSerene, Log, TEXT("HidingSpot [%s]: OnInteract from [%s] (HidingComponent delegation pending 03-04)"),
-		*GetName(), *Interactor->GetName());
+	UHidingComponent* HidingComp = Interactor->FindComponentByClass<UHidingComponent>();
+	if (!HidingComp)
+	{
+		UE_LOG(LogSerene, Warning, TEXT("HidingSpot [%s]: Interactor [%s] has no HidingComponent"),
+			*GetName(), *Interactor->GetName());
+		return;
+	}
+	HidingComp->EnterHidingSpot(this);
 }
 
 void AHidingSpotActor::OnFocusBegin_Implementation(AActor* Interactor)
