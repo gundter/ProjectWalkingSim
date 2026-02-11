@@ -59,7 +59,9 @@ public:
 	 */
 	int32 GetNextWaypointIndex(int32 CurrentIndex) const;
 
+#if WITH_EDITOR
 	virtual void Tick(float DeltaTime) override;
+#endif
 
 protected:
 #if WITH_EDITORONLY_DATA

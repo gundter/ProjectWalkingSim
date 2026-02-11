@@ -2,12 +2,18 @@
 
 #include "AI/PatrolRouteActor.h"
 #include "Components/BillboardComponent.h"
+#if WITH_EDITOR
 #include "DrawDebugHelpers.h"
+#endif
 
 APatrolRouteActor::APatrolRouteActor()
 {
+#if WITH_EDITOR
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.bStartWithTickEnabled = true;
+#else
+	PrimaryActorTick.bCanEverTick = false;
+#endif
 
 #if WITH_EDITORONLY_DATA
 	BillboardComponent = CreateEditorOnlyDefaultSubobject<UBillboardComponent>(TEXT("Billboard"));
@@ -67,11 +73,10 @@ int32 APatrolRouteActor::GetNextWaypointIndex(int32 CurrentIndex) const
 	return NextIndex;
 }
 
+#if WITH_EDITOR
 void APatrolRouteActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-#if WITH_EDITOR
 	const UWorld* World = GetWorld();
 	if (!World || !World->IsEditorWorld())
 	{
@@ -117,5 +122,5 @@ void APatrolRouteActor::Tick(float DeltaTime)
 			false, -1.0f, SDPG_World, 1.5f
 		);
 	}
-#endif
 }
+#endif

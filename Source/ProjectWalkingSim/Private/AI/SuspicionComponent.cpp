@@ -69,7 +69,7 @@ void USuspicionComponent::ResetSuspicion()
 	if (PreviousLevel != EAlertLevel::Patrol)
 	{
 		UE_LOG(LogSerene, Log, TEXT("SuspicionComponent [%s]: Alert level reset to Patrol"),
-			*GetOwner()->GetName());
+			GetOwner() ? *GetOwner()->GetName() : TEXT("None"));
 		OnAlertLevelChanged.Broadcast(EAlertLevel::Patrol);
 	}
 }
@@ -97,7 +97,7 @@ void USuspicionComponent::UpdateAlertLevel()
 		CurrentAlertLevel = NewLevel;
 
 		UE_LOG(LogSerene, Log, TEXT("SuspicionComponent [%s]: Alert level changed %d -> %d (Suspicion: %.3f)"),
-			*GetOwner()->GetName(),
+			GetOwner() ? *GetOwner()->GetName() : TEXT("None"),
 			static_cast<uint8>(PreviousLevel),
 			static_cast<uint8>(NewLevel),
 			CurrentSuspicion);

@@ -15,17 +15,23 @@ void UNoiseReportingComponent::BeginPlay()
 	Super::BeginPlay();
 
 	// Find FootstepComponent on owner and bind to its delegate
-	UFootstepComponent* FootstepComp = GetOwner()->FindComponentByClass<UFootstepComponent>();
+	AActor* Owner = GetOwner();
+	if (!Owner)
+	{
+		return;
+	}
+
+	UFootstepComponent* FootstepComp = Owner->FindComponentByClass<UFootstepComponent>();
 	if (FootstepComp)
 	{
 		FootstepComp->OnFootstep.AddDynamic(this, &UNoiseReportingComponent::HandleFootstep);
 		UE_LOG(LogSerene, Log, TEXT("NoiseReportingComponent [%s]: Bound to FootstepComponent"),
-			*GetOwner()->GetName());
+			*Owner->GetName());
 	}
 	else
 	{
 		UE_LOG(LogSerene, Warning, TEXT("NoiseReportingComponent [%s]: FootstepComponent not found on owner"),
-			*GetOwner()->GetName());
+			*Owner->GetName());
 	}
 }
 
