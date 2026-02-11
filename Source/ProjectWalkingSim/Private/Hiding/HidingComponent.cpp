@@ -139,8 +139,33 @@ void UHidingComponent::ExitHidingSpot()
 		Data = IHideable::Execute_GetSpotData(CurrentHidingSpot.Get());
 	}
 
-	// Play exit montage if available
+	// Notify the hiding spot BEFORE montage/TransitionToFreeState which clears CurrentHidingSpot
+	if (CurrentHidingSpot.IsValid())
+	{
+		IHideable::Execute_OnExitHiding(CurrentHidingSpot.Get(), GetOwner());
+	}
+
+	// Blend camera back to player character
 	ACharacter* Character = Cast<ACharacter>(GetOwner());
+	if (Character)
+	{
+		APlayerController* PC = Cast<APlayerController>(Character->GetController());
+		if (PC && Data)
+		{
+			PC->SetViewTargetWithBlend(
+				Character,
+				Data->CameraBlendOutTime,
+				VTBlend_Cubic,
+				0.0f,
+				false
+			);
+		}
+	}
+
+	// Broadcast state change
+	OnHidingStateChanged.Broadcast(EHidingState::Exiting);
+
+	// Play exit montage if available (TransitionToFreeState clears CurrentHidingSpot)
 	if (Data && Data->ExitMontage && Character && Character->GetMesh())
 	{
 		UAnimInstance* AnimInstance = Character->GetMesh()->GetAnimInstance();
@@ -167,31 +192,6 @@ void UHidingComponent::ExitHidingSpot()
 	{
 		TransitionToFreeState();
 	}
-
-	// Blend camera back to player character
-	if (Character)
-	{
-		APlayerController* PC = Cast<APlayerController>(Character->GetController());
-		if (PC && Data)
-		{
-			PC->SetViewTargetWithBlend(
-				Character,
-				Data->CameraBlendOutTime,
-				VTBlend_Cubic,
-				0.0f,
-				false
-			);
-		}
-	}
-
-	// Notify the hiding spot that the actor is exiting
-	if (CurrentHidingSpot.IsValid())
-	{
-		IHideable::Execute_OnExitHiding(CurrentHidingSpot.Get(), GetOwner());
-	}
-
-	// Broadcast state change
-	OnHidingStateChanged.Broadcast(EHidingState::Exiting);
 }
 
 // -----------------------------------------------------------------------------
