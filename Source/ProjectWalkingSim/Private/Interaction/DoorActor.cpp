@@ -9,6 +9,7 @@
 ADoorActor::ADoorActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	// Door panel mesh, child of root frame
 	DoorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorMesh"));
@@ -103,6 +104,8 @@ void ADoorActor::OnInteract_Implementation(AActor* Interactor)
 
 		UE_LOG(LogSerene, Verbose, TEXT("ADoorActor::OnInteract - Door closing."));
 	}
+
+	SetActorTickEnabled(true);
 }
 
 void ADoorActor::Tick(float DeltaTime)
@@ -122,5 +125,12 @@ void ADoorActor::Tick(float DeltaTime)
 		// Apply rotation around the Z axis (yaw) as relative rotation on the door mesh
 		const FRotator NewRotation(0.0f, CurrentAngle, 0.0f);
 		DoorMesh->SetRelativeRotation(NewRotation);
+	}
+	else
+	{
+		// Snap to target and stop ticking until next interaction
+		CurrentAngle = TargetAngle;
+		DoorMesh->SetRelativeRotation(FRotator(0.0f, CurrentAngle, 0.0f));
+		SetActorTickEnabled(false);
 	}
 }

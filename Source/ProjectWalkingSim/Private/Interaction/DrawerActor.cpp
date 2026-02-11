@@ -8,6 +8,7 @@
 ADrawerActor::ADrawerActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	// Drawer mesh, child of root frame
 	DrawerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DrawerMesh"));
@@ -31,6 +32,8 @@ void ADrawerActor::OnInteract_Implementation(AActor* Interactor)
 		InteractionText = NSLOCTEXT("Interaction", "DrawerOpen", "Open");
 		UE_LOG(LogSerene, Verbose, TEXT("ADrawerActor::OnInteract - Drawer closing."));
 	}
+
+	SetActorTickEnabled(true);
 }
 
 void ADrawerActor::Tick(float DeltaTime)
@@ -53,5 +56,14 @@ void ADrawerActor::Tick(float DeltaTime)
 		FVector NewLocation = DrawerInitialLocation;
 		NewLocation.X += CurrentSlide;
 		DrawerMesh->SetRelativeLocation(NewLocation);
+	}
+	else
+	{
+		// Snap to target and stop ticking until next interaction
+		CurrentSlide = TargetSlide;
+		FVector FinalLocation = DrawerInitialLocation;
+		FinalLocation.X += CurrentSlide;
+		DrawerMesh->SetRelativeLocation(FinalLocation);
+		SetActorTickEnabled(false);
 	}
 }
