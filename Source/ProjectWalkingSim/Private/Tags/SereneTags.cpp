@@ -33,4 +33,13 @@ namespace SereneTags
 	UE_DEFINE_GAMEPLAY_TAG(TAG_HidingSpot_Locker, "HidingSpot.Locker");
 	UE_DEFINE_GAMEPLAY_TAG(TAG_HidingSpot_Closet, "HidingSpot.Closet");
 	UE_DEFINE_GAMEPLAY_TAG(TAG_HidingSpot_UnderBed, "HidingSpot.UnderBed");
+
+	// AI alert levels
+	UE_DEFINE_GAMEPLAY_TAG(TAG_AI_Alert_Patrol, "AI.Alert.Patrol");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_AI_Alert_Suspicious, "AI.Alert.Suspicious");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_AI_Alert_Alert, "AI.Alert.Alert");
+
+	// AI stimulus types
+	UE_DEFINE_GAMEPLAY_TAG(TAG_AI_Stimulus_Sight, "AI.Stimulus.Sight");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_AI_Stimulus_Hearing, "AI.Stimulus.Hearing");
 }
