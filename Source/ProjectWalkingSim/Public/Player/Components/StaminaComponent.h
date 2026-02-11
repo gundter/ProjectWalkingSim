@@ -9,11 +9,11 @@
 /** Broadcast when stamina ratio changes. Param is 0.0 (empty) to 1.0 (full). */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnStaminaChanged, float, Percent);
 
-/** Broadcast once when stamina reaches zero. */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaDepleted);
+/** Broadcast once when stamina reaches zero. C++ only -- no Blueprint binding needed. */
+DECLARE_MULTICAST_DELEGATE(FOnStaminaDepleted);
 
-/** Broadcast once when stamina reaches MaxStamina after being depleted. */
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStaminaFull);
+/** Broadcast once when stamina reaches MaxStamina after being depleted. C++ only -- no Blueprint binding needed. */
+DECLARE_MULTICAST_DELEGATE(FOnStaminaFull);
 
 /**
  * Stamina system component for The Juniper Tree.
@@ -61,11 +61,9 @@ public:
 	FOnStaminaChanged OnStaminaChanged;
 
 	/** Fires once when stamina hits zero. */
-	UPROPERTY(BlueprintAssignable, Category = "Stamina")
 	FOnStaminaDepleted OnStaminaDepleted;
 
 	/** Fires once when stamina reaches max after depletion. */
-	UPROPERTY(BlueprintAssignable, Category = "Stamina")
 	FOnStaminaFull OnStaminaFull;
 
 protected:

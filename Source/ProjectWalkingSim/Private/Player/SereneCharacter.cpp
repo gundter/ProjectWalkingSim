@@ -5,6 +5,9 @@
 #include "Camera/CameraComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Player/Components/StaminaComponent.h"
+#include "Player/Components/HeadBobComponent.h"
+#include "Player/Components/LeanComponent.h"
 #include "Player/Components/InteractionComponent.h"
 #include "Player/Components/FootstepComponent.h"
 #include "Inventory/InventoryComponent.h"
@@ -121,7 +124,7 @@ void ASereneCharacter::BeginPlay()
 	// Bind stamina depletion to force stop sprint
 	if (StaminaComponent)
 	{
-		StaminaComponent->OnStaminaDepleted.AddDynamic(this, &ASereneCharacter::OnStaminaDepleted);
+		StaminaComponent->OnStaminaDepleted.AddUObject(this, &ASereneCharacter::OnStaminaDepleted);
 	}
 
 	// Read GameInstance head-bob accessibility setting

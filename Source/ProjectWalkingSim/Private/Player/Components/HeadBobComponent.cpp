@@ -4,6 +4,7 @@
 
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Player/SereneCharacter.h"
 #include "Core/SereneLogChannels.h"
 
 UHeadBobComponent::UHeadBobComponent()
@@ -48,10 +49,12 @@ void UHeadBobComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 	{
 		AmplitudeMultiplier = CrouchBobMultiplier;
 	}
-	else if (CMC && CMC->MaxWalkSpeed > 400.0f)
+	else if (const ASereneCharacter* SereneChar = Cast<ASereneCharacter>(OwnerCharacter))
 	{
-		// Sprint detection: MaxWalkSpeed is set to SprintSpeed (500) during sprint
-		AmplitudeMultiplier = SprintBobMultiplier;
+		if (SereneChar->GetIsSprinting())
+		{
+			AmplitudeMultiplier = SprintBobMultiplier;
+		}
 	}
 
 	const float Amplitude = WalkBobAmplitude * AmplitudeMultiplier;

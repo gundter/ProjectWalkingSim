@@ -4,6 +4,7 @@
 
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Player/SereneCharacter.h"
 #include "Core/SereneLogChannels.h"
 
 UFootstepComponent::UFootstepComponent()
@@ -51,15 +52,17 @@ void UFootstepComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 
 	// Determine current interval based on movement state.
 	float CurrentInterval = FootstepInterval;
-	const float CurrentSpeed = CMC->MaxWalkSpeed;
 
 	if (CMC->IsCrouching())
 	{
 		CurrentInterval = FootstepInterval * CrouchIntervalMultiplier;
 	}
-	else if (CurrentSpeed > 400.0f) // Sprint detection: MaxWalkSpeed > 400 matches Plan 03 convention
+	else if (const ASereneCharacter* SereneChar = Cast<ASereneCharacter>(OwnerCharacter))
 	{
-		CurrentInterval = FootstepInterval * SprintIntervalMultiplier;
+		if (SereneChar->GetIsSprinting())
+		{
+			CurrentInterval = FootstepInterval * SprintIntervalMultiplier;
+		}
 	}
 
 	// Accumulate timer.
@@ -109,15 +112,15 @@ void UFootstepComponent::PlayFootstepForSurface(const FVector& FootLocation)
 	// Determine volume based on movement state.
 	float Volume = 1.0f;
 
-	if (const ACharacter* OwnerCharacter = Cast<ACharacter>(GetOwner()))
+	if (const ASereneCharacter* SereneChar = Cast<ASereneCharacter>(GetOwner()))
 	{
-		if (const UCharacterMovementComponent* CMC = OwnerCharacter->GetCharacterMovement())
+		if (const UCharacterMovementComponent* CMC = SereneChar->GetCharacterMovement())
 		{
 			if (CMC->IsCrouching())
 			{
 				Volume = CrouchVolumeMultiplier;
 			}
-			else if (CMC->MaxWalkSpeed > 400.0f)
+			else if (SereneChar->GetIsSprinting())
 			{
 				Volume = SprintVolumeMultiplier;
 			}

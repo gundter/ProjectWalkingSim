@@ -4,11 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Player/Components/StaminaComponent.h"
-#include "Player/Components/HeadBobComponent.h"
-#include "Player/Components/LeanComponent.h"
 #include "SereneCharacter.generated.h"
 
+class UStaminaComponent;
+class UHeadBobComponent;
+class ULeanComponent;
 class UInteractionComponent;
 class UFootstepComponent;
 class UInventoryComponent;
@@ -190,6 +190,5 @@ private:
 	float CrouchCameraInterpSpeed = 12.0f;
 
 	/** Callback bound to StaminaComponent::OnStaminaDepleted. Forces sprint stop. */
-	UFUNCTION()
 	void OnStaminaDepleted();
 };
