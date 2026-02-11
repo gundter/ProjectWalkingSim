@@ -16,6 +16,7 @@
 - AI: State Tree (not Behavior Trees)
 - Rendering: Lumen GI + Virtual Shadow Maps
 - Player: First-person with visible body
+- Process: Performance + code quality audit required before phase is marked complete (Epic coding standards, tick overhead, memory patterns, UE5 pitfalls)
 
 ---
 
