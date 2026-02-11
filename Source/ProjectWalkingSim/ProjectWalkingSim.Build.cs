@@ -18,7 +18,13 @@ public class ProjectWalkingSim : ModuleRules
 			"GameplayTags",
 			"PhysicsCore",
 			"RenderCore",
-			"RHI"
+			"RHI",
+
+			// AI modules (Phase 4)
+			"AIModule",
+			"NavigationSystem",
+			"StateTreeModule",
+			"GameplayStateTreeModule"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {
