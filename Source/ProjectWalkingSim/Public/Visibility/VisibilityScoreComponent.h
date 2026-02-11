@@ -34,11 +34,11 @@ public:
 	// --- Public API ---
 
 	/** Returns the current visibility score (0.0 = invisible, 1.0 = fully visible). */
-	UFUNCTION(BlueprintCallable, Category = "Visibility")
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Visibility")
 	float GetVisibilityScore() const { return VisibilityScore; }
 
 	/** Returns the raw light level before crouch/hiding modifiers (for debug). */
-	UFUNCTION(BlueprintCallable, Category = "Visibility")
+	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "Visibility")
 	float GetRawLightLevel() const { return RawLightLevel; }
 
 	/**

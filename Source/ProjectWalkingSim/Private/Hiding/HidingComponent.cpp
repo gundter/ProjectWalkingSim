@@ -415,6 +415,9 @@ void UHidingComponent::RestoreLookConstraints()
 // Player System Control
 // -----------------------------------------------------------------------------
 
+// NOTE: Architecture concern (SUGG-08) - this method has broad knowledge of player subsystems.
+// Future improvement: consider a "PlayerSystemsInterface" that components register with
+// for bulk enable/disable without explicit FindComponentByClass per type.
 void UHidingComponent::DisablePlayerSystems()
 {
 	ACharacter* Character = Cast<ACharacter>(GetOwner());
@@ -451,6 +454,9 @@ void UHidingComponent::DisablePlayerSystems()
 	}
 }
 
+// NOTE: Architecture concern (SUGG-08) - this method has broad knowledge of player subsystems.
+// Future improvement: consider a "PlayerSystemsInterface" that components register with
+// for bulk enable/disable without explicit FindComponentByClass per type.
 void UHidingComponent::RestorePlayerSystems()
 {
 	ACharacter* Character = Cast<ACharacter>(GetOwner());
