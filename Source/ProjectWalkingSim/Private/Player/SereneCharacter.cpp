@@ -11,6 +11,7 @@
 #include "Hiding/HidingComponent.h"
 #include "Hiding/HidingTypes.h"
 #include "Visibility/VisibilityScoreComponent.h"
+#include "AI/NoiseReportingComponent.h"
 #include "Player/HUD/SereneHUD.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
@@ -55,6 +56,9 @@ ASereneCharacter::ASereneCharacter()
 	// --- Phase 03 Components ---
 	HidingComponent = CreateDefaultSubobject<UHidingComponent>(TEXT("HidingComponent"));
 	VisibilityScoreComponent = CreateDefaultSubobject<UVisibilityScoreComponent>(TEXT("VisibilityScoreComponent"));
+
+	// --- Phase 04 Components ---
+	NoiseReportingComponent = CreateDefaultSubobject<UNoiseReportingComponent>(TEXT("NoiseReportingComponent"));
 
 	// --- Character Movement Component Configuration ---
 	// Grounded, deliberate horror movement. No jump, no air control.
@@ -128,8 +132,8 @@ void ASereneCharacter::BeginPlay()
 	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - Character initialized. WalkSpeed=%.0f, SprintSpeed=%.0f"),
 		WalkSpeed, SprintSpeed);
 
-	// Log all 8 component creation status (9 total with FirstPersonCamera)
-	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - Components: Stamina=%s, HeadBob=%s, Lean=%s, Interaction=%s, Footstep=%s, Inventory=%s, Hiding=%s, Visibility=%s"),
+	// Log all 9 component creation status (10 total with FirstPersonCamera)
+	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - Components: Stamina=%s, HeadBob=%s, Lean=%s, Interaction=%s, Footstep=%s, Inventory=%s, Hiding=%s, Visibility=%s, NoiseReporting=%s"),
 		StaminaComponent ? TEXT("OK") : TEXT("MISSING"),
 		HeadBobComponent ? TEXT("OK") : TEXT("MISSING"),
 		LeanComponent ? TEXT("OK") : TEXT("MISSING"),
@@ -137,7 +141,8 @@ void ASereneCharacter::BeginPlay()
 		FootstepComponent ? TEXT("OK") : TEXT("MISSING"),
 		InventoryComponent ? TEXT("OK") : TEXT("MISSING"),
 		HidingComponent ? TEXT("OK") : TEXT("MISSING"),
-		VisibilityScoreComponent ? TEXT("OK") : TEXT("MISSING"));
+		VisibilityScoreComponent ? TEXT("OK") : TEXT("MISSING"),
+		NoiseReportingComponent ? TEXT("OK") : TEXT("MISSING"));
 }
 
 void ASereneCharacter::Tick(float DeltaTime)

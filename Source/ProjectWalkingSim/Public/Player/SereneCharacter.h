@@ -14,6 +14,7 @@ class UFootstepComponent;
 class UInventoryComponent;
 class UHidingComponent;
 class UVisibilityScoreComponent;
+class UNoiseReportingComponent;
 
 class UCameraComponent;
 class USkeletalMeshComponent;
@@ -25,7 +26,7 @@ class USkeletalMeshComponent;
  * with a WorldRepresentationMesh for shadow casting. Camera is attached to the head
  * bone of the skeletal mesh. Movement is grounded and deliberate (no jump).
  *
- * Attached components (all 8 created in constructor, 9 total with camera):
+ * Attached components (all 9 created in constructor, 10 total with camera):
  * - StaminaComponent (Plan 03): Stamina drain/regen during sprint
  * - HeadBobComponent (Plan 03): Procedural sine-wave camera bob
  * - LeanComponent (Plan 03): Camera-only lean (Q/E)
@@ -34,6 +35,7 @@ class USkeletalMeshComponent;
  * - InventoryComponent (Phase 02): 8-slot item inventory
  * - HidingComponent (Phase 03): Hiding state machine and lifecycle
  * - VisibilityScoreComponent (Phase 03): Ambient light sampling for AI visibility
+ * - NoiseReportingComponent (Phase 04): Sprint noise to AI hearing bridge
  *
  * Camera offset aggregation: Tick() reads offsets from HeadBobComponent and
  * LeanComponent, sums them, and applies the combined result to the camera.
@@ -134,6 +136,12 @@ protected:
 	/** Ambient light sampling for visibility scoring. AI reads this in Phase 4. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UVisibilityScoreComponent> VisibilityScoreComponent;
+
+	// --- Phase 04 Components ---
+
+	/** Reports sprint footstep noise to AI hearing system. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UNoiseReportingComponent> NoiseReportingComponent;
 
 	// --- Movement Configuration ---
 
