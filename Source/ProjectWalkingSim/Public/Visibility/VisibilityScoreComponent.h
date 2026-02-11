@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Math/Float16Color.h"
 #include "VisibilityScoreComponent.generated.h"
 
 class USceneCaptureComponent2D;
@@ -86,6 +87,9 @@ private:
 
 	/** Timer handle for periodic capture. */
 	FTimerHandle CaptureTimerHandle;
+
+	/** Cached pixel readback buffer to avoid per-call heap allocation (CRIT-01). */
+	TArray<FFloat16Color> CachedPixels;
 
 	// --- Score State ---
 

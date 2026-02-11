@@ -54,8 +54,10 @@ void UVisibilityScoreComponent::BeginPlay()
 	SceneCapture->ShowFlags.SetFog(false);
 	SceneCapture->ShowFlags.SetPostProcessing(false);
 
-	// Lumen GI support: keep GI and reflections for correct light readings
-	SceneCapture->ShowFlags.SetGlobalIllumination(true);
+	// Disable GI for performance (WARN-09): direct lighting alone is sufficient
+	// for visibility scoring since we measure "how lit is the player", not
+	// how bounce light affects visibility. Reflections kept for specular cues.
+	SceneCapture->ShowFlags.SetGlobalIllumination(false);
 	SceneCapture->ShowFlags.SetReflectionEnvironment(true);
 
 	UE_LOG(LogSerene, Log, TEXT("VisibilityScoreComponent: SceneCapture initialized (FOV=%.0f, Interval=%.2fs)"),
@@ -105,12 +107,15 @@ void UVisibilityScoreComponent::ComputeScore()
 		return;
 	}
 
-	TArray<FFloat16Color> Pixels;
-	Resource->ReadFloat16Pixels(Pixels);
+	// Reuse cached pixel buffer to avoid per-call heap allocation (CRIT-01).
+	// NOTE: ReadFloat16Pixels is a synchronous GPU readback -- known performance concern.
+	// Future improvement: use ReadPixelsAsync or FRenderCommandFence for async readback.
+	CachedPixels.Reset();
+	Resource->ReadFloat16Pixels(CachedPixels);
 
 	// Compute average luminance using Rec.709 coefficients
 	float TotalLuminance = 0.0f;
-	for (const FFloat16Color& Pixel : Pixels)
+	for (const FFloat16Color& Pixel : CachedPixels)
 	{
 		const float R = Pixel.R.GetFloat();
 		const float G = Pixel.G.GetFloat();
@@ -118,7 +123,7 @@ void UVisibilityScoreComponent::ComputeScore()
 		TotalLuminance += 0.2126f * R + 0.7152f * G + 0.0722f * B;
 	}
 
-	const float AvgLuminance = (Pixels.Num() > 0) ? TotalLuminance / Pixels.Num() : 0.0f;
+	const float AvgLuminance = (CachedPixels.Num() > 0) ? TotalLuminance / CachedPixels.Num() : 0.0f;
 
 	// Normalize raw light level
 	RawLightLevel = FMath::Clamp(AvgLuminance / MaxExpectedLuminance, 0.0f, 1.0f);
