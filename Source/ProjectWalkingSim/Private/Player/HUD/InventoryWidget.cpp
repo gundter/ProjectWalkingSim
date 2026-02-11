@@ -71,7 +71,7 @@ void UInventoryWidget::NativeConstruct()
 	UE_LOG(LogSerene, Log, TEXT("UInventoryWidget::NativeConstruct - Created %d slot widgets"), SlotWidgets.Num());
 }
 
-void UInventoryWidget::RefreshSlots(const TArray<FInventorySlot>& Slots, const UInventoryComponent* InventoryComp)
+void UInventoryWidget::RefreshSlots(const TArray<FInventorySlot>& Slots, UInventoryComponent* InventoryComp)
 {
 	CachedInventoryComp = InventoryComp;
 

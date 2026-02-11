@@ -37,12 +37,13 @@ void UInventoryComponent::LoadItemRegistry()
 		// Try to get already-loaded asset first
 		UObject* LoadedObject = AssetManager.GetPrimaryAssetObject(AssetId);
 
-		// If not loaded, load synchronously via path resolution (acceptable for small item count)
+		// If not loaded, load synchronously via path resolution
 		if (!LoadedObject)
 		{
 			FSoftObjectPath AssetPath = AssetManager.GetPrimaryAssetPath(AssetId);
 			if (!AssetPath.IsNull())
 			{
+				// Synchronous load -- acceptable for <30 items. Consider LoadPrimaryAssetsAsync if item count grows.
 				LoadedObject = AssetPath.TryLoad();
 			}
 		}

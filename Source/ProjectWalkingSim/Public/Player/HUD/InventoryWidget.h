@@ -46,7 +46,7 @@ public:
 	 * @param InventoryComp Inventory component for item data lookup
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
-	void RefreshSlots(const TArray<FInventorySlot>& Slots, const UInventoryComponent* InventoryComp);
+	void RefreshSlots(const TArray<FInventorySlot>& Slots, UInventoryComponent* InventoryComp);
 
 	/** Show the inventory panel (set opacity to 1). */
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
@@ -150,9 +150,9 @@ private:
 	/** Source slot index for combine mode. */
 	int32 CombineSourceSlotIndex = -1;
 
-	/** Cached reference to inventory component for data lookup. */
+	/** Cached reference to inventory component for data lookup. Constness enforced at the API level. */
 	UPROPERTY()
-	TObjectPtr<const UInventoryComponent> CachedInventoryComp;
+	TObjectPtr<UInventoryComponent> CachedInventoryComp;
 
 	/** Internal handler for slot click events. */
 	UFUNCTION()

@@ -35,7 +35,8 @@ void APickupActor::BeginPlay()
 				FSoftObjectPath AssetPath = AssetManager.GetPrimaryAssetPath(AssetId);
 				if (!AssetPath.IsNull())
 				{
-					LoadedObject = AssetPath.TryLoad();
+					// Synchronous load -- acceptable for <30 items. Consider LoadPrimaryAssetsAsync if item count grows.
+				LoadedObject = AssetPath.TryLoad();
 				}
 			}
 
@@ -146,6 +147,7 @@ void APickupActor::InitFromItemData(FName InItemId, int32 InQuantity, const UIte
 	// Load and set world mesh if available
 	if (ItemData && !ItemData->WorldMesh.IsNull())
 	{
+		// Synchronous load on discard -- acceptable for player-initiated action with small item set.
 		UStaticMesh* Mesh = ItemData->WorldMesh.LoadSynchronous();
 		if (Mesh && MeshComponent)
 		{
