@@ -155,10 +155,8 @@ void ASereneCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (!FirstPersonCamera || !GetMesh())
-	{
-		return;
-	}
+	if (!ensureMsgf(FirstPersonCamera, TEXT("SereneCharacter: FirstPersonCamera is null"))) return;
+	if (!ensureMsgf(GetMesh(), TEXT("SereneCharacter: Mesh is null"))) return;
 
 	// --- Skip camera updates while hiding ---
 	// When hiding, the camera is controlled by SetViewTargetWithBlend
@@ -190,13 +188,29 @@ void ASereneCharacter::Tick(float DeltaTime)
 	}
 
 	// --- Position: head bone world location + actor-space offsets ---
-	const FVector HeadWorldPos = GetMesh()->GetSocketLocation(FName(TEXT("head")));
-	const FVector WorldOffset = GetActorRotation().RotateVector(ActorSpaceOffset);
-	FirstPersonCamera->SetWorldLocation(HeadWorldPos + WorldOffset);
+	static const FName HeadSocketName(TEXT("head"));
+	const FVector HeadWorldPos = GetMesh()->GetSocketLocation(HeadSocketName);
+
+	// Early-out: if all offsets are zero and no roll, skip RotateVector
+	const bool bHasOffset = !ActorSpaceOffset.IsNearlyZero(KINDA_SMALL_NUMBER);
+	const bool bHasRoll = !FMath::IsNearlyZero(CameraRoll, KINDA_SMALL_NUMBER);
+
+	if (bHasOffset)
+	{
+		const FVector WorldOffset = GetActorRotation().RotateVector(ActorSpaceOffset);
+		FirstPersonCamera->SetWorldLocation(HeadWorldPos + WorldOffset);
+	}
+	else
+	{
+		FirstPersonCamera->SetWorldLocation(HeadWorldPos);
+	}
 
 	// --- Rotation: controller rotation + lean roll ---
 	FRotator CameraRotation = GetControlRotation();
-	CameraRotation.Roll = CameraRoll;
+	if (bHasRoll)
+	{
+		CameraRotation.Roll = CameraRoll;
+	}
 	FirstPersonCamera->SetWorldRotation(CameraRotation);
 }
 
