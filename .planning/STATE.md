@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plans 04-01 through 04-04 complete.
+**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plans 04-01 through 04-05 complete.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,16 +22,16 @@
 ## Current Position
 
 **Phase:** 4 of 8 (Monster AI Core)
-**Plan:** 4 of ? (in progress)
+**Plan:** 5 of 7 (in progress)
 **Status:** In progress
-**Last activity:** 2026-02-11 - Completed 04-04-PLAN.md (Patrol route and State Tree tasks)
+**Last activity:** 2026-02-11 - Completed 04-05-PLAN.md (Perception-suspicion pipeline and sprint noise)
 
 **Progress:**
 ```
 Phase 1: [######] 6/6 plans complete
 Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
-Phase 4: [####..] 4/? plans complete
+Phase 4: [#####.] 5/7 plans complete
 Overall: [███.....] 3/8 phases complete
 ```
 
@@ -62,7 +62,8 @@ Overall: [███.....] 3/8 phases complete
 | 4-01  | 1/?   | 2/2   | ~2m  | 0      |
 | 4-02  | 2/?   | 2/2   | ~7m  | 1      |
 | 4-03  | 3/?   | 1/1   | ~4m  | 2      |
-| 4-04  | 4/?   | 2/2   | ~6m  | 1      |
+| 4-04  | 4/7   | 2/2   | ~6m  | 1      |
+| 4-05  | 5/7   | 2/2   | ~14m | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -129,6 +130,9 @@ Overall: [███.....] 3/8 phases complete
 | Mutable PingPongDirection for const GetNextWaypointIndex | Query method needs to track direction state for ping-pong; mutable is appropriate | 04-04 |
 | Look-around at 40% idle, clear at 75% | Creates observable scan pattern players can learn to exploit | 04-04 |
 | STT_ prefix for State Tree task structs | Consistent naming convention: FSTT_PatrolMoveToWaypoint, FSTT_PatrolIdle | 04-04 |
+| Volume threshold > not >= for sprint noise | Walk=1.0 exactly is silent; only sprint (1.5) generates AI noise | 04-05 |
+| NoiseReportingComponent on player, not Wendigo | Player is noise source; component reports outward via ReportNoiseEvent | 04-05 |
+| Tick for continuous sight, delegate for discrete hearing | Sight needs DeltaTime for accumulation; hearing is instant bump | 04-05 |
 
 ### Technical Discoveries
 
@@ -151,6 +155,7 @@ Overall: [███.....] 3/8 phases complete
 | Perception delegates must bind in BeginPlay, not constructor | Delegates don't work from constructor; binding in BeginPlay is safe | 04-03 |
 | AActor::Instigator member shadows parameter names | ProcessHearingPerception(AActor* Instigator) triggers C4458; renamed to NoiseInstigator | 04-04 |
 | State Tree tasks need explicit includes for linker and context | StateTreeLinker.h and StateTreeExecutionContext.h not transitively included from StateTreeTaskBase.h | 04-04 |
+| Parallel wave agents may pre-implement cross-plan work | 04-04 implemented 04-05 Task 1 (perception wiring) as part of its own scope | 04-05 |
 
 ### TODOs
 
@@ -162,7 +167,7 @@ Overall: [███.....] 3/8 phases complete
 - [x] Plan Phase 3: Hiding System
 - [x] Execute Phase 3 (all 6 plans)
 - [x] Plan Phase 4: Monster AI Core
-- [ ] Execute Phase 4 (04-01 through 04-04 complete)
+- [ ] Execute Phase 4 (04-01 through 04-05 complete)
 
 ### Blockers
 
@@ -176,16 +181,15 @@ None — Phase 4 in progress.
 
 **Date:** 2026-02-11
 **Completed:**
-- Executed 04-04 (Patrol route and State Tree tasks) - 2 tasks, ~6 minutes
-- APatrolRouteActor: expanded from stub with bLoopRoute, GetNextWaypointIndex, MakeEditWidget, editor debug viz
-- FSTT_PatrolMoveToWaypoint: MoveToLocation-based waypoint navigation, advances index on arrival
-- FSTT_PatrolIdle: random 3-6s duration, look-around at 40%, clear at 75%
-- Fixed AActor::Instigator shadow in WendigoAIController (NoiseInstigator rename)
-- Task 1 committed as b99d36c; Task 2 committed as 5806c94
+- Executed 04-05 (Perception-suspicion pipeline and sprint noise) - 2 tasks, ~14 minutes
+- Task 1 (perception-to-suspicion wiring) was pre-completed by parallel 04-04 agent in commit b99d36c
+- UNoiseReportingComponent: binds to FootstepComponent::OnFootstep, reports sprint noise to AI hearing
+- Integrated on ASereneCharacter as 10th component (9 custom + camera)
+- Task 2 committed as bababb2
 
-**Stopped at:** Completed 04-04-PLAN.md
+**Stopped at:** Completed 04-05-PLAN.md
 
-**Next:** Continue Phase 4 execution (remaining plans)
+**Next:** Continue Phase 4 execution (04-06, 04-07 remaining)
 
 ### Context for Next Session
 
@@ -195,7 +199,7 @@ The roadmap has 8 phases:
 1. Foundation - Player controller, movement, interaction - complete
 2. Inventory - 8-slot system with items - complete
 3. Hiding - Hide spots and visibility - complete
-4. Monster AI Core - State Tree, patrol, perception - in progress (04-01 through 04-04 done)
+4. Monster AI Core - State Tree, patrol, perception - in progress (04-01 through 04-05 done)
 5. Monster Behaviors - Chase, investigate, search, spawns
 6. Light and Audio - Flashlight, Lumen, spatial audio
 7. Save System - Checkpoints and manual saves
@@ -206,14 +210,15 @@ Phase 4 AI core building. The project now has:
 - AI module dependencies: AIModule, NavigationSystem, StateTreeModule, GameplayStateTreeModule
 - MonsterAITypes.h: EAlertLevel (Patrol/Suspicious/Alert), FOnAlertLevelChanged delegate, AIConstants
 - USuspicionComponent: sight/hearing processing, decay, 3 alert levels, delegate broadcasts
-- AWendigoAIController: StateTreeAIComponent, AIPerceptionComponent (sight+hearing), StartLogic guard, perception-to-suspicion wiring
+- AWendigoAIController: StateTreeAIComponent, AIPerceptionComponent (sight+hearing), StartLogic guard, perception-to-suspicion pipeline (Tick sight accumulation, delegate hearing bumps, decay)
+- UNoiseReportingComponent (on player): bridges FootstepComponent to AI hearing; sprint-only noise (Volume > 1.0)
 - AWendigoCharacter: 260cm capsule, 150 cm/s walk, SuspicionComponent, PatrolRoute ref
 - APatrolRouteActor: full waypoint container with loop/ping-pong, editor debug visualization, MakeEditWidget
 - FSTT_PatrolMoveToWaypoint: State Tree task using MoveToLocation for waypoint navigation
 - FSTT_PatrolIdle: State Tree task with random 3-6s pause and look-around behavior
 - 5 AI gameplay tags: AI.Alert.Patrol/Suspicious/Alert, AI.Stimulus.Sight/Hearing
 
-**Phase 4 remaining:**
+**Phase 4 remaining (04-06, 04-07):**
 - Additional State Tree tasks (investigate location, orient toward stimulus)
 - State Tree asset creation and wiring in editor
 - NavMesh configuration for tall Wendigo agent
@@ -222,4 +227,4 @@ Phase 4 AI core building. The project now has:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-11 (Phase 4 plan 04-04 complete)*
+*Last updated: 2026-02-11 (Phase 4 plan 04-05 complete)*
