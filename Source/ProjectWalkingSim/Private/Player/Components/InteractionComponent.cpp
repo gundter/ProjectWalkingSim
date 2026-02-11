@@ -16,7 +16,12 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	PerformTrace();
+	TimeSinceLastTrace += DeltaTime;
+	if (TimeSinceLastTrace >= TraceInterval)
+	{
+		TimeSinceLastTrace = 0.0f;
+		PerformTrace();
+	}
 }
 
 void UInteractionComponent::PerformTrace()

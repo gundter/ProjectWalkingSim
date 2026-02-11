@@ -14,6 +14,17 @@ void UStaminaBarWidget::NativeConstruct()
 	SetRenderOpacity(0.0f);
 }
 
+void UStaminaBarWidget::NativeDestruct()
+{
+	// Cancel any pending hide timer
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HideTimerHandle);
+	}
+
+	Super::NativeDestruct();
+}
+
 void UStaminaBarWidget::SetStaminaPercent(float Percent)
 {
 	if (StaminaBar)
@@ -28,8 +39,10 @@ void UStaminaBarWidget::SetStaminaPercent(float Percent)
 	if (Percent < 1.0f)
 	{
 		// Stamina is not full -- show the bar and cancel any hide timer.
-		bWaitingToHide = false;
-		HideTimer = 0.0f;
+		if (const UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(HideTimerHandle);
+		}
 
 		if (!bIsVisible)
 		{
@@ -39,10 +52,13 @@ void UStaminaBarWidget::SetStaminaPercent(float Percent)
 	else
 	{
 		// Stamina is full -- start the hide delay if not already waiting.
-		if (bIsVisible && !bWaitingToHide)
+		if (bIsVisible && !HideTimerHandle.IsValid())
 		{
-			bWaitingToHide = true;
-			HideTimer = 0.0f;
+			if (const UWorld* World = GetWorld())
+			{
+				World->GetTimerManager().SetTimer(
+					HideTimerHandle, this, &UStaminaBarWidget::HideBar, HideDelay, false);
+			}
 		}
 	}
 }
@@ -50,11 +66,15 @@ void UStaminaBarWidget::SetStaminaPercent(float Percent)
 void UStaminaBarWidget::ShowBar()
 {
 	bIsVisible = true;
-	bWaitingToHide = false;
-	HideTimer = 0.0f;
+
+	// Cancel any pending hide timer
+	if (const UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HideTimerHandle);
+	}
 
 	SetRenderOpacity(1.0f);
-	UE_LOG(LogSerene, Log, TEXT("UStaminaBarWidget::ShowBar - Bar now visible."));
+	UE_LOG(LogSerene, Verbose, TEXT("UStaminaBarWidget::ShowBar - Bar now visible."));
 
 	if (FadeAnimation)
 	{
@@ -65,27 +85,12 @@ void UStaminaBarWidget::ShowBar()
 void UStaminaBarWidget::HideBar()
 {
 	bIsVisible = false;
-	bWaitingToHide = false;
-	HideTimer = 0.0f;
+	HideTimerHandle.Invalidate();
 
 	SetRenderOpacity(0.0f);
 
 	if (FadeAnimation)
 	{
 		PlayAnimation(FadeAnimation, 0.0f, 1, EUMGSequencePlayMode::Reverse);
-	}
-}
-
-void UStaminaBarWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
-{
-	Super::NativeTick(MyGeometry, InDeltaTime);
-
-	if (bWaitingToHide)
-	{
-		HideTimer += InDeltaTime;
-		if (HideTimer >= HideDelay)
-		{
-			HideBar();
-		}
 	}
 }

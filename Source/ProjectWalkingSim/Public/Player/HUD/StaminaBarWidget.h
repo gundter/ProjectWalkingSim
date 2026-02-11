@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "TimerManager.h"
 #include "StaminaBarWidget.generated.h"
 
 class UProgressBar;
@@ -52,7 +53,7 @@ public:
 
 protected:
 	virtual void NativeConstruct() override;
-	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
+	virtual void NativeDestruct() override;
 
 	/** The progress bar fill. Must exist in UMG Blueprint with this exact name. */
 	UPROPERTY(meta = (BindWidget))
@@ -66,12 +67,9 @@ private:
 	/** Whether the bar is currently visible (or transitioning to visible). */
 	bool bIsVisible = false;
 
-	/** Whether we are waiting to hide the bar after full stamina. */
-	bool bWaitingToHide = false;
-
 	/** Seconds to wait after stamina reaches 100% before hiding. */
 	float HideDelay = 2.0f;
 
-	/** Accumulates time while waiting to hide. */
-	float HideTimer = 0.0f;
+	/** Timer handle for delayed hide after stamina reaches full. */
+	FTimerHandle HideTimerHandle;
 };

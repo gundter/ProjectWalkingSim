@@ -57,6 +57,12 @@ private:
 	/** The actor currently in focus (looked at within range). */
 	TWeakObjectPtr<AActor> CurrentInteractable;
 
+	/** Interval in seconds between interaction traces. 0.05s = 20Hz. */
+	float TraceInterval = 0.05f;
+
+	/** Accumulated time since last trace. */
+	float TimeSinceLastTrace = 0.0f;
+
 	/** Perform per-tick line trace from camera center to detect interactables. */
 	void PerformTrace();
 
