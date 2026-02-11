@@ -10,7 +10,6 @@
 class AHidingSpotActor;
 class UHidingSpotDataAsset;
 class UInputMappingContext;
-class UInputAction;
 class UAnimMontage;
 
 /**
@@ -25,7 +24,7 @@ class UAnimMontage;
  *
  * While Hidden:
  * - Look constraints are set relative to hiding spot orientation (world-space yaw offset)
- * - Input context switches to hiding-only (look + exit, no movement/interact)
+ * - Input context switches to hiding-only (look + interact-to-exit, no movement)
  * - Player mesh is hidden
  * - Visibility score reduction is applied
  *
@@ -38,8 +37,6 @@ class PROJECTWALKINGSIM_API UHidingComponent : public UActorComponent
 
 public:
 	UHidingComponent();
-
-	virtual void BeginPlay() override;
 
 	// --- Public API ---
 
@@ -80,13 +77,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> DefaultMappingContext;
 
-	/** Input Mapping Context active while hiding (look + exit only). */
+	/** Input Mapping Context active while hiding (look + interact-to-exit only). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputMappingContext> HidingMappingContext;
-
-	/** Input Action for exiting a hiding spot. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")
-	TObjectPtr<UInputAction> ExitHidingAction;
 
 	/** Priority for the hiding IMC (higher than default 0 to override). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Input")

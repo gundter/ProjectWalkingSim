@@ -4,8 +4,7 @@ Phase 3 Asset Creation Script for The Juniper Tree.
 Run via: UnrealEditor-Cmd.exe <project> -ExecutePythonScript=<this_script> -nullrhi -unattended
 
 Creates programmatically:
-  - 1 Input Action asset (IA_ExitHiding)
-  - 1 Input Mapping Context (IMC_Hiding) with F -> ExitHiding and Mouse2D -> Look
+  - 1 Input Mapping Context (IMC_Hiding) with F -> IA_Interact and Mouse2D -> IA_Look
 
 Manual steps required after this script (see EDITOR_SETUP_PHASE3.md):
   - 3 HidingSpotDataAsset instances (DA_HidingSpot_Locker, Closet, UnderBed)
@@ -35,48 +34,13 @@ def make_key(name):
     return k
 
 # ===================================================================
-# 1. Create IA_ExitHiding Input Action
+# 1. Create IMC_Hiding Input Mapping Context
 # ===================================================================
 
-def create_exit_hiding_action():
-    """Create IA_ExitHiding input action under /Game/Input/Actions/."""
-
-    path = "/Game/Input/Actions"
-    ensure_directory(path)
-    asset_path = f"{path}/IA_ExitHiding"
-
-    if unreal.EditorAssetLibrary.does_asset_exist(asset_path):
-        unreal.log_warning("[SKIP] IA_ExitHiding already exists")
-        return unreal.EditorAssetLibrary.load_asset(asset_path)
-
-    at = unreal.AssetToolsHelpers.get_asset_tools()
-    factory = unreal.InputAction_Factory()
-
-    ia = at.create_asset("IA_ExitHiding", path, unreal.InputAction, factory)
-    if ia is None:
-        unreal.log_error("[FAIL] Could not create IA_ExitHiding")
-        return None
-
-    # Boolean value type for exit action (single press)
-    ia.set_editor_property("value_type", unreal.InputActionValueType.BOOLEAN)
-
-    # Add Pressed trigger so it fires once on key press
-    trigger = unreal.InputTriggerPressed()
-    ia.set_editor_property("triggers", [trigger])
-
-    save(asset_path)
-    unreal.log_warning("[OK] Created IA_ExitHiding (type=BOOLEAN, trigger=Pressed)")
-
-    return ia
-
-# ===================================================================
-# 2. Create IMC_Hiding Input Mapping Context
-# ===================================================================
-
-def create_imc_hiding(exit_action):
+def create_imc_hiding():
     """
     Create IMC_Hiding with two mappings:
-    1. F key -> IA_ExitHiding (Pressed trigger)
+    1. F key -> IA_Interact (reuses existing interact action; controller routes to ExitHidingSpot when hiding)
     2. Mouse2D -> IA_Look (existing action for look input)
     """
 
@@ -96,12 +60,18 @@ def create_imc_hiding(exit_action):
         unreal.log_error("[FAIL] Could not create IMC_Hiding")
         return None
 
-    # --- Mapping 1: F key -> IA_ExitHiding ---
-    if exit_action:
-        m_exit = imc.map_key(exit_action, make_key("F"))
-        pressed = unreal.InputTriggerPressed()
-        m_exit.set_editor_property("triggers", [pressed])
-        unreal.log_warning("[OK] IMC_Hiding: F -> IA_ExitHiding (Pressed)")
+    # --- Mapping 1: F key -> IA_Interact (reuse existing) ---
+    ia_interact_path = "/Game/Input/Actions/IA_Interact"
+    if unreal.EditorAssetLibrary.does_asset_exist(ia_interact_path):
+        ia_interact = unreal.EditorAssetLibrary.load_asset(ia_interact_path)
+        if ia_interact:
+            m_interact = imc.map_key(ia_interact, make_key("F"))
+            pressed = unreal.InputTriggerPressed()
+            m_interact.set_editor_property("triggers", [pressed])
+            unreal.log_warning("[OK] IMC_Hiding: F -> IA_Interact (Pressed)")
+    else:
+        unreal.log_warning("[WARN] IA_Interact not found - Interact mapping not added to IMC_Hiding")
+        unreal.log_warning("[WARN] Add Interact mapping manually after running Phase 1 script")
 
     # --- Mapping 2: Mouse2D -> IA_Look (reuse existing) ---
     ia_look_path = "/Game/Input/Actions/IA_Look"
@@ -132,17 +102,14 @@ def main():
     unreal.log_warning("Phase 3 Asset Creation - The Juniper Tree")
     unreal.log_warning("=" * 60)
 
-    # Create IA_ExitHiding
-    exit_action = create_exit_hiding_action()
-
-    # Create IMC_Hiding
-    imc = create_imc_hiding(exit_action)
+    # Create IMC_Hiding (maps F -> IA_Interact, Mouse2D -> IA_Look)
+    imc = create_imc_hiding()
 
     unreal.log_warning("=" * 60)
     unreal.log_warning("PHASE 3 AUTOMATED ASSET CREATION COMPLETE")
     unreal.log_warning("=" * 60)
     unreal.log_warning("")
-    unreal.log_warning("Created: IA_ExitHiding + IMC_Hiding (fully configured)")
+    unreal.log_warning("Created: IMC_Hiding (F -> IA_Interact, Mouse2D -> IA_Look)")
     unreal.log_warning("")
     unreal.log_warning("MANUAL STEPS REQUIRED:")
     unreal.log_warning("See Scripts/EDITOR_SETUP_PHASE3.md for:")

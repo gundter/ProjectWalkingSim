@@ -14,7 +14,6 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Camera/PlayerCameraManager.h"
-#include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Animation/AnimInstance.h"
 #include "Animation/AnimMontage.h"
@@ -22,32 +21,6 @@
 UHidingComponent::UHidingComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-}
-
-void UHidingComponent::BeginPlay()
-{
-	Super::BeginPlay();
-
-	// Bind the exit hiding input action.
-	// The binding always exists on the input component, but ExitHidingAction
-	// only fires when HidingMappingContext is active (Enhanced Input pattern).
-	ACharacter* Character = Cast<ACharacter>(GetOwner());
-	if (!Character)
-	{
-		return;
-	}
-
-	APlayerController* PC = Cast<APlayerController>(Character->GetController());
-	if (!PC)
-	{
-		return;
-	}
-
-	UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(PC->InputComponent);
-	if (EIC && ExitHidingAction)
-	{
-		EIC->BindAction(ExitHidingAction, ETriggerEvent::Started, this, &UHidingComponent::ExitHidingSpot);
-	}
 }
 
 // -----------------------------------------------------------------------------

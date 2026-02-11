@@ -26,18 +26,15 @@ The C++ code for the hiding system is complete (Plans 01-05). This guide covers 
 
 ### What the Script Creates
 
-- **IA_ExitHiding** - Boolean input action with Pressed trigger for exiting hiding spots
 - **IMC_Hiding** - Input Mapping Context with two mappings:
-  - F key -> IA_ExitHiding (Pressed trigger)
+  - F key -> IA_Interact (reuses existing interact action; controller routes to ExitHidingSpot when hiding)
   - Mouse2D -> IA_Look (constrained look while hiding)
 
 ### Verify Script Results
 
-1. Navigate to `Content/Input/Actions/`
-2. Confirm `IA_ExitHiding` exists (Boolean type, Pressed trigger)
-3. Navigate to `Content/Input/Mappings/`
-4. Open `IMC_Hiding` and verify:
-   - F is bound to IA_ExitHiding with Pressed trigger
+1. Navigate to `Content/Input/Mappings/`
+2. Open `IMC_Hiding` and verify:
+   - F is bound to IA_Interact with Pressed trigger
    - Mouse2D is bound to IA_Look
 
 ---
@@ -153,21 +150,19 @@ Wire up the HidingComponent's input references on the Blueprint.
 1. Open `Content/Blueprints/Game/BP_SereneCharacter`
 2. In the Components panel, select **HidingComponent**
 3. In the Details panel, find the **Input** category
-4. Set these three properties:
+4. Set these two properties:
 
 | Property | Value |
 |----------|-------|
 | DefaultMappingContext | IMC_Default |
 | HidingMappingContext | IMC_Hiding |
-| ExitHidingAction | IA_ExitHiding |
 
 5. **Compile** and **Save** the Blueprint
 
 ### Why these matter
 
 - **DefaultMappingContext (IMC_Default):** The HidingComponent removes this when entering a hiding spot to disable WASD movement, sprint, crouch, and other default inputs. It restores this on exit.
-- **HidingMappingContext (IMC_Hiding):** Added while hiding. Contains only Look (mouse) and ExitHiding (F key).
-- **ExitHidingAction (IA_ExitHiding):** The input action bound in BeginPlay that triggers ExitHidingSpot() when F is pressed during hiding.
+- **HidingMappingContext (IMC_Hiding):** Added while hiding. Contains only Look (mouse) and Interact (F key). The controller's HandleInteract routes F to ExitHidingSpot() when the player is hiding.
 
 ---
 
@@ -268,12 +263,12 @@ Press **Ctrl+S** to save TestMap.
 
 ### F Key Does Not Exit
 
-**Cause:** ExitHidingAction not assigned on HidingComponent, or IMC_Hiding not active.
+**Cause:** IMC_Hiding not active, or HidingMappingContext not assigned on HidingComponent.
 
 **Fix:**
 1. Open BP_SereneCharacter > HidingComponent
-2. Verify ExitHidingAction = IA_ExitHiding
-3. Verify HidingMappingContext = IMC_Hiding
+2. Verify HidingMappingContext = IMC_Hiding
+3. Open IMC_Hiding and verify F is mapped to IA_Interact
 4. Compile and save the Blueprint
 
 ### Movement Not Restored After Exit
@@ -293,8 +288,7 @@ After completing this guide, the project should have:
 
 | Asset | Path | Type |
 |-------|------|------|
-| IA_ExitHiding | Content/Input/Actions/ | Input Action (Boolean, Pressed) |
-| IMC_Hiding | Content/Input/Mappings/ | Input Mapping Context (F + Mouse2D) |
+| IMC_Hiding | Content/Input/Mappings/ | Input Mapping Context (F -> IA_Interact, Mouse2D -> IA_Look) |
 | DA_HidingSpot_Locker | Content/Hiding/ | HidingSpotDataAsset |
 | DA_HidingSpot_Closet | Content/Hiding/ | HidingSpotDataAsset |
 | DA_HidingSpot_UnderBed | Content/Hiding/ | HidingSpotDataAsset |
