@@ -28,13 +28,13 @@ Requirements for initial demo release. Each maps to roadmap phases.
 
 ### Wendigo Monster
 
-- [ ] **WNDG-01**: State Tree-driven AI controller
-- [ ] **WNDG-02**: Patrol behavior within designated patrol zones
+- [x] **WNDG-01**: State Tree-driven AI controller
+- [x] **WNDG-02**: Patrol behavior within designated patrol zones
 - [ ] **WNDG-03**: Investigate sounds and visual disturbances
 - [ ] **WNDG-04**: Chase player when spotted
 - [ ] **WNDG-05**: Search behavior when player escapes/hides
 - [ ] **WNDG-06**: Multiple spawn locations with per-spawn patrol zones
-- [ ] **WNDG-07**: AI Perception system (sight + hearing)
+- [x] **WNDG-07**: AI Perception system (sight + hearing)
 
 ### Light System
 
@@ -120,13 +120,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INVT-04 | Phase 2: Inventory System | Complete |
 | HIDE-01 | Phase 3: Hiding System | Complete |
 | HIDE-02 | Phase 3: Hiding System | Complete |
-| WNDG-01 | Phase 4: Monster AI Core | Pending |
-| WNDG-02 | Phase 4: Monster AI Core | Pending |
+| WNDG-01 | Phase 4: Monster AI Core | Complete |
+| WNDG-02 | Phase 4: Monster AI Core | Complete |
 | WNDG-03 | Phase 5: Monster Behaviors | Pending |
 | WNDG-04 | Phase 5: Monster Behaviors | Pending |
 | WNDG-05 | Phase 5: Monster Behaviors | Pending |
 | WNDG-06 | Phase 5: Monster Behaviors | Pending |
-| WNDG-07 | Phase 4: Monster AI Core | Pending |
+| WNDG-07 | Phase 4: Monster AI Core | Complete |
 | LGHT-01 | Phase 6: Light and Audio | Pending |
 | LGHT-02 | Phase 6: Light and Audio | Pending |
 | AUDO-01 | Phase 6: Light and Audio | Pending |

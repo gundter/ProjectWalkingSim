@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plans 04-01 through 04-06 complete.
+**Current Focus:** Phase 4 complete. Ready for Phase 5 (Monster Behaviors) — chase, investigate, search, spawns.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -21,18 +21,18 @@
 
 ## Current Position
 
-**Phase:** 4 of 8 (Monster AI Core)
-**Plan:** 6 of 7 (in progress)
-**Status:** In progress
-**Last activity:** 2026-02-11 - Completed 04-06-PLAN.md (Investigation tasks and suspicion condition)
+**Phase:** 5 of 8 (Monster Behaviors)
+**Plan:** 0 of ? (not yet planned)
+**Status:** Ready to plan Phase 5
+**Last activity:** 2026-02-11 - Phase 4 complete, all features verified
 
 **Progress:**
 ```
-Phase 1: [######] 6/6 plans complete
-Phase 2: [######] 6/6 plans complete
-Phase 3: [######] 6/6 plans complete
-Phase 4: [######.] 6/7 plans complete
-Overall: [███.....] 3/8 phases complete
+Phase 1: [######] 6/6 plans complete ✓
+Phase 2: [######] 6/6 plans complete ✓
+Phase 3: [######] 6/6 plans complete ✓
+Phase 4: [#######] 7/7 plans complete ✓
+Overall: [████....] 4/8 phases complete
 ```
 
 ---
@@ -173,13 +173,15 @@ Overall: [███.....] 3/8 phases complete
 - [x] Plan Phase 3: Hiding System
 - [x] Execute Phase 3 (all 6 plans)
 - [x] Plan Phase 4: Monster AI Core
-- [ ] Execute Phase 4 (04-01 through 04-06 complete)
+- [x] Execute Phase 4 (all 7 plans)
+- [ ] Plan Phase 5: Monster Behaviors
+- [ ] Execute Phase 5
 - [ ] Future: Consider spline-based patrol routes for polish/main release (current MakeEditWidget waypoints work but less designer-friendly; may not need static routes in main release)
 - [ ] Future: Replace On Tick State Tree transitions with event-driven triggers (OnAlertLevelChanged delegate, gameplay tags, or reduced tick interval) for performance — On Tick is fine for demo but won't scale for complex Alien: Isolation-style State Trees
 
 ### Blockers
 
-None — Phase 4 in progress.
+None — Phase 4 complete, ready for Phase 5.
 
 ---
 
@@ -189,29 +191,64 @@ None — Phase 4 in progress.
 
 **Date:** 2026-02-11
 **Completed:**
-- Executed 04-06 (Investigation tasks and suspicion condition) - 2 tasks, ~5 minutes
-- FSTT_InvestigateLocation: navigates to stimulus at 200 cm/s, 4s look-around, clears stimulus
-- FSTT_OrientToward: menacing 2s pause with SetFocalPoint for smooth rotation
-- FSTC_SuspicionLevel: enum comparison condition with invert for bidirectional transitions
-- Task 1 committed as a86cd8a, Task 2 committed as c54ed94
+- Executed all 7 Phase 4 plans across 5 waves
+- Wave 1: AI foundation types (04-01)
+- Wave 2: WendigoCharacter + SuspicionComponent (04-02) + WendigoAIController (04-03) in parallel
+- Wave 3: PatrolRouteActor + patrol tasks (04-04) + perception-to-suspicion wiring (04-05) in parallel
+- Wave 4: Investigation tasks + suspicion condition (04-06)
+- Wave 5: Editor assets + PIE verification (04-07) with interactive checkpoint
+- Fixed 7 integration issues during PIE verification:
+  1. STC_SuspicionLevel missing instance data struct (State Tree requirement)
+  2. Waypoints world-space vs local-space mismatch (MakeEditWidget is local)
+  3. CurrentWaypointIndex reset on state re-entry (moved to character)
+  4. Player missing AIPerceptionStimuliSourceComponent for sight
+  5. Sight didn't set stimulus location for investigation
+  6. VisibilityScore too low for default threshold (0.16 in full light vs 0.3 threshold)
+  7. Sight suspicion accumulation too slow for practical gameplay
+- Collaboratively designed hierarchical State Tree structure:
+  Patrol (container) > Suspicious/Investigate (reactive), Move to Waypoint/Idle (default)
+- On Tick transitions on Move to Waypoint and Patrol Idle for suspicion interrupts
+- Verified patrol (loop + ping-pong), sight detection, hearing detection, state transitions
 
-**Stopped at:** Completed 04-06-PLAN.md
+**Stopped at:** Phase 4 complete
 
-**Next:** Continue Phase 4 execution (04-07 remaining -- editor assets, NavMesh, PIE verification)
+**Next:** Plan Phase 5 (Monster Behaviors)
 
 ### Context for Next Session
 
 The Juniper Tree is a psychological horror game demo. The player is a detective investigating a missing boy, eventually discovering they ARE the murdered boy. A Wendigo (the father transformed by cannibalism) stalks the player.
 
 The roadmap has 8 phases:
-1. Foundation - Player controller, movement, interaction - complete
-2. Inventory - 8-slot system with items - complete
-3. Hiding - Hide spots and visibility - complete
-4. Monster AI Core - State Tree, patrol, perception - in progress (04-01 through 04-06 done)
+1. Foundation - Player controller, movement, interaction ✓
+2. Inventory - 8-slot system with items ✓
+3. Hiding - Hide spots and visibility ✓
+4. Monster AI Core - State Tree, patrol, perception ✓
 5. Monster Behaviors - Chase, investigate, search, spawns
 6. Light and Audio - Flashlight, Lumen, spatial audio
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
+
+Phase 4 complete. The project now has:
+- All Phase 1-3 features (character, movement, interaction, inventory, hiding, visibility)
+- AWendigoCharacter: 260cm capsule, 150 cm/s walk, SuspicionComponent, PatrolRoute reference, CurrentWaypointIndex
+- AWendigoAIController: StateTreeAIComponent, AIPerceptionComponent (sight 2500cm/90deg, hearing 2000cm), two-flag StartLogic guard, continuous sight processing in Tick, hearing via delegate
+- USuspicionComponent: sight accumulation (visibility-scaled), hearing bump (0.25), decay, 3 alert levels, OnAlertLevelChanged delegate
+- APatrolRouteActor: local-space waypoints with MakeEditWidget, loop/ping-pong modes, editor debug visualization
+- UNoiseReportingComponent: sprint footstep -> ReportNoiseEvent bridge (11th player component)
+- UAIPerceptionStimuliSourceComponent: registered for sight on player (12th player component)
+- State Tree tasks: STT_PatrolMoveToWaypoint, STT_PatrolIdle, STT_InvestigateLocation, STT_OrientToward
+- State Tree condition: FSTC_SuspicionLevel (enum comparison with invert)
+- Editor assets: BP_WendigoCharacter, BP_PatrolRoute, BP_WendigoAIController, ST_WendigoAI
+- AI gameplay tags: AI.Wendigo, AI.AlertLevel.Patrol/Suspicious/Alert, AI.Stimulus.Noise/Visual
+- 22 AI source files, ~1800 lines of C++
+
+13/29 v1 requirements complete. No orphans.
+
+**Phase 5 delivers:**
+- Chase player when spotted (WNDG-04)
+- Investigate sounds and visual disturbances (WNDG-03)
+- Search behavior when player escapes/hides (WNDG-05)
+- Multiple spawn locations with per-spawn patrol zones (WNDG-06)
 
 Phase 4 AI core building. The project now has:
 - All Phase 1-3 features (character, movement, interaction, HUD, inventory, hiding)
