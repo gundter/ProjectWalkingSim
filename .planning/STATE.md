@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 3 complete. Ready for Phase 4 (Monster AI Core) — State Tree AI, patrol, perception.
+**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plan 04-01 complete.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,15 +22,16 @@
 ## Current Position
 
 **Phase:** 4 of 8 (Monster AI Core)
-**Plan:** 0 of ? (not yet planned)
-**Status:** Ready to plan Phase 4
-**Last activity:** 2026-02-10 - Phase 3 complete, all features verified
+**Plan:** 1 of ? (in progress)
+**Status:** In progress
+**Last activity:** 2026-02-11 - Completed 04-01-PLAN.md (AI foundation types)
 
 **Progress:**
 ```
-Phase 1: [######] 6/6 plans complete ✓
-Phase 2: [######] 6/6 plans complete ✓
-Phase 3: [######] 6/6 plans complete ✓
+Phase 1: [######] 6/6 plans complete
+Phase 2: [######] 6/6 plans complete
+Phase 3: [######] 6/6 plans complete
+Phase 4: [#.....] 1/? plans complete
 Overall: [███.....] 3/8 phases complete
 ```
 
@@ -58,6 +59,7 @@ Overall: [███.....] 3/8 phases complete
 | 3-04  | 4/6   | 1/1   | ~4m  | 0      |
 | 3-05  | 5/6   | 2/2   | ~3m  | 0      |
 | 3-06  | 6/6   | 2/2*  | ~15m | 4      |
+| 4-01  | 1/?   | 2/2   | ~2m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -140,12 +142,12 @@ Overall: [███.....] 3/8 phases complete
 - [x] Execute Phase 2 (all 6 plans)
 - [x] Plan Phase 3: Hiding System
 - [x] Execute Phase 3 (all 6 plans)
-- [ ] Plan Phase 4: Monster AI Core
-- [ ] Execute Phase 4
+- [x] Plan Phase 4: Monster AI Core
+- [ ] Execute Phase 4 (04-01 complete)
 
 ### Blockers
 
-None — Phase 3 complete, ready for Phase 4.
+None — Phase 4 in progress.
 
 ---
 
@@ -153,60 +155,47 @@ None — Phase 3 complete, ready for Phase 4.
 
 ### Last Session
 
-**Date:** 2026-02-10
+**Date:** 2026-02-11
 **Completed:**
-- Executed all 6 Phase 3 plans across 4 waves
-- Wave 1: Foundation types (03-01) + Visibility score component (03-02) in parallel
-- Wave 2: HidingSpotActor (03-03) + HidingComponent (03-04) in parallel
-- Wave 3: Character integration (03-05)
-- Wave 4: Editor assets + PIE verification (03-06) with checkpoint
-- Fixed 4 integration bugs during PIE verification:
-  1. Commented-out OnInteract delegation (parallel plan artifact)
-  2. Exit sequencing: OnExitHiding called after pointer cleared
-  3. Hiding camera bAutoActivate=false preventing CalcCamera from reading it
-  4. Controller rotation not mirrored to hiding camera for look-around
-- Simplified input: removed IA_ExitHiding, reuse IA_Interact
-- Verified full hiding flow in PIE (enter, look-around, exit, re-enter)
+- Executed 04-01 (AI foundation types) - 2 tasks, ~2 minutes
+- Added AIModule, NavigationSystem, StateTreeModule, GameplayStateTreeModule to Build.cs
+- Enabled StateTree and GameplayStateTree plugins in .uproject
+- Created AITypes.h: EAlertLevel enum, FOnAlertLevelChanged delegate, AIConstants namespace (11 tuning params)
+- Added 5 AI gameplay tags to SereneTags (3 alert levels + 2 stimulus types)
 
-**Stopped at:** Phase 3 complete
+**Stopped at:** Completed 04-01-PLAN.md
 
-**Next:** Plan Phase 4 (Monster AI Core)
+**Next:** Continue Phase 4 execution (04-02 onward)
 
 ### Context for Next Session
 
 The Juniper Tree is a psychological horror game demo. The player is a detective investigating a missing boy, eventually discovering they ARE the murdered boy. A Wendigo (the father transformed by cannibalism) stalks the player.
 
 The roadmap has 8 phases:
-1. Foundation - Player controller, movement, interaction ✓
-2. Inventory - 8-slot system with items ✓
-3. Hiding - Hide spots and visibility ✓
-4. Monster AI Core - State Tree, patrol, perception
+1. Foundation - Player controller, movement, interaction - complete
+2. Inventory - 8-slot system with items - complete
+3. Hiding - Hide spots and visibility - complete
+4. Monster AI Core - State Tree, patrol, perception - in progress (04-01 done)
 5. Monster Behaviors - Chase, investigate, search, spawns
 6. Light and Audio - Flashlight, Lumen, spatial audio
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
 
-Phase 3 complete. The project now has:
-- All Phase 1 features (character, movement, interaction, HUD)
-- All Phase 2 features (inventory, items, doors, combine)
-- UHidingComponent: 4-state machine (Free/Entering/Hidden/Exiting) with montage, camera blend, look constraints, IMC switching
-- AHidingSpotActor: dual IInteractable + IHideable, SpotMesh, HidingCamera, SpotData reference
-- UVisibilityScoreComponent: 8x8 SceneCapture light sampling, 0.0-1.0 score, crouch/hiding modifiers
-- UHidingSpotDataAsset: per-type config (camera limits, blend times, interaction text, visibility reduction)
-- 5 gameplay tags: Player.Hiding, Interaction.HidingSpot, HidingSpot.Locker/Closet/UnderBed
-- IMC_Hiding: F -> IA_Interact (exit via controller routing), Mouse2D -> IA_Look
-- 3 data assets: DA_HidingSpot_Locker, DA_HidingSpot_Closet, DA_HidingSpot_UnderBed
-- ASereneCharacter: 9 components total, hiding-aware Tick bypass
+Phase 4 foundation laid. The project now has:
+- All Phase 1-3 features (character, movement, interaction, HUD, inventory, hiding)
+- AI module dependencies: AIModule, NavigationSystem, StateTreeModule, GameplayStateTreeModule
+- AI types: EAlertLevel (Patrol/Suspicious/Alert), FOnAlertLevelChanged delegate
+- AIConstants: 11 tuning parameters (visibility, suspicion, movement, perception ranges)
+- 5 AI gameplay tags: AI.Alert.Patrol/Suspicious/Alert, AI.Stimulus.Sight/Hearing
 
-All 9 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep, Inventory, Camera, Hiding, VisibilityScore.
-10/29 v1 requirements complete. No orphans.
-
-**Phase 4 delivers:**
-- State Tree-driven AI controller for Wendigo
-- Patrol behavior within designated zones
-- AI Perception system (sight + hearing)
+**Phase 4 remaining:**
+- Wendigo AI controller with StateTreeAIComponent and Perception
+- Wendigo character pawn with SuspicionComponent
+- Custom State Tree tasks (patrol, idle, investigate)
+- PatrolRouteActor for waypoint-based patrol
+- Editor assets and PIE verification
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-10 (Phase 3 complete)*
+*Last updated: 2026-02-11 (Phase 4 plan 04-01 complete)*
