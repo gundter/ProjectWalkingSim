@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 3 in progress (Hiding System) — foundation types, visibility scoring, hiding spots, player-side hiding component, and character integration complete. Verification next.
+**Current Focus:** Phase 3 complete. Ready for Phase 4 (Monster AI Core) — State Tree AI, patrol, perception.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -21,17 +21,17 @@
 
 ## Current Position
 
-**Phase:** 3 of 8 (Hiding System)
-**Plan:** 5 of 6 complete
-**Status:** In progress
-**Last activity:** 2026-02-10 - Completed 03-05-PLAN.md (Character Integration)
+**Phase:** 4 of 8 (Monster AI Core)
+**Plan:** 0 of ? (not yet planned)
+**Status:** Ready to plan Phase 4
+**Last activity:** 2026-02-10 - Phase 3 complete, all features verified
 
 **Progress:**
 ```
-Phase 1: [######] 6/6 plans complete
-Phase 2: [######] 6/6 plans complete
-Phase 3: [#####.] 5/6 plans complete
-Overall: [█████████████░░░░░░░░░░░] 17/18 plans (94%) | 2.8/8 phases
+Phase 1: [######] 6/6 plans complete ✓
+Phase 2: [######] 6/6 plans complete ✓
+Phase 3: [######] 6/6 plans complete ✓
+Overall: [███.....] 3/8 phases complete
 ```
 
 ---
@@ -57,6 +57,7 @@ Overall: [█████████████░░░░░░░░░░�
 | 3-03  | 3/6   | 1/1   | ~5m  | 0      |
 | 3-04  | 4/6   | 1/1   | ~4m  | 0      |
 | 3-05  | 5/6   | 2/2   | ~3m  | 0      |
+| 3-06  | 6/6   | 2/2*  | ~15m | 4      |
 
 *Checkpoint tasks require human verification
 
@@ -109,22 +110,10 @@ Overall: [█████████████░░░░░░░░░░�
 | SetVisibility for tooltip show/hide | RenderOpacity allows Tab focus on hidden buttons; Visibility blocks input properly | 02-06 |
 | Tab key handled in InventoryWidget | Widget has focus for keyboard nav; must explicitly handle Tab to close | 02-06 |
 | TObjectPtr for data asset references (not TSoftObjectPtr) | Data assets always loaded when referenced; no need for async load | 03-01 |
-| NSLOCTEXT for default hiding interaction text | Supports future localization; "Hide" and "Exit" as defaults | 03-01 |
-| Forward declarations in interface headers | Avoids heavy includes (UAnimMontage, UCameraComponent) in widely-included headers | 03-01 |
-| UActorComponent for VisibilityScore (not USceneComponent) | SceneCapture is a child of the owning actor, not of this component | 03-02 |
-| bIsCrouched from ACharacter base for crouch detection | Avoids circular dependency between Visibility/ and Player/ directories | 03-02 |
-| 8x8 HDR render target for light sampling | 64 pixels sufficient for luminance average; trivially cheap to render and read | 03-02 |
-| ShowFlags optimization on SceneCapture | Disable Bloom/MotionBlur/Particles/Fog/PostProcessing; keep GI and Reflections | 03-02 |
-| No BoxComponent trigger on HidingSpotActor | SpotMesh BlockAll collision is the trace target; simpler actor | 03-03 |
-| PostProcessSettings.WeightedBlendables for peek overlay | Per-camera blendable avoids separate UPostProcessComponent | 03-03 |
-| Commented HidingComponent delegation in OnInteract | Maintains plan boundary isolation; activates in 03-04 | 03-03 |
-| Event-driven hiding state machine (no tick) | Montage delegates drive transitions; PrimaryComponentTick disabled | 03-04 |
-| DefaultMappingContext UPROPERTY on HidingComponent | Avoids accessing protected member on SerenePlayerController | 03-04 |
-| GetComponents iteration for mesh hide | Covers main mesh + WorldRepresentationMesh without protected access | 03-04 |
-| Exit input binding always present, IMC-gated | Enhanced Input pattern: binding exists but IA only fires when IMC active | 03-04 |
-| Tick early-return when HidingState != Free | Prevents camera offset aggregation from fighting SetViewTargetWithBlend | 03-05 |
-| F key routes to ExitHidingSpot via HandleInteract check | Code-driven approach simpler than adding F to HidingMappingContext | 03-05 |
-| Inventory accessible while hiding | Per CONTEXT.md; HandleToggleInventory not gated by hiding state | 03-05 |
+| Reuse IA_Interact for hiding exit | Controller already routes interact to ExitHidingSpot when hiding; avoids redundant action | 03-06 |
+| Activate hiding camera (no bAutoActivate=false) | CalcCamera only reads active camera components; inactive camera falls back to fixed actor rotation | 03-06 |
+| Mirror controller rotation to hiding camera via tick | SetViewTargetWithBlend locks view to camera component; controller rotation needs explicit sync | 03-06 |
+| Notify hiding spot before montage block | TransitionToFreeState clears CurrentHidingSpot; OnExitHiding must fire before pointer nulled | 03-06 |
 
 ### Technical Discoveries
 
@@ -138,6 +127,9 @@ Overall: [█████████████░░░░░░░░░░�
 | UAssetManager::LoadPrimaryAsset returns FStreamableHandle | Not UObject* as expected; use GetPrimaryAssetPath().TryLoad() for sync load | 02-01 |
 | UWidget::Slot member shadows local variable names | MSVC C4458 warning-as-error; use SlotData instead of Slot in loops | 02-02 |
 | Asset Manager config needs Project Settings UI | DefaultEngine.ini config alone may not work; use Editor UI to configure | 02-06 |
+| AActor::CalcCamera skips inactive UCameraComponents | bAutoActivate=false means CalcCamera falls back to GetActorEyesViewPoint; camera component rotation changes ignored | 03-06 |
+| SetViewTargetWithBlend uses actor CalcCamera, not controller rotation | When view target is non-pawn, controller AddYawInput/AddPitchInput don't affect the view | 03-06 |
+| Parallel plan execution can leave cross-references commented out | Plans 03-03 and 03-04 ran simultaneously; OnInteract delegation to HidingComponent was stubbed | 03-06 |
 
 ### TODOs
 
@@ -147,11 +139,13 @@ Overall: [█████████████░░░░░░░░░░�
 - [x] Plan Phase 2: Inventory
 - [x] Execute Phase 2 (all 6 plans)
 - [x] Plan Phase 3: Hiding System
-- [ ] Execute Phase 3 (5/6 plans complete)
+- [x] Execute Phase 3 (all 6 plans)
+- [ ] Plan Phase 4: Monster AI Core
+- [ ] Execute Phase 4
 
 ### Blockers
 
-None — Phase 3 execution in progress.
+None — Phase 3 complete, ready for Phase 4.
 
 ---
 
@@ -161,35 +155,58 @@ None — Phase 3 execution in progress.
 
 **Date:** 2026-02-10
 **Completed:**
-- Executed Phase 3 Plan 05 (Character Integration)
-- Integrated HidingComponent and VisibilityScoreComponent into ASereneCharacter (9 total components)
-- Added Tick early-return when HidingState != Free (prevents camera jitter during hiding blend)
-- Wired F key to ExitHidingSpot via HandleInteract hiding check on SerenePlayerController
-- Inventory toggle remains accessible while hiding per CONTEXT.md
+- Executed all 6 Phase 3 plans across 4 waves
+- Wave 1: Foundation types (03-01) + Visibility score component (03-02) in parallel
+- Wave 2: HidingSpotActor (03-03) + HidingComponent (03-04) in parallel
+- Wave 3: Character integration (03-05)
+- Wave 4: Editor assets + PIE verification (03-06) with checkpoint
+- Fixed 4 integration bugs during PIE verification:
+  1. Commented-out OnInteract delegation (parallel plan artifact)
+  2. Exit sequencing: OnExitHiding called after pointer cleared
+  3. Hiding camera bAutoActivate=false preventing CalcCamera from reading it
+  4. Controller rotation not mirrored to hiding camera for look-around
+- Simplified input: removed IA_ExitHiding, reuse IA_Interact
+- Verified full hiding flow in PIE (enter, look-around, exit, re-enter)
 
-**Stopped at:** Completed 03-05-PLAN.md
+**Stopped at:** Phase 3 complete
 
-**Next:** Execute 03-06-PLAN.md (Verification and Polish)
+**Next:** Plan Phase 4 (Monster AI Core)
 
 ### Context for Next Session
 
-Phase 3 Plans 01-05 complete. The hiding system is now fully wired end-to-end:
-- EHidingState enum (Free/Entering/Hidden/Exiting) with FOnHidingStateChanged delegate
-- UHidingSpotDataAsset with 13 properties (montages, camera, visibility reduction)
-- IHideable expanded to 8 methods
+The Juniper Tree is a psychological horror game demo. The player is a detective investigating a missing boy, eventually discovering they ARE the murdered boy. A Wendigo (the father transformed by cannibalism) stalks the player.
+
+The roadmap has 8 phases:
+1. Foundation - Player controller, movement, interaction ✓
+2. Inventory - 8-slot system with items ✓
+3. Hiding - Hide spots and visibility ✓
+4. Monster AI Core - State Tree, patrol, perception
+5. Monster Behaviors - Chase, investigate, search, spawns
+6. Light and Audio - Flashlight, Lumen, spatial audio
+7. Save System - Checkpoints and manual saves
+8. Demo Polish - Environment, story, optimization
+
+Phase 3 complete. The project now has:
+- All Phase 1 features (character, movement, interaction, HUD)
+- All Phase 2 features (inventory, items, doors, combine)
+- UHidingComponent: 4-state machine (Free/Entering/Hidden/Exiting) with montage, camera blend, look constraints, IMC switching
+- AHidingSpotActor: dual IInteractable + IHideable, SpotMesh, HidingCamera, SpotData reference
+- UVisibilityScoreComponent: 8x8 SceneCapture light sampling, 0.0-1.0 score, crouch/hiding modifiers
+- UHidingSpotDataAsset: per-type config (camera limits, blend times, interaction text, visibility reduction)
 - 5 gameplay tags: Player.Hiding, Interaction.HidingSpot, HidingSpot.Locker/Closet/UnderBed
-- UVisibilityScoreComponent: SceneCapture light sampling, GetVisibilityScore() 0.0-1.0
-- AHidingSpotActor implementing IHideable and IInteractable
-- UHidingComponent: complete player-side hiding lifecycle with montage, camera, input context
-- ASereneCharacter: 9 components, Tick camera bypass when hiding
-- ASerenePlayerController: F key routes to ExitHidingSpot when hidden
+- IMC_Hiding: F -> IA_Interact (exit via controller routing), Mouse2D -> IA_Look
+- 3 data assets: DA_HidingSpot_Locker, DA_HidingSpot_Closet, DA_HidingSpot_UnderBed
+- ASereneCharacter: 9 components total, hiding-aware Tick bypass
 
-**Full flow:** InteractionComponent traces -> HidingSpotActor::OnInteract -> HidingComponent::EnterHidingSpot -> state machine -> F key exits -> back to Free
+All 9 character components wired: Stamina, HeadBob, Lean, Interaction, Footstep, Inventory, Camera, Hiding, VisibilityScore.
+10/29 v1 requirements complete. No orphans.
 
-**Phase 3 remaining plans:**
-- 03-06: Verification and polish
+**Phase 4 delivers:**
+- State Tree-driven AI controller for Wendigo
+- Patrol behavior within designated zones
+- AI Perception system (sight + hearing)
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-10 (Phase 3, Plan 05 complete)*
+*Last updated: 2026-02-10 (Phase 3 complete)*

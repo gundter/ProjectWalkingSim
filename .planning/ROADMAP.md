@@ -89,12 +89,12 @@ Plans:
 **Plans:** 6 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- Foundation types: IHideable expansion, HidingSpotDataAsset, tags, EHidingState
-- [ ] 03-02-PLAN.md -- VisibilityScoreComponent with SceneCapture light sampling
-- [ ] 03-03-PLAN.md -- HidingSpotActor base class with dual IInteractable + IHideable interface
-- [ ] 03-04-PLAN.md -- HidingComponent state machine (entry/exit, camera, montage, input)
-- [ ] 03-05-PLAN.md -- Character integration: Tick bypass, component wiring, controller exit
-- [ ] 03-06-PLAN.md -- Editor assets: data assets, input actions, Blueprint config, PIE verification
+- [x] 03-01-PLAN.md -- Foundation types: IHideable expansion, HidingSpotDataAsset, tags, EHidingState
+- [x] 03-02-PLAN.md -- VisibilityScoreComponent with SceneCapture light sampling
+- [x] 03-03-PLAN.md -- HidingSpotActor base class with dual IInteractable + IHideable interface
+- [x] 03-04-PLAN.md -- HidingComponent state machine (entry/exit, camera, montage, input)
+- [x] 03-05-PLAN.md -- Character integration: Tick bypass, component wiring, controller exit
+- [x] 03-06-PLAN.md -- Editor assets: data assets, input actions, Blueprint config, PIE verification
 
 **Success Criteria:**
 1. Player can enter a locker/closet and view shifts to inside perspective
@@ -212,7 +212,7 @@ Plans:
 |-------|------|--------------|--------|
 | 1 | Foundation | PLYR-01, PLYR-02, PLYR-03, PLYR-04 | ✓ Complete |
 | 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | ✓ Complete |
-| 3 | Hiding System | HIDE-01, HIDE-02 | Planned |
+| 3 | Hiding System | HIDE-01, HIDE-02 | ✓ Complete |
 | 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | Not Started |
 | 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | Not Started |
 | 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | Not Started |
@@ -224,4 +224,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-02-07*
-*Last updated: 2026-02-10 (Phase 3 planned)*
+*Last updated: 2026-02-10 (Phase 3 complete)*

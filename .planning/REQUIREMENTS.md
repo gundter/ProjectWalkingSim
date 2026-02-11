@@ -9,22 +9,22 @@ Requirements for initial demo release. Each maps to roadmap phases.
 
 ### Player Character
 
-- [ ] **PLYR-01**: First-person with visible body (hands, arms, legs visible when looking down)
-- [ ] **PLYR-02**: Movement with crouch, sprint, and stamina system
-- [ ] **PLYR-03**: Head-bob camera with motion sickness disable option
-- [ ] **PLYR-04**: Interaction system (pick up items, open doors, examine objects)
+- [x] **PLYR-01**: First-person with visible body (hands, arms, legs visible when looking down)
+- [x] **PLYR-02**: Movement with crouch, sprint, and stamina system
+- [x] **PLYR-03**: Head-bob camera with motion sickness disable option
+- [x] **PLYR-04**: Interaction system (pick up items, open doors, examine objects)
 
 ### Inventory
 
-- [ ] **INVT-01**: 8-slot inventory with UI (grid or radial)
-- [ ] **INVT-02**: Item actions: use, combine, info, discard
-- [ ] **INVT-03**: Discarded items drop into world and can be picked up again
-- [ ] **INVT-04**: Item types: key items, healing items, flashlight
+- [x] **INVT-01**: 8-slot inventory with UI (grid or radial)
+- [x] **INVT-02**: Item actions: use, combine, info, discard
+- [x] **INVT-03**: Discarded items drop into world and can be picked up again
+- [x] **INVT-04**: Item types: key items, healing items, flashlight
 
 ### Hiding
 
-- [ ] **HIDE-01**: Context-sensitive hiding spots (lockers, closets, under beds)
-- [ ] **HIDE-02**: Line of sight / darkness concealment from monster
+- [x] **HIDE-01**: Context-sensitive hiding spots (lockers, closets, under beds)
+- [x] **HIDE-02**: Line of sight / darkness concealment from monster
 
 ### Wendigo Monster
 
@@ -110,16 +110,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PLYR-01 | Phase 1: Foundation | Pending |
-| PLYR-02 | Phase 1: Foundation | Pending |
-| PLYR-03 | Phase 1: Foundation | Pending |
-| PLYR-04 | Phase 1: Foundation | Pending |
-| INVT-01 | Phase 2: Inventory System | Pending |
-| INVT-02 | Phase 2: Inventory System | Pending |
-| INVT-03 | Phase 2: Inventory System | Pending |
-| INVT-04 | Phase 2: Inventory System | Pending |
-| HIDE-01 | Phase 3: Hiding System | Pending |
-| HIDE-02 | Phase 3: Hiding System | Pending |
+| PLYR-01 | Phase 1: Foundation | Complete |
+| PLYR-02 | Phase 1: Foundation | Complete |
+| PLYR-03 | Phase 1: Foundation | Complete |
+| PLYR-04 | Phase 1: Foundation | Complete |
+| INVT-01 | Phase 2: Inventory System | Complete |
+| INVT-02 | Phase 2: Inventory System | Complete |
+| INVT-03 | Phase 2: Inventory System | Complete |
+| INVT-04 | Phase 2: Inventory System | Complete |
+| HIDE-01 | Phase 3: Hiding System | Complete |
+| HIDE-02 | Phase 3: Hiding System | Complete |
 | WNDG-01 | Phase 4: Monster AI Core | Pending |
 | WNDG-02 | Phase 4: Monster AI Core | Pending |
 | WNDG-03 | Phase 5: Monster Behaviors | Pending |
@@ -147,4 +147,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-07 after roadmap creation*
+*Last updated: 2026-02-10 (Phase 3 complete)*
