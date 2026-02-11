@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plans 04-01 through 04-03 complete.
+**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plans 04-01 through 04-03 complete, 04-02 formally documented.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -24,7 +24,7 @@
 **Phase:** 4 of 8 (Monster AI Core)
 **Plan:** 3 of ? (in progress)
 **Status:** In progress
-**Last activity:** 2026-02-11 - Completed 04-03-PLAN.md (Wendigo AI controller)
+**Last activity:** 2026-02-11 - Completed 04-02-PLAN.md (Wendigo character and suspicion system)
 
 **Progress:**
 ```
@@ -60,6 +60,7 @@ Overall: [███.....] 3/8 phases complete
 | 3-05  | 5/6   | 2/2   | ~3m  | 0      |
 | 3-06  | 6/6   | 2/2*  | ~15m | 4      |
 | 4-01  | 1/?   | 2/2   | ~2m  | 0      |
+| 4-02  | 2/?   | 2/2   | ~7m  | 1      |
 | 4-03  | 3/?   | 1/1   | ~4m  | 2      |
 
 *Checkpoint tasks require human verification
@@ -117,6 +118,10 @@ Overall: [███.....] 3/8 phases complete
 | Activate hiding camera (no bAutoActivate=false) | CalcCamera only reads active camera components; inactive camera falls back to fixed actor rotation | 03-06 |
 | Mirror controller rotation to hiding camera via tick | SetViewTargetWithBlend locks view to camera component; controller rotation needs explicit sync | 03-06 |
 | Notify hiding spot before montage block | TransitionToFreeState clears CurrentHidingSpot; OnExitHiding must fire before pointer nulled | 03-06 |
+| Visibility normalization: (score - threshold) / (1 - threshold) | Maps above-threshold visibility to clean 0-1 range for suspicion scaling | 04-02 |
+| Fixed hearing bump (0.25) not scaled | Single noise gets attention; two push to Suspicious; matches horror convention | 04-02 |
+| PatrolRouteActor stub created early | UHT requires UPROPERTY class types to exist at parse time; stub unblocks WendigoCharacter | 04-02 |
+| HearingSuspicionBump as component property, not AIConstants | Higher-level gameplay param vs raw perception constant; per-instance tunable | 04-02 |
 | Renamed AITypes.h to MonsterAITypes.h | UHT error: project header name conflicted with engine AIModule/Classes/AITypes.h | 04-03 |
 | UAISense::GetSenseID<T>() for sense identification | Cleaner and type-safe vs FAIPerceptionSystem::GetSenseClassForStimulus | 04-03 |
 
@@ -135,6 +140,7 @@ Overall: [███.....] 3/8 phases complete
 | AActor::CalcCamera skips inactive UCameraComponents | bAutoActivate=false means CalcCamera falls back to GetActorEyesViewPoint; camera component rotation changes ignored | 03-06 |
 | SetViewTargetWithBlend uses actor CalcCamera, not controller rotation | When view target is non-pawn, controller AddYawInput/AddPitchInput don't affect the view | 03-06 |
 | Parallel plan execution can leave cross-references commented out | Plans 03-03 and 03-04 ran simultaneously; OnInteract delegation to HidingComponent was stubbed | 03-06 |
+| UHT requires UPROPERTY class types to exist even with forward declaration | TObjectPtr<APatrolRouteActor> in UPROPERTY fails if class not defined in any header | 04-02 |
 | Project header names must not collide with engine module headers | AITypes.h conflicted with AIModule/Classes/AITypes.h; UHT rejects duplicate names | 04-03 |
 | Two-flag guard required for StateTree StartLogic | bBeginPlayCalled + bPossessCalled; bStartLogicAutomatically reportedly fails | 04-03 |
 | Perception delegates must bind in BeginPlay, not constructor | Delegates don't work from constructor; binding in BeginPlay is safe | 04-03 |
@@ -163,14 +169,13 @@ None — Phase 4 in progress.
 
 **Date:** 2026-02-11
 **Completed:**
-- Executed 04-03 (Wendigo AI controller) - 1 task, ~4 minutes
-- AWendigoAIController with UStateTreeAIComponent and UAIPerceptionComponent
-- Sight (2500cm, 90deg FOV) + Hearing (2000cm) perception senses configured
-- Two-flag StartLogic guard for safe State Tree initialization
-- Renamed AITypes.h to MonsterAITypes.h (engine header name conflict fix)
-- Committed uncommitted SuspicionComponent from plan 04-02
+- Executed 04-02 (Wendigo character and suspicion system) - 2 tasks, ~7 minutes
+- AWendigoCharacter: 260cm capsule, 150 cm/s walk, SuspicionComponent, PatrolRoute ref
+- APatrolRouteActor stub: waypoint array with wrapping GetWaypoint()
+- USuspicionComponent verified: sight/hearing processing, decay, 3 alert levels, delegate
+- Task 1 was pre-committed (328f5c4); Task 2 committed as 28c34d7
 
-**Stopped at:** Completed 04-03-PLAN.md
+**Stopped at:** Completed 04-02-PLAN.md
 
 **Next:** Continue Phase 4 execution (04-04 onward)
 
@@ -192,18 +197,19 @@ Phase 4 AI core building. The project now has:
 - All Phase 1-3 features (character, movement, interaction, HUD, inventory, hiding)
 - AI module dependencies: AIModule, NavigationSystem, StateTreeModule, GameplayStateTreeModule
 - MonsterAITypes.h: EAlertLevel (Patrol/Suspicious/Alert), FOnAlertLevelChanged delegate, AIConstants
-- USuspicionComponent: suspicion accumulation/decay with alert level transitions
+- USuspicionComponent: sight/hearing processing, decay, 3 alert levels, delegate broadcasts
 - AWendigoAIController: StateTreeAIComponent, AIPerceptionComponent (sight+hearing), StartLogic guard
+- AWendigoCharacter: 260cm capsule, 150 cm/s walk, SuspicionComponent, PatrolRoute ref
+- APatrolRouteActor stub: waypoint array with wrapping GetWaypoint()
 - 5 AI gameplay tags: AI.Alert.Patrol/Suspicious/Alert, AI.Stimulus.Sight/Hearing
 
 **Phase 4 remaining:**
-- Wendigo character pawn (ACharacter with SuspicionComponent, tall capsule)
 - Custom State Tree tasks (patrol, idle, investigate)
-- PatrolRouteActor for waypoint-based patrol
+- PatrolRouteActor expansion with editor visualization
 - Perception-to-suspicion wiring in AI controller
 - Editor assets and PIE verification
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-11 (Phase 4 plan 04-03 complete)*
+*Last updated: 2026-02-11 (Phase 4 plan 04-02 formally complete)*
