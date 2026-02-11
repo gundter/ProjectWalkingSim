@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "AITypes.generated.h"
+#include "MonsterAITypes.generated.h"
 
 /**
  * Alert level for AI-controlled characters.
