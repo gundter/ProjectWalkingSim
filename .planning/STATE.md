@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plans 04-01 through 04-03 complete, 04-02 formally documented.
+**Current Focus:** Phase 4 in progress (Monster AI Core) — State Tree AI, patrol, perception. Plans 04-01 through 04-04 complete.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,16 +22,16 @@
 ## Current Position
 
 **Phase:** 4 of 8 (Monster AI Core)
-**Plan:** 3 of ? (in progress)
+**Plan:** 4 of ? (in progress)
 **Status:** In progress
-**Last activity:** 2026-02-11 - Completed 04-02-PLAN.md (Wendigo character and suspicion system)
+**Last activity:** 2026-02-11 - Completed 04-04-PLAN.md (Patrol route and State Tree tasks)
 
 **Progress:**
 ```
 Phase 1: [######] 6/6 plans complete
 Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
-Phase 4: [###...] 3/? plans complete
+Phase 4: [####..] 4/? plans complete
 Overall: [███.....] 3/8 phases complete
 ```
 
@@ -62,6 +62,7 @@ Overall: [███.....] 3/8 phases complete
 | 4-01  | 1/?   | 2/2   | ~2m  | 0      |
 | 4-02  | 2/?   | 2/2   | ~7m  | 1      |
 | 4-03  | 3/?   | 1/1   | ~4m  | 2      |
+| 4-04  | 4/?   | 2/2   | ~6m  | 1      |
 
 *Checkpoint tasks require human verification
 
@@ -124,6 +125,10 @@ Overall: [███.....] 3/8 phases complete
 | HearingSuspicionBump as component property, not AIConstants | Higher-level gameplay param vs raw perception constant; per-instance tunable | 04-02 |
 | Renamed AITypes.h to MonsterAITypes.h | UHT error: project header name conflicted with engine AIModule/Classes/AITypes.h | 04-03 |
 | UAISense::GetSenseID<T>() for sense identification | Cleaner and type-safe vs FAIPerceptionSystem::GetSenseClassForStimulus | 04-03 |
+| Clamp waypoint index instead of modulo wrap | Safer boundary behavior; GetNextWaypointIndex handles advancement explicitly | 04-04 |
+| Mutable PingPongDirection for const GetNextWaypointIndex | Query method needs to track direction state for ping-pong; mutable is appropriate | 04-04 |
+| Look-around at 40% idle, clear at 75% | Creates observable scan pattern players can learn to exploit | 04-04 |
+| STT_ prefix for State Tree task structs | Consistent naming convention: FSTT_PatrolMoveToWaypoint, FSTT_PatrolIdle | 04-04 |
 
 ### Technical Discoveries
 
@@ -144,6 +149,8 @@ Overall: [███.....] 3/8 phases complete
 | Project header names must not collide with engine module headers | AITypes.h conflicted with AIModule/Classes/AITypes.h; UHT rejects duplicate names | 04-03 |
 | Two-flag guard required for StateTree StartLogic | bBeginPlayCalled + bPossessCalled; bStartLogicAutomatically reportedly fails | 04-03 |
 | Perception delegates must bind in BeginPlay, not constructor | Delegates don't work from constructor; binding in BeginPlay is safe | 04-03 |
+| AActor::Instigator member shadows parameter names | ProcessHearingPerception(AActor* Instigator) triggers C4458; renamed to NoiseInstigator | 04-04 |
+| State Tree tasks need explicit includes for linker and context | StateTreeLinker.h and StateTreeExecutionContext.h not transitively included from StateTreeTaskBase.h | 04-04 |
 
 ### TODOs
 
@@ -155,7 +162,7 @@ Overall: [███.....] 3/8 phases complete
 - [x] Plan Phase 3: Hiding System
 - [x] Execute Phase 3 (all 6 plans)
 - [x] Plan Phase 4: Monster AI Core
-- [ ] Execute Phase 4 (04-01 through 04-03 complete)
+- [ ] Execute Phase 4 (04-01 through 04-04 complete)
 
 ### Blockers
 
@@ -169,15 +176,16 @@ None — Phase 4 in progress.
 
 **Date:** 2026-02-11
 **Completed:**
-- Executed 04-02 (Wendigo character and suspicion system) - 2 tasks, ~7 minutes
-- AWendigoCharacter: 260cm capsule, 150 cm/s walk, SuspicionComponent, PatrolRoute ref
-- APatrolRouteActor stub: waypoint array with wrapping GetWaypoint()
-- USuspicionComponent verified: sight/hearing processing, decay, 3 alert levels, delegate
-- Task 1 was pre-committed (328f5c4); Task 2 committed as 28c34d7
+- Executed 04-04 (Patrol route and State Tree tasks) - 2 tasks, ~6 minutes
+- APatrolRouteActor: expanded from stub with bLoopRoute, GetNextWaypointIndex, MakeEditWidget, editor debug viz
+- FSTT_PatrolMoveToWaypoint: MoveToLocation-based waypoint navigation, advances index on arrival
+- FSTT_PatrolIdle: random 3-6s duration, look-around at 40%, clear at 75%
+- Fixed AActor::Instigator shadow in WendigoAIController (NoiseInstigator rename)
+- Task 1 committed as b99d36c; Task 2 committed as 5806c94
 
-**Stopped at:** Completed 04-02-PLAN.md
+**Stopped at:** Completed 04-04-PLAN.md
 
-**Next:** Continue Phase 4 execution (04-04 onward)
+**Next:** Continue Phase 4 execution (remaining plans)
 
 ### Context for Next Session
 
@@ -187,7 +195,7 @@ The roadmap has 8 phases:
 1. Foundation - Player controller, movement, interaction - complete
 2. Inventory - 8-slot system with items - complete
 3. Hiding - Hide spots and visibility - complete
-4. Monster AI Core - State Tree, patrol, perception - in progress (04-01 through 04-03 done)
+4. Monster AI Core - State Tree, patrol, perception - in progress (04-01 through 04-04 done)
 5. Monster Behaviors - Chase, investigate, search, spawns
 6. Light and Audio - Flashlight, Lumen, spatial audio
 7. Save System - Checkpoints and manual saves
@@ -198,18 +206,20 @@ Phase 4 AI core building. The project now has:
 - AI module dependencies: AIModule, NavigationSystem, StateTreeModule, GameplayStateTreeModule
 - MonsterAITypes.h: EAlertLevel (Patrol/Suspicious/Alert), FOnAlertLevelChanged delegate, AIConstants
 - USuspicionComponent: sight/hearing processing, decay, 3 alert levels, delegate broadcasts
-- AWendigoAIController: StateTreeAIComponent, AIPerceptionComponent (sight+hearing), StartLogic guard
+- AWendigoAIController: StateTreeAIComponent, AIPerceptionComponent (sight+hearing), StartLogic guard, perception-to-suspicion wiring
 - AWendigoCharacter: 260cm capsule, 150 cm/s walk, SuspicionComponent, PatrolRoute ref
-- APatrolRouteActor stub: waypoint array with wrapping GetWaypoint()
+- APatrolRouteActor: full waypoint container with loop/ping-pong, editor debug visualization, MakeEditWidget
+- FSTT_PatrolMoveToWaypoint: State Tree task using MoveToLocation for waypoint navigation
+- FSTT_PatrolIdle: State Tree task with random 3-6s pause and look-around behavior
 - 5 AI gameplay tags: AI.Alert.Patrol/Suspicious/Alert, AI.Stimulus.Sight/Hearing
 
 **Phase 4 remaining:**
-- Custom State Tree tasks (patrol, idle, investigate)
-- PatrolRouteActor expansion with editor visualization
-- Perception-to-suspicion wiring in AI controller
+- Additional State Tree tasks (investigate location, orient toward stimulus)
+- State Tree asset creation and wiring in editor
+- NavMesh configuration for tall Wendigo agent
 - Editor assets and PIE verification
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-11 (Phase 4 plan 04-02 formally complete)*
+*Last updated: 2026-02-11 (Phase 4 plan 04-04 complete)*
