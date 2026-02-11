@@ -115,6 +115,17 @@ Plans:
 - WNDG-02: Patrol behavior within zones
 - WNDG-07: AI Perception system (sight + hearing)
 
+**Plans:** 7 plans
+
+Plans:
+- [ ] 04-01-PLAN.md -- AI module dependencies, plugin enables, AI types, gameplay tags
+- [ ] 04-02-PLAN.md -- WendigoCharacter pawn + SuspicionComponent
+- [ ] 04-03-PLAN.md -- WendigoAIController with StateTree + AI Perception
+- [ ] 04-04-PLAN.md -- PatrolRouteActor + patrol State Tree tasks
+- [ ] 04-05-PLAN.md -- Perception-to-suspicion wiring + sprint noise reporting
+- [ ] 04-06-PLAN.md -- Investigation tasks + orient task + suspicion condition
+- [ ] 04-07-PLAN.md -- NavMesh config, Blueprint creation, State Tree asset, PIE verification
+
 **Success Criteria:**
 1. Wendigo follows patrol route through designated zones
 2. Wendigo visually detects player who is visible and not hiding
@@ -213,7 +224,7 @@ Plans:
 | 1 | Foundation | PLYR-01, PLYR-02, PLYR-03, PLYR-04 | ✓ Complete |
 | 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | ✓ Complete |
 | 3 | Hiding System | HIDE-01, HIDE-02 | ✓ Complete |
-| 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | Not Started |
+| 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | Planned |
 | 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | Not Started |
 | 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | Not Started |
 | 7 | Save System | SAVE-01, SAVE-02 | Not Started |
@@ -224,4 +235,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-02-07*
-*Last updated: 2026-02-10 (Phase 3 complete)*
+*Last updated: 2026-02-11 (Phase 4 planned)*
