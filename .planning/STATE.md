@@ -135,7 +135,7 @@ Overall: [███.....] 3/8 phases complete
 | NoiseReportingComponent on player, not Wendigo | Player is noise source; component reports outward via ReportNoiseEvent | 04-05 |
 | Tick for continuous sight, delegate for discrete hearing | Sight needs DeltaTime for accumulation; hearing is instant bump | 04-05 |
 | FStateTreeConditionCommonBase for conditions | Schema-safe subclass; allows State Tree schemas to include all common conditions | 04-06 |
-| No instance data for SuspicionLevel condition | Pure stateless enum comparison; no per-instance tracking needed | 04-06 |
+| Empty instance data struct required for ST conditions | State Tree conditions need GetInstanceDataType() even if stateless; "missing instance value" error otherwise | 04-06 |
 | InvestigateLocation clears stimulus on completion | Allows natural return to patrol without stale stimulus data | 04-06 |
 | STC_ prefix for State Tree condition structs | Parallel to STT_ for tasks: FSTC_SuspicionLevel | 04-06 |
 
@@ -174,6 +174,8 @@ Overall: [███.....] 3/8 phases complete
 - [x] Execute Phase 3 (all 6 plans)
 - [x] Plan Phase 4: Monster AI Core
 - [ ] Execute Phase 4 (04-01 through 04-06 complete)
+- [ ] Future: Consider spline-based patrol routes for polish/main release (current MakeEditWidget waypoints work but less designer-friendly; may not need static routes in main release)
+- [ ] Future: Replace On Tick State Tree transitions with event-driven triggers (OnAlertLevelChanged delegate, gameplay tags, or reduced tick interval) for performance — On Tick is fine for demo but won't scale for complex Alien: Isolation-style State Trees
 
 ### Blockers
 
