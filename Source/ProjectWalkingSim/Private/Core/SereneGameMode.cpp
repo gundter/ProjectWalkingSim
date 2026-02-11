@@ -13,5 +13,5 @@ ASereneGameMode::ASereneGameMode()
 	PlayerControllerClass = ASerenePlayerController::StaticClass();
 	HUDClass = ASereneHUD::StaticClass();
 
-	UE_LOG(LogSerene, Log, TEXT("ASereneGameMode: DefaultPawnClass=ASereneCharacter, PlayerControllerClass=ASerenePlayerController, HUDClass=ASereneHUD"));
+	UE_LOG(LogSerene, Verbose, TEXT("ASereneGameMode: DefaultPawnClass=ASereneCharacter, PlayerControllerClass=ASerenePlayerController, HUDClass=ASereneHUD"));
 }

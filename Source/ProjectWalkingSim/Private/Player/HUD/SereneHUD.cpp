@@ -95,7 +95,7 @@ void ASereneHUD::HandleInteractableChanged(AActor* NewInteractable, FText Intera
 
 void ASereneHUD::HandleInventoryChanged()
 {
-	UE_LOG(LogSerene, Log, TEXT("ASereneHUD::HandleInventoryChanged - HUDWidgetInstance=%s, GetInventoryWidget=%s, CachedInventoryComp=%s"),
+	UE_LOG(LogSerene, Verbose, TEXT("ASereneHUD::HandleInventoryChanged - HUDWidgetInstance=%s, GetInventoryWidget=%s, CachedInventoryComp=%s"),
 		HUDWidgetInstance ? TEXT("valid") : TEXT("null"),
 		(HUDWidgetInstance && HUDWidgetInstance->GetInventoryWidget()) ? TEXT("valid") : TEXT("null"),
 		CachedInventoryComp ? TEXT("valid") : TEXT("null"));

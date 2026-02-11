@@ -127,6 +127,6 @@ void UFootstepComponent::PlayFootstepForSurface(const FVector& FootLocation)
 	// Broadcast to listeners (Phase 6 audio, Phase 4/5 AI noise).
 	OnFootstep.Broadcast(SurfaceType, Volume);
 
-	UE_LOG(LogSerene, Log, TEXT("UFootstepComponent::PlayFootstepForSurface - Surface=%d, Volume=%.2f"),
+	UE_LOG(LogSerene, Verbose, TEXT("UFootstepComponent::PlayFootstepForSurface - Surface=%d, Volume=%.2f"),
 		static_cast<int32>(SurfaceType), Volume);
 }
