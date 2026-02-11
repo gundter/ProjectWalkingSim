@@ -136,7 +136,7 @@ Plans:
 
 ### Phase 5: Monster Behaviors
 
-**Goal:** Wendigo exhibits full range of hunt behaviors.
+**Goal:** Wendigo exhibits full range of hunt behaviors: chase on sight, search when player escapes, investigate stimuli with differentiated sight/sound reactions, spawn at designated locations with zone-based patrol selection.
 
 **Dependencies:** Phase 4 (core AI required)
 
@@ -145,6 +145,15 @@ Plans:
 - WNDG-04: Chase player when spotted
 - WNDG-05: Search behavior when player escapes/hides
 - WNDG-06: Multiple spawn locations with per-spawn patrol zones
+
+**Plans:** 5 plans
+
+Plans:
+- [ ] 05-01-PLAN.md -- AI types extension: enums, constants, WendigoCharacter state, SuspicionComponent stimulus tracking
+- [ ] 05-02-PLAN.md -- Chase, Search, and ReturnToNearestWaypoint State Tree tasks
+- [ ] 05-03-PLAN.md -- GrabAttack task, StimulusType condition, investigation enhancement
+- [ ] 05-04-PLAN.md -- SpawnPoint actor, AI controller witnessed-hiding, AI door interaction
+- [ ] 05-05-PLAN.md -- State Tree update, SpawnPoint Blueprint, PIE verification
 
 **Success Criteria:**
 1. Wendigo investigates location of sounds before returning to patrol
@@ -225,7 +234,7 @@ Plans:
 | 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | ✓ Complete |
 | 3 | Hiding System | HIDE-01, HIDE-02 | ✓ Complete |
 | 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | ✓ Complete |
-| 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | Not Started |
+| 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | In Progress |
 | 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | Not Started |
 | 7 | Save System | SAVE-01, SAVE-02 | Not Started |
 | 8 | Demo Polish | DEMO-01, DEMO-02, DEMO-03, DEMO-04 | Not Started |
@@ -235,4 +244,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-02-07*
-*Last updated: 2026-02-11 (Phase 4 complete)*
+*Last updated: 2026-02-11 (Phase 5 planned)*
