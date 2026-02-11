@@ -38,6 +38,8 @@ class PROJECTWALKINGSIM_API UHidingComponent : public UActorComponent
 public:
 	UHidingComponent();
 
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
 	// --- Public API ---
 
 	/** Initiate the hiding sequence. Called by HidingSpotActor::OnInteract. */
@@ -93,6 +95,11 @@ private:
 
 	/** The hiding spot actor the player is currently in or transitioning to/from. */
 	TWeakObjectPtr<AHidingSpotActor> CurrentHidingSpot;
+
+	// --- Hiding Camera ---
+
+	/** Base rotation of the hiding camera when entering Hidden state. */
+	FRotator HidingCameraBaseRotation = FRotator::ZeroRotator;
 
 	// --- Saved Camera Limits ---
 

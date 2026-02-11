@@ -13,6 +13,7 @@
 #include "Core/SereneLogChannels.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "EnhancedInputSubsystems.h"
 #include "Animation/AnimInstance.h"
@@ -20,7 +21,45 @@
 
 UHidingComponent::UHidingComponent()
 {
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
+}
+
+void UHidingComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	// Mirror controller rotation onto the hiding camera so look input works.
+	// The camera manager shows the hiding spot's UCameraComponent, which has a
+	// fixed transform. Controller rotation (from AddYawInput/AddPitchInput) is
+	// already clamped by ViewPitch/YawMin/Max, so we just apply it directly.
+	if (HidingState != EHidingState::Hidden || !CurrentHidingSpot.IsValid())
+	{
+		return;
+	}
+
+	ACharacter* Character = Cast<ACharacter>(GetOwner());
+	if (!Character)
+	{
+		return;
+	}
+
+	APlayerController* PC = Cast<APlayerController>(Character->GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	UCameraComponent* HidingCam = IHideable::Execute_GetHidingCamera(CurrentHidingSpot.Get());
+	if (!HidingCam)
+	{
+		return;
+	}
+
+	// Controller rotation is clamped by camera manager constraints.
+	// Apply it to the hiding camera so the view follows the player's look.
+	const FRotator ControlRot = PC->GetControlRotation();
+	HidingCam->SetWorldRotation(ControlRot);
 }
 
 // -----------------------------------------------------------------------------
@@ -120,6 +159,19 @@ void UHidingComponent::ExitHidingSpot()
 	}
 
 	HidingState = EHidingState::Exiting;
+
+	// Stop driving hiding camera from controller input
+	SetComponentTickEnabled(false);
+
+	// Restore the hiding camera's original rotation (so it's correct for next use)
+	if (CurrentHidingSpot.IsValid())
+	{
+		UCameraComponent* HidingCam = IHideable::Execute_GetHidingCamera(CurrentHidingSpot.Get());
+		if (HidingCam)
+		{
+			HidingCam->SetWorldRotation(HidingCameraBaseRotation);
+		}
+	}
 
 	// Restore look constraints and input before playing exit montage
 	RestoreLookConstraints();
@@ -227,11 +279,35 @@ void UHidingComponent::TransitionToHiddenState()
 	// Hide the player mesh (invisible while inside the hiding spot)
 	SetPlayerMeshVisibility(false);
 
+	// Save the hiding camera's base rotation and align controller to it.
+	// The tick will mirror controller rotation onto the camera for look-around.
+	if (CurrentHidingSpot.IsValid())
+	{
+		UCameraComponent* HidingCam = IHideable::Execute_GetHidingCamera(CurrentHidingSpot.Get());
+		if (HidingCam)
+		{
+			HidingCameraBaseRotation = HidingCam->GetComponentRotation();
+
+			ACharacter* Character = Cast<ACharacter>(GetOwner());
+			if (Character)
+			{
+				APlayerController* PC = Cast<APlayerController>(Character->GetController());
+				if (PC)
+				{
+					PC->SetControlRotation(HidingCameraBaseRotation);
+				}
+			}
+		}
+	}
+
 	// Apply look constraints relative to hiding spot orientation
 	ApplyLookConstraints();
 
-	// Switch to hiding-only input context (look + exit)
+	// Switch to hiding-only input context (look + interact-to-exit)
 	SwitchToHidingInputContext();
+
+	// Enable tick to drive hiding camera rotation from controller input
+	SetComponentTickEnabled(true);
 
 	// Apply visibility score reduction from hiding spot data
 	if (UVisibilityScoreComponent* VisComp = GetOwner()->FindComponentByClass<UVisibilityScoreComponent>())
