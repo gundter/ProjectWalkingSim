@@ -113,6 +113,28 @@ void ASerenePlayerController::SetupInputComponent()
 	UE_LOG(LogSerene, Log, TEXT("ASerenePlayerController::SetupInputComponent - Enhanced Input bindings configured."));
 }
 
+void ASerenePlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+	CacheComponentPointers(InPawn);
+}
+
+void ASerenePlayerController::CacheComponentPointers(APawn* InPawn)
+{
+	if (InPawn)
+	{
+		CachedLeanComponent = InPawn->FindComponentByClass<ULeanComponent>();
+		CachedHidingComponent = InPawn->FindComponentByClass<UHidingComponent>();
+		CachedInteractionComponent = InPawn->FindComponentByClass<UInteractionComponent>();
+	}
+	else
+	{
+		CachedLeanComponent = nullptr;
+		CachedHidingComponent = nullptr;
+		CachedInteractionComponent = nullptr;
+	}
+}
+
 ASereneCharacter* ASerenePlayerController::GetSereneCharacter() const
 {
 	return Cast<ASereneCharacter>(GetPawn());
@@ -200,67 +222,48 @@ void ASerenePlayerController::HandleInteract(const FInputActionValue& Value)
 	}
 
 	// If hiding, pressing interact exits the hiding spot
-	if (UHidingComponent* HidingComp = SereneChar->FindComponentByClass<UHidingComponent>())
+	if (CachedHidingComponent && CachedHidingComponent->IsHiding())
 	{
-		if (HidingComp->IsHiding())
-		{
-			HidingComp->ExitHidingSpot();
-			return;
-		}
+		CachedHidingComponent->ExitHidingSpot();
+		return;
 	}
 
 	// Normal interaction
-	if (UInteractionComponent* InteractionComp = SereneChar->FindComponentByClass<UInteractionComponent>())
+	if (CachedInteractionComponent)
 	{
-		InteractionComp->TryInteract();
+		CachedInteractionComponent->TryInteract();
 	}
 }
 
 void ASerenePlayerController::HandleLeanLeftStart(const FInputActionValue& Value)
 {
-	ASereneCharacter* SereneChar = GetSereneCharacter();
-	if (SereneChar)
+	if (CachedLeanComponent)
 	{
-		if (ULeanComponent* LeanComp = SereneChar->FindComponentByClass<ULeanComponent>())
-		{
-			LeanComp->SetLeanLeft(true);
-		}
+		CachedLeanComponent->SetLeanLeft(true);
 	}
 }
 
 void ASerenePlayerController::HandleLeanLeftStop(const FInputActionValue& Value)
 {
-	ASereneCharacter* SereneChar = GetSereneCharacter();
-	if (SereneChar)
+	if (CachedLeanComponent)
 	{
-		if (ULeanComponent* LeanComp = SereneChar->FindComponentByClass<ULeanComponent>())
-		{
-			LeanComp->SetLeanLeft(false);
-		}
+		CachedLeanComponent->SetLeanLeft(false);
 	}
 }
 
 void ASerenePlayerController::HandleLeanRightStart(const FInputActionValue& Value)
 {
-	ASereneCharacter* SereneChar = GetSereneCharacter();
-	if (SereneChar)
+	if (CachedLeanComponent)
 	{
-		if (ULeanComponent* LeanComp = SereneChar->FindComponentByClass<ULeanComponent>())
-		{
-			LeanComp->SetLeanRight(true);
-		}
+		CachedLeanComponent->SetLeanRight(true);
 	}
 }
 
 void ASerenePlayerController::HandleLeanRightStop(const FInputActionValue& Value)
 {
-	ASereneCharacter* SereneChar = GetSereneCharacter();
-	if (SereneChar)
+	if (CachedLeanComponent)
 	{
-		if (ULeanComponent* LeanComp = SereneChar->FindComponentByClass<ULeanComponent>())
-		{
-			LeanComp->SetLeanRight(false);
-		}
+		CachedLeanComponent->SetLeanRight(false);
 	}
 }
 

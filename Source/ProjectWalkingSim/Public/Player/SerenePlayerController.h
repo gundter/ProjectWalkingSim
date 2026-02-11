@@ -10,6 +10,9 @@ class UInputMappingContext;
 class UInputAction;
 class ASereneCharacter;
 class ASereneHUD;
+class ULeanComponent;
+class UHidingComponent;
+class UInteractionComponent;
 struct FInputActionValue;
 
 /**
@@ -39,6 +42,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
+	virtual void OnPossess(APawn* InPawn) override;
 
 	// --- Input Assets (assign in BP subclass or DefaultObject) ---
 
@@ -94,6 +98,20 @@ private:
 
 	/** Cached pointer to the controlled SereneCharacter. Updated on Possess. */
 	ASereneCharacter* GetSereneCharacter() const;
+
+	// --- Cached Component Pointers (populated in OnPossess) ---
+
+	UPROPERTY()
+	TObjectPtr<ULeanComponent> CachedLeanComponent;
+
+	UPROPERTY()
+	TObjectPtr<UHidingComponent> CachedHidingComponent;
+
+	UPROPERTY()
+	TObjectPtr<UInteractionComponent> CachedInteractionComponent;
+
+	/** Populate cached component pointers from the possessed pawn. */
+	void CacheComponentPointers(APawn* InPawn);
 
 	// --- Inventory Toggle ---
 
