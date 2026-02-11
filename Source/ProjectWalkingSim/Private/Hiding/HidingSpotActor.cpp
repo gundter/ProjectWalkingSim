@@ -24,7 +24,6 @@ AHidingSpotActor::AHidingSpotActor()
 	// --- Hiding Camera ---
 	HidingCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("HidingCamera"));
 	HidingCamera->SetupAttachment(SceneRoot);
-	HidingCamera->bAutoActivate = false;
 }
 
 void AHidingSpotActor::BeginPlay()
