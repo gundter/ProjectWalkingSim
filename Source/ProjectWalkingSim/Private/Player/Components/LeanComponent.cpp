@@ -7,6 +7,7 @@
 ULeanComponent::ULeanComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 }
 
 void ULeanComponent::TickComponent(float DeltaTime, ELevelTick TickType,
@@ -27,11 +28,19 @@ void ULeanComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 
 	// Smooth interpolation toward target
 	CurrentLeanAlpha = FMath::FInterpTo(CurrentLeanAlpha, TargetLean, DeltaTime, LeanSpeed);
+
+	// Disable tick when we've reached the target and no input is held
+	if (!bLeaningLeft && !bLeaningRight && FMath::IsNearlyEqual(CurrentLeanAlpha, TargetLean, KINDA_SMALL_NUMBER))
+	{
+		CurrentLeanAlpha = TargetLean; // Snap to exact value
+		SetComponentTickEnabled(false);
+	}
 }
 
 void ULeanComponent::SetLeanLeft(bool bLean)
 {
 	bLeaningLeft = bLean;
+	SetComponentTickEnabled(true);
 
 	UE_LOG(LogSerene, Verbose, TEXT("ULeanComponent::SetLeanLeft(%s)"),
 		bLean ? TEXT("true") : TEXT("false"));
@@ -40,6 +49,7 @@ void ULeanComponent::SetLeanLeft(bool bLean)
 void ULeanComponent::SetLeanRight(bool bLean)
 {
 	bLeaningRight = bLean;
+	SetComponentTickEnabled(true);
 
 	UE_LOG(LogSerene, Verbose, TEXT("ULeanComponent::SetLeanRight(%s)"),
 		bLean ? TEXT("true") : TEXT("false"));

@@ -7,6 +7,7 @@
 UStaminaComponent::UStaminaComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
 
 	CurrentStamina = MaxStamina;
 }
@@ -50,6 +51,7 @@ void UStaminaComponent::TickComponent(float DeltaTime, ELevelTick TickType,
 			{
 				UE_LOG(LogSerene, Verbose, TEXT("UStaminaComponent: Stamina full."));
 				OnStaminaFull.Broadcast();
+				SetComponentTickEnabled(false);
 			}
 		}
 	}
@@ -77,6 +79,7 @@ void UStaminaComponent::SetSprinting(bool bSprinting)
 
 		bIsSprinting = true;
 		TimeSinceStoppedSprinting = 0.0f;
+		SetComponentTickEnabled(true);
 
 		UE_LOG(LogSerene, Verbose, TEXT("UStaminaComponent::SetSprinting(true) - Sprint started. Stamina: %.1f/%.1f"),
 			CurrentStamina, MaxStamina);
