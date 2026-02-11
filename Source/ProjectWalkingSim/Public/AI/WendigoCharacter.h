@@ -35,6 +35,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AI|Patrol")
 	APatrolRouteActor* GetPatrolRoute() const { return PatrolRoute; }
 
+	/** Current waypoint index — stored on character so it persists across State Tree state re-entries. */
+	UPROPERTY(BlueprintReadOnly, Category = "AI|Patrol")
+	int32 CurrentWaypointIndex = 0;
+
 protected:
 	/** Suspicion component -- tracks detection state and alert levels. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")

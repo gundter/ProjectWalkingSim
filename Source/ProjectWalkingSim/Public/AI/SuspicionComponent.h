@@ -61,6 +61,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AI|Suspicion")
 	bool HasStimulusLocation() const { return bHasStimulusLocation; }
 
+	/** Set the stimulus location (used by sight to track player position). */
+	void SetStimulusLocation(const FVector& Location)
+	{
+		LastKnownStimulusLocation = Location;
+		bHasStimulusLocation = true;
+	}
+
 	/** Clear the stored stimulus location. */
 	UFUNCTION(BlueprintCallable, Category = "AI|Suspicion")
 	void ClearStimulusLocation();

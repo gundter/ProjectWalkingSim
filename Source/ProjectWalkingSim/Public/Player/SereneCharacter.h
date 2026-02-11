@@ -15,6 +15,7 @@ class UInventoryComponent;
 class UHidingComponent;
 class UVisibilityScoreComponent;
 class UNoiseReportingComponent;
+class UAIPerceptionStimuliSourceComponent;
 
 class UCameraComponent;
 class USkeletalMeshComponent;
@@ -142,6 +143,10 @@ protected:
 	/** Reports sprint footstep noise to AI hearing system. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UNoiseReportingComponent> NoiseReportingComponent;
+
+	/** Registers player as a stimuli source for AI sight perception. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UAIPerceptionStimuliSourceComponent> AIPerceptionStimuliSource;
 
 	// --- Movement Configuration ---
 

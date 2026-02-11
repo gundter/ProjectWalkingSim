@@ -118,8 +118,23 @@ void AWendigoAIController::Tick(float DeltaTime)
 		if (VisComp)
 		{
 			const float VisibilityScore = VisComp->GetVisibilityScore();
+
+			// Record player location as stimulus for investigation
+			SuspicionComp->SetStimulusLocation(Actor->GetActorLocation());
+
 			SuspicionComp->ProcessSightStimulus(VisibilityScore, DeltaTime);
 			bSeeingPlayer = true;
+
+			// Debug: log visibility score periodically (every ~1s)
+			SightDebugTimer += DeltaTime;
+			if (SightDebugTimer >= 1.0f)
+			{
+				UE_LOG(LogSerene, Log, TEXT("Wendigo sight: Visibility=%.2f, Suspicion=%.3f, Alert=%d"),
+					VisibilityScore, SuspicionComp->GetCurrentSuspicion(),
+					static_cast<uint8>(SuspicionComp->GetAlertLevel()));
+				SightDebugTimer = 0.0f;
+			}
+
 			break; // Only one player in this game
 		}
 	}

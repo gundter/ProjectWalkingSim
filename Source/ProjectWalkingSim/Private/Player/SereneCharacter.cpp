@@ -12,6 +12,8 @@
 #include "Hiding/HidingTypes.h"
 #include "Visibility/VisibilityScoreComponent.h"
 #include "AI/NoiseReportingComponent.h"
+#include "Perception/AIPerceptionStimuliSourceComponent.h"
+#include "Perception/AISense_Sight.h"
 #include "Player/HUD/SereneHUD.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
@@ -59,6 +61,10 @@ ASereneCharacter::ASereneCharacter()
 
 	// --- Phase 04 Components ---
 	NoiseReportingComponent = CreateDefaultSubobject<UNoiseReportingComponent>(TEXT("NoiseReportingComponent"));
+
+	AIPerceptionStimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("AIPerceptionStimuliSource"));
+	AIPerceptionStimuliSource->RegisterForSense(TSubclassOf<UAISense>(UAISense_Sight::StaticClass()));
+	AIPerceptionStimuliSource->bAutoRegister = true;
 
 	// --- Character Movement Component Configuration ---
 	// Grounded, deliberate horror movement. No jump, no air control.

@@ -35,7 +35,8 @@ EStateTreeRunStatus FSTT_PatrolMoveToWaypoint::EnterState(
 		return EStateTreeRunStatus::Failed;
 	}
 
-	const FVector TargetLocation = PatrolRoute->GetWaypoint(InstanceData.CurrentWaypointIndex);
+	// Read waypoint index from character (persists across state re-entries)
+	const FVector TargetLocation = PatrolRoute->GetWaypoint(Wendigo->CurrentWaypointIndex);
 
 	// Issue move request. Do NOT set bLockAILogic (prevents State Tree transitions).
 	const EPathFollowingRequestResult::Type MoveResult = Controller.MoveToLocation(
@@ -52,14 +53,14 @@ EStateTreeRunStatus FSTT_PatrolMoveToWaypoint::EnterState(
 	if (MoveResult == EPathFollowingRequestResult::Failed)
 	{
 		UE_LOG(LogSerene, Warning, TEXT("PatrolMoveToWaypoint: MoveToLocation failed for waypoint %d at %s"),
-			InstanceData.CurrentWaypointIndex, *TargetLocation.ToString());
+			Wendigo->CurrentWaypointIndex, *TargetLocation.ToString());
 		return EStateTreeRunStatus::Failed;
 	}
 
 	if (MoveResult == EPathFollowingRequestResult::AlreadyAtGoal)
 	{
 		// Already at waypoint -- advance index and succeed immediately
-		InstanceData.CurrentWaypointIndex = PatrolRoute->GetNextWaypointIndex(InstanceData.CurrentWaypointIndex);
+		Wendigo->CurrentWaypointIndex = PatrolRoute->GetNextWaypointIndex(Wendigo->CurrentWaypointIndex);
 		InstanceData.bMoveRequestActive = false;
 		return EStateTreeRunStatus::Succeeded;
 	}
@@ -82,7 +83,7 @@ EStateTreeRunStatus FSTT_PatrolMoveToWaypoint::Tick(
 		return EStateTreeRunStatus::Running;
 	}
 
-	// Idle or reached destination -- advance waypoint index
+	// Idle or reached destination -- advance waypoint index on character
 	APawn* Pawn = Controller.GetPawn();
 	AWendigoCharacter* Wendigo = Cast<AWendigoCharacter>(Pawn);
 	if (Wendigo)
@@ -90,7 +91,7 @@ EStateTreeRunStatus FSTT_PatrolMoveToWaypoint::Tick(
 		APatrolRouteActor* PatrolRoute = Wendigo->GetPatrolRoute();
 		if (PatrolRoute)
 		{
-			InstanceData.CurrentWaypointIndex = PatrolRoute->GetNextWaypointIndex(InstanceData.CurrentWaypointIndex);
+			Wendigo->CurrentWaypointIndex = PatrolRoute->GetNextWaypointIndex(Wendigo->CurrentWaypointIndex);
 		}
 	}
 

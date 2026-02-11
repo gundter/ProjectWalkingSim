@@ -32,7 +32,9 @@ FVector APatrolRouteActor::GetWaypoint(int32 Index) const
 
 	// Clamp index to valid range
 	const int32 ClampedIndex = FMath::Clamp(Index, 0, Waypoints.Num() - 1);
-	return Waypoints[ClampedIndex];
+
+	// Waypoints are stored in local space (MakeEditWidget), transform to world space
+	return GetActorTransform().TransformPosition(Waypoints[ClampedIndex]);
 }
 
 int32 APatrolRouteActor::GetNextWaypointIndex(int32 CurrentIndex) const
@@ -85,10 +87,13 @@ void APatrolRouteActor::Tick(float DeltaTime)
 	const FColor RouteColor = FColor::Green;
 	const FColor LoopBackColor = FColor(100, 100, 255); // Light blue for loop-back
 
+	// Transform waypoints to world space for debug draw
+	const FTransform ActorTransform = GetActorTransform();
+
 	// Draw spheres at each waypoint and lines between consecutive waypoints
 	for (int32 i = 0; i < NumWaypoints; ++i)
 	{
-		const FVector& WaypointPos = Waypoints[i];
+		const FVector WaypointPos = ActorTransform.TransformPosition(Waypoints[i]);
 
 		// Sphere at waypoint
 		DrawDebugSphere(World, WaypointPos, 25.0f, 8, RouteColor, false, -1.0f, SDPG_World, 2.0f);
@@ -96,7 +101,8 @@ void APatrolRouteActor::Tick(float DeltaTime)
 		// Line to next waypoint (not from last in non-loop mode)
 		if (i < NumWaypoints - 1)
 		{
-			DrawDebugLine(World, WaypointPos, Waypoints[i + 1], RouteColor, false, -1.0f, SDPG_World, 2.0f);
+			const FVector NextPos = ActorTransform.TransformPosition(Waypoints[i + 1]);
+			DrawDebugLine(World, WaypointPos, NextPos, RouteColor, false, -1.0f, SDPG_World, 2.0f);
 		}
 	}
 
@@ -105,8 +111,8 @@ void APatrolRouteActor::Tick(float DeltaTime)
 	{
 		DrawDebugLine(
 			World,
-			Waypoints[NumWaypoints - 1],
-			Waypoints[0],
+			ActorTransform.TransformPosition(Waypoints[NumWaypoints - 1]),
+			ActorTransform.TransformPosition(Waypoints[0]),
 			LoopBackColor,
 			false, -1.0f, SDPG_World, 1.5f
 		);

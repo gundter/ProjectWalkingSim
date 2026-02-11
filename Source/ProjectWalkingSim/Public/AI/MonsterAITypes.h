@@ -28,16 +28,16 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAlertLevelChanged, EAlertLevel, N
 namespace AIConstants
 {
 	/** Player visibility score below this is invisible to AI. */
-	constexpr float VisibilityThreshold = 0.3f;
+	constexpr float VisibilityThreshold = 0.05f;
 
 	/** Base suspicion gain per second at full visibility. */
-	constexpr float BaseSuspicionRate = 0.15f;
+	constexpr float BaseSuspicionRate = 1.5f;
 
 	/** Suspicion decay per second when player not visible (~15s from full). */
 	constexpr float SuspicionDecayRate = 0.065f;
 
 	/** Suspicion value that triggers Suspicious alert level. */
-	constexpr float SuspiciousThreshold = 0.4f;
+	constexpr float SuspiciousThreshold = 0.2f;
 
 	/** Suspicion value that triggers Alert alert level. */
 	constexpr float AlertThreshold = 0.8f;

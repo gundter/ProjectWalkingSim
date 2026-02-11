@@ -12,18 +12,13 @@ class AAIController;
 
 /**
  * Instance data for FSTT_PatrolMoveToWaypoint.
- * Stores per-instance runtime state that persists across ticks within the same
- * state activation. CurrentWaypointIndex is editable so designers can set a
- * starting waypoint in the State Tree asset.
+ * Waypoint index is stored on AWendigoCharacter (not here) so it persists
+ * across State Tree state re-entries. This struct only tracks move request state.
  */
 USTRUCT()
 struct PROJECTWALKINGSIM_API FSTT_PatrolMoveToWaypointInstanceData
 {
 	GENERATED_BODY()
-
-	/** Index of the current target waypoint along the patrol route. */
-	UPROPERTY(EditAnywhere, Category = "Patrol")
-	int32 CurrentWaypointIndex = 0;
 
 	/** True while a MoveToLocation request is active. Used for cleanup in ExitState. */
 	bool bMoveRequestActive = false;

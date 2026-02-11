@@ -73,4 +73,7 @@ private:
 	/** Two-flag guard for safe StartLogic timing. */
 	bool bBeginPlayCalled = false;
 	bool bPossessCalled = false;
+
+	/** Debug timer for periodic sight logging (avoids log spam). */
+	float SightDebugTimer = 0.0f;
 };

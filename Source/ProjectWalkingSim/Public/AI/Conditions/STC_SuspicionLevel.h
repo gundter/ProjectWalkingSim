@@ -11,6 +11,13 @@
 
 class AAIController;
 
+/** Instance data for FSTC_SuspicionLevel. Empty -- condition is stateless. */
+USTRUCT()
+struct PROJECTWALKINGSIM_API FSTC_SuspicionLevelInstanceData
+{
+	GENERATED_BODY()
+};
+
 /**
  * State Tree condition: check the Wendigo's current alert level against a threshold.
  *
@@ -30,6 +37,13 @@ USTRUCT(meta = (DisplayName = "Check Suspicion Level"))
 struct PROJECTWALKINGSIM_API FSTC_SuspicionLevel : public FStateTreeConditionCommonBase
 {
 	GENERATED_BODY()
+
+	using FInstanceDataType = FSTC_SuspicionLevelInstanceData;
+
+	virtual const UStruct* GetInstanceDataType() const override
+	{
+		return FInstanceDataType::StaticStruct();
+	}
 
 	virtual bool Link(FStateTreeLinker& Linker) override;
 
