@@ -1,6 +1,9 @@
 // Copyright Null Lantern.
 
 #include "AI/WendigoAIController.h"
+#include "AI/WendigoCharacter.h"
+#include "AI/SuspicionComponent.h"
+#include "Visibility/VisibilityScoreComponent.h"
 #include "Components/StateTreeAIComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -11,6 +14,8 @@
 
 AWendigoAIController::AWendigoAIController()
 {
+	PrimaryActorTick.bCanEverTick = true;
+
 	// ---- State Tree AI Component ----
 	StateTreeAIComponent = CreateDefaultSubobject<UStateTreeAIComponent>(
 		TEXT("StateTreeAIComponent"));
@@ -78,6 +83,54 @@ void AWendigoAIController::TryStartStateTree()
 	}
 }
 
+void AWendigoAIController::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	// Get the possessed Wendigo and its SuspicionComponent
+	AWendigoCharacter* WendigoChar = Cast<AWendigoCharacter>(GetPawn());
+	if (!WendigoChar)
+	{
+		return;
+	}
+
+	USuspicionComponent* SuspicionComp = WendigoChar->GetSuspicionComponent();
+	if (!SuspicionComp || !AIPerceptionComponent)
+	{
+		return;
+	}
+
+	// Check if any player is currently perceived by sight
+	TArray<AActor*> PerceivedActors;
+	AIPerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), PerceivedActors);
+
+	bool bSeeingPlayer = false;
+
+	for (AActor* Actor : PerceivedActors)
+	{
+		if (!Actor)
+		{
+			continue;
+		}
+
+		// Get the player's visibility score and feed into suspicion accumulation
+		UVisibilityScoreComponent* VisComp = Actor->FindComponentByClass<UVisibilityScoreComponent>();
+		if (VisComp)
+		{
+			const float VisibilityScore = VisComp->GetVisibilityScore();
+			SuspicionComp->ProcessSightStimulus(VisibilityScore, DeltaTime);
+			bSeeingPlayer = true;
+			break; // Only one player in this game
+		}
+	}
+
+	// If no player is currently in sight, decay suspicion
+	if (!bSeeingPlayer)
+	{
+		SuspicionComp->DecaySuspicion(DeltaTime);
+	}
+}
+
 void AWendigoAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus Stimulus)
 {
 	if (!Actor)
@@ -85,14 +138,46 @@ void AWendigoAIController::OnTargetPerceptionUpdated(AActor* Actor, FAIStimulus 
 		return;
 	}
 
-	// Stub: log perception events. Plan 05 will expand this to feed SuspicionComponent.
-	const FString SenseName = (Stimulus.Type == UAISense::GetSenseID<UAISense_Sight>())
-		? TEXT("Sight")
-		: (Stimulus.Type == UAISense::GetSenseID<UAISense_Hearing>())
-			? TEXT("Hearing")
-			: TEXT("Unknown");
-	const FString ActiveStr = Stimulus.WasSuccessfullySensed() ? TEXT("Detected") : TEXT("Lost");
+	// Route to the appropriate handler based on sense type
+	if (Stimulus.Type == UAISense::GetSenseID<UAISense_Sight>())
+	{
+		ProcessSightPerception(Actor, Stimulus.WasSuccessfullySensed());
+	}
+	else if (Stimulus.Type == UAISense::GetSenseID<UAISense_Hearing>())
+	{
+		ProcessHearingPerception(Actor, Stimulus.StimulusLocation);
+	}
+}
 
-	UE_LOG(LogSerene, Log, TEXT("Wendigo perceived: %s (Sense: %s, Status: %s)"),
-		*Actor->GetName(), *SenseName, *ActiveStr);
+void AWendigoAIController::ProcessSightPerception(AActor* Player, bool bCurrentlySensed)
+{
+	if (bCurrentlySensed)
+	{
+		const UVisibilityScoreComponent* VisComp = Player->FindComponentByClass<UVisibilityScoreComponent>();
+		const float Visibility = VisComp ? VisComp->GetVisibilityScore() : 1.0f;
+		UE_LOG(LogSerene, Log, TEXT("Wendigo sees %s (Visibility: %.2f)"),
+			*Player->GetName(), Visibility);
+	}
+	else
+	{
+		UE_LOG(LogSerene, Log, TEXT("Wendigo lost sight of %s"), *Player->GetName());
+	}
+}
+
+void AWendigoAIController::ProcessHearingPerception(AActor* NoiseInstigator, FVector StimulusLocation)
+{
+	AWendigoCharacter* WendigoChar = Cast<AWendigoCharacter>(GetPawn());
+	if (!WendigoChar)
+	{
+		return;
+	}
+
+	USuspicionComponent* SuspicionComp = WendigoChar->GetSuspicionComponent();
+	if (!SuspicionComp)
+	{
+		return;
+	}
+
+	SuspicionComp->ProcessHearingStimulus(StimulusLocation);
+	UE_LOG(LogSerene, Log, TEXT("Wendigo heard noise at %s"), *StimulusLocation.ToString());
 }
