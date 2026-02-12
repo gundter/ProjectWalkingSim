@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 5 in progress (Monster Behaviors) -- data layer + chase + grab/investigate + spawn/hiding-detection done, search plan remains.
+**Current Focus:** Phase 5 complete (Monster Behaviors) -- all 5 plans executed, full predator loop verified in PIE. Ready for Phase 6 (Light and Audio).
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 5 of 8 (Monster Behaviors)
-**Plan:** 4 of 5 complete
-**Status:** In progress
-**Last activity:** 2026-02-12 - Completed 05-04-PLAN.md (spawn points, witnessed hiding, AI door opening)
+**Plan:** 5 of 5 complete
+**Status:** Phase complete (pending performance audit)
+**Last activity:** 2026-02-12 - Completed 05-05-PLAN.md (State Tree wiring, PIE verification)
 
 **Progress:**
 ```
@@ -33,8 +33,8 @@ Phase 1: [######] 6/6 plans complete
 Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
-Phase 5: [####.] 4/5 plans complete
-Overall: [████....] 4/8 phases complete
+Phase 5: [#####] 5/5 plans complete
+Overall: [█████...] 5/8 phases complete
 ```
 
 ---
@@ -71,6 +71,7 @@ Overall: [████....] 4/8 phases complete
 | 5-02  | 2/5   | 2/2   | ~8m  | 0      |
 | 5-03  | 3/5   | 2/2   | ~6m  | 2      |
 | 5-04  | 4/5   | 2/2   | ~8m  | 0      |
+| 5-05  | 5/5   | 2/2*  | ~15m | 1      |
 
 *Checkpoint tasks require human verification
 
@@ -158,6 +159,7 @@ Overall: [████....] 4/8 phases complete
 | Grab range requires LOS | No blind grabs through walls; Succeeded only when within GrabRange AND LineOfSightTo | 05-02 |
 | SearchRadius 600cm max | GetRandomReachablePointInRadius degrades >1500cm; 600cm is reliable for tight search pattern | 05-02 |
 | SearchArea ExitState wipes all chase/search state | Prevents stale LastKnownPlayerLocation and WitnessedHidingSpot from influencing next alert cycle | 05-02 |
+| Option A for ReturnToPatrol in State Tree | Dedicated leaf state inside Alert container after Search for smooth patrol resumption | 05-05 |
 
 ### Technical Discoveries
 
@@ -184,6 +186,7 @@ Overall: [████....] 4/8 phases complete
 | StateTreeConditionBase.h includes StateTreeConditionCommonBase | Both base and common base in same header; conditions need StateTreeConditionBase.h not a separate file | 04-06 |
 | UE5.7 SpawnActor<T> with UClass requires references not pointers | 4-arg overload: SpawnActor<T>(UClass*, FVector const&, FRotator const&, FActorSpawnParameters); pass values not &GetActorTransform() | 05-03 |
 | Wave-parallel execution can pre-implement entire plan tasks | 05-02 committed WendigoSpawnPoint + OpenForAI + SetPatrolRoute which was Task 1 of 05-04 | 05-04 |
+| WendigoAIController.cpp needs HidingSpotActor.h for upcast | AActor* WitnessedHidingSpot needs full type include in .cpp for implicit upcast; forward decl insufficient | 05-05 |
 
 ### TODOs
 
@@ -197,13 +200,16 @@ Overall: [████....] 4/8 phases complete
 - [x] Plan Phase 4: Monster AI Core
 - [x] Execute Phase 4 (all 7 plans)
 - [x] Plan Phase 5: Monster Behaviors
-- [ ] Execute Phase 5 (4/5 plans complete)
+- [x] Execute Phase 5 (all 5 plans)
+- [ ] Performance audit for Phase 5
+- [ ] Plan Phase 6: Light and Audio
+- [ ] Execute Phase 6
 - [ ] Future: Consider spline-based patrol routes for polish/main release (current MakeEditWidget waypoints work but less designer-friendly; may not need static routes in main release)
-- [ ] Future: Replace On Tick State Tree transitions with event-driven triggers (OnAlertLevelChanged delegate, gameplay tags, or reduced tick interval) for performance — On Tick is fine for demo but won't scale for complex Alien: Isolation-style State Trees
+- [ ] Future: Replace On Tick State Tree transitions with event-driven triggers (OnAlertLevelChanged delegate, gameplay tags, or reduced tick interval) for performance -- On Tick is fine for demo but won't scale for complex Alien: Isolation-style State Trees
 
 ### Blockers
 
-None -- Phase 5 spawn/hiding-detection complete, search behavior plan (05-05) remains.
+None -- Phase 5 complete, performance audit pending before phase sign-off.
 
 ---
 
@@ -213,87 +219,56 @@ None -- Phase 5 spawn/hiding-detection complete, search behavior plan (05-05) re
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 05-04-PLAN.md: Spawn points, witnessed hiding detection, AI door opening
-- Extended AWendigoAIController with witnessed-hiding detection via player HidingComponent delegate
-- BindToPlayerDelegates on first sight detection (not constructor/BeginPlay)
-- OnPlayerHidingStateChanged records WitnessedHidingSpot only when Wendigo has active LOS
-- Tick continuously updates LastKnownPlayerLocation on WendigoCharacter while seeing player
-- Task 1 (WendigoSpawnPoint, SetPatrolRoute, OpenForAI) was pre-committed by 05-02 wave execution
+- Executed 05-05-PLAN.md: State Tree wiring, SpawnPoint Blueprint, PIE verification
+- Committed build fix: HidingSpotActor.h include in WendigoAIController.cpp
+- All 5 PIE tests passed: chase, search, hide-to-escape, investigation differentiation, spawn point
+- Updated ST_WendigoAI with Alert container (Chase/GrabAttack/Search/ReturnToPatrol)
+- Stimulus-type investigation branching (InvestigateSight/InvestigateSound)
+- BP_WendigoSpawnPoint created
 
-**Stopped at:** Completed 05-04-PLAN.md
+**Stopped at:** Completed 05-05-PLAN.md -- Phase 5 complete
 
-**Next:** Execute remaining Phase 5 plan (05-05 search behavior)
+**Next:** Performance audit for Phase 5, then plan Phase 6 (Light and Audio)
 
 ### Context for Next Session
 
 The Juniper Tree is a psychological horror game demo. The player is a detective investigating a missing boy, eventually discovering they ARE the murdered boy. A Wendigo (the father transformed by cannibalism) stalks the player.
 
 The roadmap has 8 phases:
-1. Foundation - Player controller, movement, interaction ✓
-2. Inventory - 8-slot system with items ✓
-3. Hiding - Hide spots and visibility ✓
-4. Monster AI Core - State Tree, patrol, perception ✓
-5. Monster Behaviors - Chase, investigate, search, spawns
+1. Foundation - Player controller, movement, interaction COMPLETE
+2. Inventory - 8-slot system with items COMPLETE
+3. Hiding - Hide spots and visibility COMPLETE
+4. Monster AI Core - State Tree, patrol, perception COMPLETE
+5. Monster Behaviors - Chase, investigate, search, spawns COMPLETE
 6. Light and Audio - Flashlight, Lumen, spatial audio
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
 
-Phase 4 complete. The project now has:
-- All Phase 1-3 features (character, movement, interaction, inventory, hiding, visibility)
-- AWendigoCharacter: 260cm capsule, 150 cm/s walk, SuspicionComponent, PatrolRoute reference, CurrentWaypointIndex
-- AWendigoAIController: StateTreeAIComponent, AIPerceptionComponent (sight 2500cm/90deg, hearing 2000cm), two-flag StartLogic guard, continuous sight processing in Tick, hearing via delegate
-- USuspicionComponent: sight accumulation (visibility-scaled), hearing bump (0.25), decay, 3 alert levels, OnAlertLevelChanged delegate
-- APatrolRouteActor: local-space waypoints with MakeEditWidget, loop/ping-pong modes, editor debug visualization
-- UNoiseReportingComponent: sprint footstep -> ReportNoiseEvent bridge (11th player component)
-- UAIPerceptionStimuliSourceComponent: registered for sight on player (12th player component)
-- State Tree tasks: STT_PatrolMoveToWaypoint, STT_PatrolIdle, STT_InvestigateLocation, STT_OrientToward
-- State Tree condition: FSTC_SuspicionLevel (enum comparison with invert)
-- Editor assets: BP_WendigoCharacter, BP_PatrolRoute, BP_WendigoAIController, ST_WendigoAI
-- AI gameplay tags: AI.Wendigo, AI.AlertLevel.Patrol/Suspicious/Alert, AI.Stimulus.Noise/Visual
-- 22 AI source files, ~1800 lines of C++
+Phase 5 complete. The project now has:
+- All Phase 1-4 features (character, movement, interaction, HUD, inventory, hiding, AI core)
+- Complete predator behavior loop validated in PIE:
+  - Patrol -> Suspicious (investigate sound at 200cm/s or sight at 250cm/s) -> Alert (chase at 575cm/s)
+  - Chase -> LOS lost -> Search (last-known + 2-3 random NavMesh points, 18s timeout)
+  - Chase -> grab range -> GrabAttack (disable input, 2s, restart level)
+  - Search complete -> ReturnToNearestWaypoint -> Patrol resume
+- State Tree hierarchy: Alert > Suspicious > Patrol (top-to-bottom priority)
+- On Tick transitions for escalation during investigation (Suspicious -> Alert)
+- AWendigoSpawnPoint with zone-based patrol route selection
+- Witnessed-hiding detection (AI sees player enter hiding spot)
+- AI door opening (respects lock state)
+- 30+ AI source files, ~2500 lines of C++
 
-13/29 v1 requirements complete. No orphans.
+17/29 v1 requirements complete. No orphans.
 
-**Phase 5 delivers:**
-- Chase player when spotted (WNDG-04)
-- Investigate sounds and visual disturbances (WNDG-03)
-- Search behavior when player escapes/hides (WNDG-05)
-- Multiple spawn locations with per-spawn patrol zones (WNDG-06)
-
-Phase 4 AI core building. The project now has:
-- All Phase 1-3 features (character, movement, interaction, HUD, inventory, hiding)
-- AI module dependencies: AIModule, NavigationSystem, StateTreeModule, GameplayStateTreeModule
-- MonsterAITypes.h: EAlertLevel (Patrol/Suspicious/Alert), FOnAlertLevelChanged delegate, AIConstants
-- USuspicionComponent: sight/hearing processing, decay, 3 alert levels, delegate broadcasts
-- AWendigoAIController: StateTreeAIComponent, AIPerceptionComponent (sight+hearing), StartLogic guard, perception-to-suspicion pipeline
-- UNoiseReportingComponent (on player): bridges FootstepComponent to AI hearing; sprint-only noise
-- AWendigoCharacter: 260cm capsule, 150 cm/s walk, SuspicionComponent, PatrolRoute ref
-- APatrolRouteActor: full waypoint container with loop/ping-pong, editor debug visualization
-- FSTT_PatrolMoveToWaypoint: State Tree task for waypoint navigation
-- FSTT_PatrolIdle: State Tree task with random 3-6s pause and look-around
-- FSTT_InvestigateLocation: State Tree task for stimulus investigation at 200 cm/s with look-around
-- FSTT_OrientToward: State Tree task for menacing 2s pause facing stimulus
-- FSTC_SuspicionLevel: State Tree condition for alert level threshold transitions
-- 5 AI gameplay tags: AI.Alert.Patrol/Suspicious/Alert, AI.Stimulus.Sight/Hearing
-
-**Phase 5 additions so far (05-01 through 05-04):**
-- Extended MonsterAITypes.h with EWendigoBehaviorState, EStimulusType, FOnBehaviorStateChanged, 8 new AIConstants
-- Extended WendigoCharacter with chase/search persistent state, behavior state tracking, SetPatrolRoute
-- Extended SuspicionComponent with LastStimulusType tracking
-- FSTT_ChasePlayer: high-speed chase task with LOS tracking and grab-range detection
-- FSTT_GrabAttack: cinematic kill sequence (disable input, wait, restart level)
-- FSTC_StimulusType: State Tree condition for stimulus type branching
-- Enhanced STT_InvestigateLocation with stimulus-type-aware speed
-- AWendigoSpawnPoint: zone-based spawn with random patrol route assignment
-- ADoorActor::OpenForAI: AI-compatible door opening respecting lock state
-- AWendigoAIController: witnessed-hiding detection, player delegate binding, LastKnownPlayerLocation updates
-- FSTT_SearchArea: last-known + random NavMesh point search with periodic look-around and duration timeout
-- FSTT_ReturnToNearestWaypoint: nearest waypoint by DistSquared for seamless patrol resumption
-
-**Phase 5 remaining (05-05):**
-- State Tree asset wiring and final integration
+**Phase 6 will deliver:**
+- LGHT-01: Flashlight (always on for demo)
+- LGHT-02: Lumen GI atmospheric lighting
+- AUDO-01: Spatial audio (3D monster sounds)
+- AUDO-02: Ambient horror soundscape
+- AUDO-03: Monster audio cues (footsteps, breathing, growls)
+- AUDO-04: Dynamic music and tension stingers
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 5 plan 05-02 SUMMARY complete)*
+*Last updated: 2026-02-12 (Phase 5 complete -- all 5 plans executed, PIE verified)*

@@ -149,11 +149,11 @@ Plans:
 **Plans:** 5 plans
 
 Plans:
-- [ ] 05-01-PLAN.md -- AI types extension: enums, constants, WendigoCharacter state, SuspicionComponent stimulus tracking
-- [ ] 05-02-PLAN.md -- Chase, Search, and ReturnToNearestWaypoint State Tree tasks
-- [ ] 05-03-PLAN.md -- GrabAttack task, StimulusType condition, investigation enhancement
-- [ ] 05-04-PLAN.md -- SpawnPoint actor, AI controller witnessed-hiding, AI door interaction
-- [ ] 05-05-PLAN.md -- State Tree update, SpawnPoint Blueprint, PIE verification
+- [x] 05-01-PLAN.md -- AI types extension: enums, constants, WendigoCharacter state, SuspicionComponent stimulus tracking
+- [x] 05-02-PLAN.md -- Chase, Search, and ReturnToNearestWaypoint State Tree tasks
+- [x] 05-03-PLAN.md -- GrabAttack task, StimulusType condition, investigation enhancement
+- [x] 05-04-PLAN.md -- SpawnPoint actor, AI controller witnessed-hiding, AI door interaction
+- [x] 05-05-PLAN.md -- State Tree update, SpawnPoint Blueprint, PIE verification
 
 **Success Criteria:**
 1. Wendigo investigates location of sounds before returning to patrol
@@ -234,7 +234,7 @@ Plans:
 | 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | ✓ Complete |
 | 3 | Hiding System | HIDE-01, HIDE-02 | ✓ Complete |
 | 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | ✓ Complete |
-| 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | In Progress |
+| 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | Complete |
 | 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | Not Started |
 | 7 | Save System | SAVE-01, SAVE-02 | Not Started |
 | 8 | Demo Polish | DEMO-01, DEMO-02, DEMO-03, DEMO-04 | Not Started |
