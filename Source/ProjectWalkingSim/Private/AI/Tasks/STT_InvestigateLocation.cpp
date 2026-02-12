@@ -37,14 +37,27 @@ EStateTreeRunStatus FSTT_InvestigateLocation::EnterState(
 		return EStateTreeRunStatus::Failed;
 	}
 
+	// Set behavior state
+	Wendigo->SetBehaviorState(EWendigoBehaviorState::Investigating);
+
 	// Store target and reset look-around timer
 	InstanceData.TargetLocation = Suspicion->GetLastKnownStimulusLocation();
 	InstanceData.TimeAtLocation = 0.0f;
 
-	// Temporarily increase walk speed for urgency
+	// Select investigation speed based on stimulus type
+	float SelectedSpeed = InvestigationSpeed;
+	if (bUseStimulusTypeSpeed)
+	{
+		const EStimulusType StimulusType = Suspicion->GetLastStimulusType();
+		if (StimulusType == EStimulusType::Sight)
+		{
+			SelectedSpeed = InvestigationSightSpeed;
+		}
+	}
+
 	if (UCharacterMovementComponent* MoveComp = Wendigo->GetCharacterMovement())
 	{
-		MoveComp->MaxWalkSpeed = InvestigationSpeed;
+		MoveComp->MaxWalkSpeed = SelectedSpeed;
 	}
 
 	// Issue move request
@@ -126,7 +139,7 @@ void FSTT_InvestigateLocation::ExitState(
 	FInstanceDataType& InstanceData = Context.GetInstanceData<FInstanceDataType>(*this);
 	AAIController& Controller = Context.GetExternalData(ControllerHandle);
 
-	// Restore patrol walk speed
+	// Restore patrol walk speed and behavior state
 	APawn* Pawn = Controller.GetPawn();
 	AWendigoCharacter* Wendigo = Cast<AWendigoCharacter>(Pawn);
 	if (Wendigo)
@@ -135,6 +148,7 @@ void FSTT_InvestigateLocation::ExitState(
 		{
 			MoveComp->MaxWalkSpeed = AIConstants::WendigoWalkSpeed;
 		}
+		Wendigo->SetBehaviorState(EWendigoBehaviorState::Patrol);
 	}
 
 	// Stop any active movement

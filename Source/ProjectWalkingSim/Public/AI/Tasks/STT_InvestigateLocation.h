@@ -6,6 +6,7 @@
 #include "StateTreeTaskBase.h"
 #include "StateTreeLinker.h"
 #include "StateTreeExecutionContext.h"
+#include "AI/MonsterAITypes.h"
 #include "STT_InvestigateLocation.generated.h"
 
 class AAIController;
@@ -34,11 +35,12 @@ struct PROJECTWALKINGSIM_API FSTT_InvestigateLocationInstanceData
  * State Tree task: navigate the Wendigo to the last known stimulus location.
  *
  * On EnterState, reads the stimulus location from the pawn's SuspicionComponent,
- * temporarily increases walk speed for urgency, and issues MoveToLocation.
+ * selects investigation speed based on stimulus type (sight=250, sound=200 cm/s),
+ * sets BehaviorState to Investigating, and issues MoveToLocation.
  * After arrival, enters a look-around phase (standing still for LookAroundDuration).
  * On success, clears the SuspicionComponent's stimulus location.
  *
- * Restores the pawn's walk speed in ExitState to prevent speed leaks.
+ * Restores the pawn's walk speed and BehaviorState in ExitState to prevent leaks.
  * Uses a looser AcceptanceRadius (100cm) than patrol since the AI is investigating
  * an area, not navigating to a precise point.
  */
@@ -72,9 +74,22 @@ struct PROJECTWALKINGSIM_API FSTT_InvestigateLocation : public FStateTreeTaskCom
 	UPROPERTY(EditAnywhere, Category = "Investigation", meta = (ClampMin = "10.0"))
 	float AcceptanceRadius = 100.0f;
 
-	/** Walk speed when investigating -- faster than patrol (150), slower than player walk (250). */
+	/** Walk speed when investigating sound stimuli -- faster than patrol (150), slower than player walk (250). */
 	UPROPERTY(EditAnywhere, Category = "Investigation", meta = (ClampMin = "50.0"))
 	float InvestigationSpeed = 200.0f;
+
+	/** Walk speed when investigating sight stimuli -- faster and more aggressive than sound investigation. */
+	UPROPERTY(EditAnywhere, Category = "Investigation", meta = (ClampMin = "50.0"))
+	float InvestigationSightSpeed = AIConstants::WendigoInvestigateSightSpeed;
+
+	/**
+	 * When true, EnterState reads the SuspicionComponent's LastStimulusType to select speed:
+	 *   Sight -> InvestigationSightSpeed (250 cm/s, aggressive approach)
+	 *   Sound -> InvestigationSpeed (200 cm/s, cautious approach)
+	 * When false, always uses InvestigationSpeed (backward-compatible).
+	 */
+	UPROPERTY(EditAnywhere, Category = "Investigation")
+	bool bUseStimulusTypeSpeed = true;
 
 	/** Duration in seconds to look around after arriving at the stimulus location. */
 	UPROPERTY(EditAnywhere, Category = "Investigation", meta = (ClampMin = "0.5"))
