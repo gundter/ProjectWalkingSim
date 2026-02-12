@@ -5,6 +5,7 @@
 #include "AI/SuspicionComponent.h"
 #include "Visibility/VisibilityScoreComponent.h"
 #include "Hiding/HidingComponent.h"
+#include "Hiding/HidingSpotActor.h"
 #include "Hiding/HidingTypes.h"
 #include "Components/StateTreeAIComponent.h"
 #include "Perception/AIPerceptionComponent.h"
