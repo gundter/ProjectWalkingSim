@@ -52,6 +52,7 @@ void UFlashlightComponent::BeginPlay()
 	SpotLight->SetAttenuationRadius(AttenuationRadius);
 	SpotLight->SetLightColor(LightColor);
 	SpotLight->SetVolumetricScatteringIntensity(VolumetricScatteringIntensity);
+	SpotLight->bAllowMegaLights = bAllowMegaLights;
 	SpotLight->SetCastShadows(true);
 	SpotLight->SetMobility(EComponentMobility::Movable);
 

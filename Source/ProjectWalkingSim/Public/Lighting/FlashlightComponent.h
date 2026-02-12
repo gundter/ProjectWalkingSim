@@ -73,6 +73,10 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight|Beam", meta = (ClampMin = "0.0", ClampMax = "5.0"))
 	float VolumetricScatteringIntensity = 1.0f;
 
+	/** Whether this light uses MegaLights for GPU-driven rendering. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight|Beam")
+	bool bAllowMegaLights = true;
+
 	// --- Detection Configuration ---
 
 	/** Half-angle (degrees) of the detection cone. Should be <= OuterConeAngle. */
