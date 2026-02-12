@@ -154,6 +154,10 @@ Overall: [████....] 4/8 phases complete
 | Forward declare EHidingState in AI header | Full include only in .cpp; avoids circular AI-Hiding header dependency | 05-04 |
 | SetPatrolRoute method (Option B) for runtime route assignment | Preserves EditInstanceOnly restriction for level designers while enabling spawn system | 05-04 |
 | DoorActor state fields promoted to protected for OpenForAI | bIsOpen/CurrentAngle/TargetAngle/OpenDirection accessible by subclass and same-class methods | 05-04 |
+| MoveToActor for chase, not MoveToLocation | Auto-updates destination as player moves; avoids per-frame re-issue | 05-02 |
+| Grab range requires LOS | No blind grabs through walls; Succeeded only when within GrabRange AND LineOfSightTo | 05-02 |
+| SearchRadius 600cm max | GetRandomReachablePointInRadius degrades >1500cm; 600cm is reliable for tight search pattern | 05-02 |
+| SearchArea ExitState wipes all chase/search state | Prevents stale LastKnownPlayerLocation and WitnessedHidingSpot from influencing next alert cycle | 05-02 |
 
 ### Technical Discoveries
 
@@ -283,11 +287,13 @@ Phase 4 AI core building. The project now has:
 - AWendigoSpawnPoint: zone-based spawn with random patrol route assignment
 - ADoorActor::OpenForAI: AI-compatible door opening respecting lock state
 - AWendigoAIController: witnessed-hiding detection, player delegate binding, LastKnownPlayerLocation updates
+- FSTT_SearchArea: last-known + random NavMesh point search with periodic look-around and duration timeout
+- FSTT_ReturnToNearestWaypoint: nearest waypoint by DistSquared for seamless patrol resumption
 
 **Phase 5 remaining (05-05):**
-- Search behavior (STT_SearchArea, STT_ReturnToNearestWaypoint)
+- State Tree asset wiring and final integration
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 5 plan 05-04 complete)*
+*Last updated: 2026-02-12 (Phase 5 plan 05-02 SUMMARY complete)*
