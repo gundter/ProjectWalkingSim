@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 6 in progress (Light and Audio) -- Plans 01, 02, 04 complete. Remaining: 03, 05.
+**Current Focus:** Phase 6 in progress (Light and Audio) -- Plans 01, 02, 03, 04 complete. Remaining: 05.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 6 of 8 (Light and Audio)
-**Plan:** 3 of 5 complete (06-01, 06-02, 06-04)
+**Plan:** 4 of 5 complete (06-01, 06-02, 06-03, 06-04)
 **Status:** In progress
-**Last activity:** 2026-02-12 - Completed 06-01-PLAN.md (Flashlight + Audio Constants)
+**Last activity:** 2026-02-12 - Completed 06-03-PLAN.md (MusicTensionSystem + AmbientAudioManager)
 
 **Progress:**
 ```
@@ -34,7 +34,7 @@ Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
-Phase 6: [###..] 3/5 plans complete (06-01, 06-02, 06-04)
+Phase 6: [####.] 4/5 plans complete (06-01, 06-02, 06-03, 06-04)
 Overall: [█████░...] 6/8 phases in progress
 ```
 
@@ -75,6 +75,7 @@ Overall: [█████░...] 6/8 phases in progress
 | 5-05  | 5/5   | 2/2*  | ~15m | 1      |
 | 6-01  | 3/5   | 2/2   | ~6m  | 1      |
 | 6-02  | 2/5   | 2/2   | ~5m  | 2      |
+| 6-03  | 4/5   | 2/2   | ~9m  | 0      |
 | 6-04  | 1/5   | 2/2   | ~4m  | 0      |
 
 *Checkpoint tasks require human verification
@@ -233,15 +234,14 @@ None -- Phase 6 in progress.
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 06-01-PLAN.md: Flashlight + Audio Constants
-- FlashlightComponent: narrow-cone LED spotlight attached to player camera via NewObject in BeginPlay
-- AudioConstants.h: centralized tuning namespace for all Phase 6 audio (already tracked from plan checker)
-- MonsterAudioComponent.cpp: full implementation resolving pre-existing linker errors
+- Executed 06-03-PLAN.md: MusicTensionSystem + AmbientAudioManager
+- Task 1 (MusicTensionSystem) was pre-implemented by wave-parallel 06-04 execution -- verified complete
+- Task 2 (AmbientAudioManager): looping ambient bed, randomized one-shots on timer, predator silence API
 - Build verified: zero errors, zero warnings
 
-**Stopped at:** Completed 06-01-PLAN.md
+**Stopped at:** Completed 06-03-PLAN.md
 
-**Next:** Continue Phase 6 execution (plans 03, 05 remaining)
+**Next:** Continue Phase 6 execution (plan 05 remaining)
 
 ### Context for Next Session
 
@@ -284,4 +284,4 @@ Phase 5 complete. The project now has:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 6 plan 01 complete -- Flashlight + Audio Constants)*
+*Last updated: 2026-02-12 (Phase 6 plan 03 complete -- MusicTensionSystem + AmbientAudioManager)*
