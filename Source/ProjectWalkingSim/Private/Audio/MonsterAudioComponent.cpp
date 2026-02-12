@@ -206,13 +206,16 @@ float UMonsterAudioComponent::GetFootstepInterval() const
 
 	switch (Wendigo->BehaviorState)
 	{
-	case EWendigoBehaviorState::Chasing:
-	case EWendigoBehaviorState::GrabAttack:
-		return AudioConstants::MonsterFootstepInterval_Chase;
+	case EWendigoBehaviorState::Patrol:
+		return AudioConstants::MonsterFootstepInterval_Patrol;
 	case EWendigoBehaviorState::Investigating:
 		return AudioConstants::MonsterFootstepInterval_Investigate;
+	case EWendigoBehaviorState::Chasing:
+		return AudioConstants::MonsterFootstepInterval_Chase;
 	case EWendigoBehaviorState::Searching:
 		return AudioConstants::MonsterFootstepInterval_Search;
+	case EWendigoBehaviorState::GrabAttack:
+		return 0.0f; // No footsteps during grab attack
 	default:
 		return AudioConstants::MonsterFootstepInterval_Patrol;
 	}
@@ -229,6 +232,11 @@ void UMonsterAudioComponent::UpdateFootstepTimer()
 	World->GetTimerManager().ClearTimer(FootstepTimerHandle);
 
 	const float Interval = GetFootstepInterval();
+	if (Interval <= 0.0f)
+	{
+		return; // No footsteps for this state (e.g., GrabAttack)
+	}
+
 	World->GetTimerManager().SetTimer(
 		FootstepTimerHandle,
 		this,
