@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 5 in progress (Monster Behaviors) -- data layer + chase + grab/investigate done, search/spawn plans remain.
+**Current Focus:** Phase 5 in progress (Monster Behaviors) -- data layer + chase + grab/investigate + spawn/hiding-detection done, search plan remains.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 5 of 8 (Monster Behaviors)
-**Plan:** 3 of 5 complete
+**Plan:** 4 of 5 complete
 **Status:** In progress
-**Last activity:** 2026-02-12 - Completed 05-03-PLAN.md (grab attack, stimulus condition, investigation enhancement)
+**Last activity:** 2026-02-12 - Completed 05-04-PLAN.md (spawn points, witnessed hiding, AI door opening)
 
 **Progress:**
 ```
@@ -33,7 +33,7 @@ Phase 1: [######] 6/6 plans complete
 Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
-Phase 5: [###..] 3/5 plans complete
+Phase 5: [####.] 4/5 plans complete
 Overall: [████....] 4/8 phases complete
 ```
 
@@ -68,7 +68,9 @@ Overall: [████....] 4/8 phases complete
 | 4-05  | 5/7   | 2/2   | ~14m | 0      |
 | 4-06  | 6/7   | 2/2   | ~5m  | 0      |
 | 5-01  | 1/5   | 2/2   | ~6m  | 0      |
+| 5-02  | 2/5   | 2/2   | ~8m  | 0      |
 | 5-03  | 3/5   | 2/2   | ~6m  | 2      |
+| 5-04  | 4/5   | 2/2   | ~8m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -148,6 +150,10 @@ Overall: [████....] 4/8 phases complete
 | RestartLevel console command for demo death | Simple demo-scope approach; Phase 8 replaces with proper death/respawn system | 05-03 |
 | bUseStimulusTypeSpeed defaults true | New stimulus-aware speed is desired default; flag preserves backward compatibility | 05-03 |
 | BehaviorState lifecycle in tasks | Set in EnterState, restore to Patrol in ExitState; clean state for next task | 05-03 |
+| Bind player hiding delegate on first sight, not at init | Player may not exist at controller init; binding on first sight ensures HidingComponent available | 05-04 |
+| Forward declare EHidingState in AI header | Full include only in .cpp; avoids circular AI-Hiding header dependency | 05-04 |
+| SetPatrolRoute method (Option B) for runtime route assignment | Preserves EditInstanceOnly restriction for level designers while enabling spawn system | 05-04 |
+| DoorActor state fields promoted to protected for OpenForAI | bIsOpen/CurrentAngle/TargetAngle/OpenDirection accessible by subclass and same-class methods | 05-04 |
 
 ### Technical Discoveries
 
@@ -173,6 +179,7 @@ Overall: [████....] 4/8 phases complete
 | Parallel wave agents may pre-implement cross-plan work | 04-04 implemented 04-05 Task 1 (perception wiring) as part of its own scope | 04-05 |
 | StateTreeConditionBase.h includes StateTreeConditionCommonBase | Both base and common base in same header; conditions need StateTreeConditionBase.h not a separate file | 04-06 |
 | UE5.7 SpawnActor<T> with UClass requires references not pointers | 4-arg overload: SpawnActor<T>(UClass*, FVector const&, FRotator const&, FActorSpawnParameters); pass values not &GetActorTransform() | 05-03 |
+| Wave-parallel execution can pre-implement entire plan tasks | 05-02 committed WendigoSpawnPoint + OpenForAI + SetPatrolRoute which was Task 1 of 05-04 | 05-04 |
 
 ### TODOs
 
@@ -186,13 +193,13 @@ Overall: [████....] 4/8 phases complete
 - [x] Plan Phase 4: Monster AI Core
 - [x] Execute Phase 4 (all 7 plans)
 - [x] Plan Phase 5: Monster Behaviors
-- [ ] Execute Phase 5 (3/5 plans complete)
+- [ ] Execute Phase 5 (4/5 plans complete)
 - [ ] Future: Consider spline-based patrol routes for polish/main release (current MakeEditWidget waypoints work but less designer-friendly; may not need static routes in main release)
 - [ ] Future: Replace On Tick State Tree transitions with event-driven triggers (OnAlertLevelChanged delegate, gameplay tags, or reduced tick interval) for performance — On Tick is fine for demo but won't scale for complex Alien: Isolation-style State Trees
 
 ### Blockers
 
-None -- Phase 5 grab/investigate/condition tasks complete, search and spawn plans remain.
+None -- Phase 5 spawn/hiding-detection complete, search behavior plan (05-05) remains.
 
 ---
 
@@ -202,16 +209,16 @@ None -- Phase 5 grab/investigate/condition tasks complete, search and spawn plan
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 05-03-PLAN.md: Grab attack, stimulus condition, investigation enhancement
-- Created FSTT_GrabAttack: cinematic kill sequence (disable input, wait GrabDuration, RestartLevel)
-- Created FSTC_StimulusType: State Tree condition for stimulus type branching
-- Enhanced STT_InvestigateLocation with stimulus-type-aware speed (sight=250, sound=200 cm/s)
-- Fixed pre-existing 05-02 compilation errors (ChasePlayer missing include, SpawnPoint wrong SpawnActor signature)
-- All files compile cleanly (zero errors, zero warnings)
+- Executed 05-04-PLAN.md: Spawn points, witnessed hiding detection, AI door opening
+- Extended AWendigoAIController with witnessed-hiding detection via player HidingComponent delegate
+- BindToPlayerDelegates on first sight detection (not constructor/BeginPlay)
+- OnPlayerHidingStateChanged records WitnessedHidingSpot only when Wendigo has active LOS
+- Tick continuously updates LastKnownPlayerLocation on WendigoCharacter while seeing player
+- Task 1 (WendigoSpawnPoint, SetPatrolRoute, OpenForAI) was pre-committed by 05-02 wave execution
 
-**Stopped at:** Completed 05-03-PLAN.md
+**Stopped at:** Completed 05-04-PLAN.md
 
-**Next:** Execute remaining Phase 5 plans (05-04 search behavior, 05-05 spawn system)
+**Next:** Execute remaining Phase 5 plan (05-05 search behavior)
 
 ### Context for Next Session
 
@@ -265,12 +272,22 @@ Phase 4 AI core building. The project now has:
 - FSTC_SuspicionLevel: State Tree condition for alert level threshold transitions
 - 5 AI gameplay tags: AI.Alert.Patrol/Suspicious/Alert, AI.Stimulus.Sight/Hearing
 
-**Phase 4 remaining (04-07):**
-- State Tree asset creation and wiring in editor
-- NavMesh configuration for tall Wendigo agent
-- Editor assets and PIE verification
+**Phase 5 additions so far (05-01 through 05-04):**
+- Extended MonsterAITypes.h with EWendigoBehaviorState, EStimulusType, FOnBehaviorStateChanged, 8 new AIConstants
+- Extended WendigoCharacter with chase/search persistent state, behavior state tracking, SetPatrolRoute
+- Extended SuspicionComponent with LastStimulusType tracking
+- FSTT_ChasePlayer: high-speed chase task with LOS tracking and grab-range detection
+- FSTT_GrabAttack: cinematic kill sequence (disable input, wait, restart level)
+- FSTC_StimulusType: State Tree condition for stimulus type branching
+- Enhanced STT_InvestigateLocation with stimulus-type-aware speed
+- AWendigoSpawnPoint: zone-based spawn with random patrol route assignment
+- ADoorActor::OpenForAI: AI-compatible door opening respecting lock state
+- AWendigoAIController: witnessed-hiding detection, player delegate binding, LastKnownPlayerLocation updates
+
+**Phase 5 remaining (05-05):**
+- Search behavior (STT_SearchArea, STT_ReturnToNearestWaypoint)
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 5 plan 05-03 complete)*
+*Last updated: 2026-02-12 (Phase 5 plan 05-04 complete)*
