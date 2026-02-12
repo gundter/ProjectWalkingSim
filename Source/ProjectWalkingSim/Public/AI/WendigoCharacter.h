@@ -11,6 +11,8 @@ class USuspicionComponent;
 class AWendigoAIController;
 class APatrolRouteActor;
 class AHidingSpotActor;
+class UMonsterAudioComponent;
+class UMusicTensionSystem;
 
 /**
  * The Wendigo monster character.
@@ -91,10 +93,22 @@ public:
 	/** Assign a patrol route at runtime (e.g., from WendigoSpawnPoint). Resets waypoint index to 0. */
 	void SetPatrolRoute(APatrolRouteActor* Route) { PatrolRoute = Route; CurrentWaypointIndex = 0; }
 
+	/** Get the music tension system for external binding. */
+	UFUNCTION(BlueprintCallable, Category = "Audio")
+	UMusicTensionSystem* GetMusicTensionSystem() const { return MusicTensionSystem; }
+
 protected:
 	/** Suspicion component -- tracks detection state and alert levels. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
 	TObjectPtr<USuspicionComponent> SuspicionComponent;
+
+	/** Behavior-state-driven spatial audio: breathing, footsteps, vocalizations. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")
+	TObjectPtr<UMonsterAudioComponent> MonsterAudioComponent;
+
+	/** Dynamic music system driven by alert level. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Audio")
+	TObjectPtr<UMusicTensionSystem> MusicTensionSystem;
 
 	/**
 	 * Patrol route for this Wendigo instance.

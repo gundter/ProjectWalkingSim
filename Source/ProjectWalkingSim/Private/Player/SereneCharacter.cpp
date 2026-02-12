@@ -17,6 +17,8 @@
 #include "AI/NoiseReportingComponent.h"
 #include "Perception/AIPerceptionStimuliSourceComponent.h"
 #include "Perception/AISense_Sight.h"
+#include "Lighting/FlashlightComponent.h"
+#include "Audio/PlayerAudioComponent.h"
 #include "Player/HUD/SereneHUD.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
@@ -68,6 +70,13 @@ ASereneCharacter::ASereneCharacter()
 	AIPerceptionStimuliSource = CreateDefaultSubobject<UAIPerceptionStimuliSourceComponent>(TEXT("AIPerceptionStimuliSource"));
 	AIPerceptionStimuliSource->RegisterForSense(TSubclassOf<UAISense>(UAISense_Sight::StaticClass()));
 	AIPerceptionStimuliSource->bAutoRegister = true;
+
+	// --- Phase 06: Flashlight and Audio ---
+	FlashlightComponent = CreateDefaultSubobject<UFlashlightComponent>(
+		TEXT("FlashlightComponent"));
+
+	PlayerAudioComponent = CreateDefaultSubobject<UPlayerAudioComponent>(
+		TEXT("PlayerAudioComponent"));
 
 	// --- Character Movement Component Configuration ---
 	// Grounded, deliberate horror movement. No jump, no air control.
@@ -141,8 +150,8 @@ void ASereneCharacter::BeginPlay()
 	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - Character initialized. WalkSpeed=%.0f, SprintSpeed=%.0f"),
 		WalkSpeed, SprintSpeed);
 
-	// Log all 9 component creation status (10 total with FirstPersonCamera)
-	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - Components: Stamina=%s, HeadBob=%s, Lean=%s, Interaction=%s, Footstep=%s, Inventory=%s, Hiding=%s, Visibility=%s, NoiseReporting=%s"),
+	// Log all 11 component creation status (12 total with FirstPersonCamera)
+	UE_LOG(LogSerene, Log, TEXT("ASereneCharacter::BeginPlay - Components: Stamina=%s, HeadBob=%s, Lean=%s, Interaction=%s, Footstep=%s, Inventory=%s, Hiding=%s, Visibility=%s, NoiseReporting=%s, Flashlight=%s, PlayerAudio=%s"),
 		StaminaComponent ? TEXT("OK") : TEXT("MISSING"),
 		HeadBobComponent ? TEXT("OK") : TEXT("MISSING"),
 		LeanComponent ? TEXT("OK") : TEXT("MISSING"),
@@ -151,7 +160,9 @@ void ASereneCharacter::BeginPlay()
 		InventoryComponent ? TEXT("OK") : TEXT("MISSING"),
 		HidingComponent ? TEXT("OK") : TEXT("MISSING"),
 		VisibilityScoreComponent ? TEXT("OK") : TEXT("MISSING"),
-		NoiseReportingComponent ? TEXT("OK") : TEXT("MISSING"));
+		NoiseReportingComponent ? TEXT("OK") : TEXT("MISSING"),
+		FlashlightComponent ? TEXT("OK") : TEXT("MISSING"),
+		PlayerAudioComponent ? TEXT("OK") : TEXT("MISSING"));
 }
 
 void ASereneCharacter::Tick(float DeltaTime)

@@ -16,6 +16,8 @@ class UHidingComponent;
 class UVisibilityScoreComponent;
 class UNoiseReportingComponent;
 class UAIPerceptionStimuliSourceComponent;
+class UFlashlightComponent;
+class UPlayerAudioComponent;
 
 class UCameraComponent;
 class USkeletalMeshComponent;
@@ -27,7 +29,7 @@ class USkeletalMeshComponent;
  * with a WorldRepresentationMesh for shadow casting. Camera is attached to the head
  * bone of the skeletal mesh. Movement is grounded and deliberate (no jump).
  *
- * Attached components (all 9 created in constructor, 10 total with camera):
+ * Attached components (all 11 created in constructor, 12 total with camera):
  * - StaminaComponent (Plan 03): Stamina drain/regen during sprint
  * - HeadBobComponent (Plan 03): Procedural sine-wave camera bob
  * - LeanComponent (Plan 03): Camera-only lean (Q/E)
@@ -37,6 +39,8 @@ class USkeletalMeshComponent;
  * - HidingComponent (Phase 03): Hiding state machine and lifecycle
  * - VisibilityScoreComponent (Phase 03): Ambient light sampling for AI visibility
  * - NoiseReportingComponent (Phase 04): Sprint noise to AI hearing bridge
+ * - FlashlightComponent (Phase 06): Camera-attached spotlight with AI detection
+ * - PlayerAudioComponent (Phase 06): Surface footsteps + heartbeat proximity
  *
  * Camera offset aggregation: Tick() reads offsets from HeadBobComponent and
  * LeanComponent, sums them, and applies the combined result to the camera.
@@ -147,6 +151,16 @@ protected:
 	/** Registers player as a stimuli source for AI sight perception. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UAIPerceptionStimuliSourceComponent> AIPerceptionStimuliSource;
+
+	// --- Phase 06 Components ---
+
+	/** Flashlight spotlight attached to camera. Always on for demo. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UFlashlightComponent> FlashlightComponent;
+
+	/** Player footstep audio + heartbeat proximity system. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UPlayerAudioComponent> PlayerAudioComponent;
 
 	// --- Movement Configuration ---
 

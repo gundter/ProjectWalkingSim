@@ -4,6 +4,8 @@
 #include "AI/SuspicionComponent.h"
 #include "AI/WendigoAIController.h"
 #include "AI/MonsterAITypes.h"
+#include "Audio/MonsterAudioComponent.h"
+#include "Audio/MusicTensionSystem.h"
 #include "Core/SereneLogChannels.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -29,6 +31,13 @@ AWendigoCharacter::AWendigoCharacter()
 	// ---- Suspicion Component ----
 	SuspicionComponent = CreateDefaultSubobject<USuspicionComponent>(
 		TEXT("SuspicionComponent"));
+
+	// ---- Phase 06: Audio ----
+	MonsterAudioComponent = CreateDefaultSubobject<UMonsterAudioComponent>(
+		TEXT("MonsterAudioComponent"));
+
+	MusicTensionSystem = CreateDefaultSubobject<UMusicTensionSystem>(
+		TEXT("MusicTensionSystem"));
 }
 
 void AWendigoCharacter::SetBehaviorState(EWendigoBehaviorState NewState)
