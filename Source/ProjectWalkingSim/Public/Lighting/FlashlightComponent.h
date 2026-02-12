@@ -7,6 +7,7 @@
 #include "FlashlightComponent.generated.h"
 
 class USpotLightComponent;
+class AWendigoCharacter;
 
 /**
  * Flashlight component for the player character.
@@ -16,14 +17,15 @@ class USpotLightComponent;
  * forcing the player to actively scan their surroundings.
  *
  * Always-on for the demo (no toggle, no battery). The beam attracts the Wendigo
- * when shining directly at it -- detection logic is handled externally via
- * periodic traces in a later plan.
+ * when shining directly at it -- a periodic cone trace checks if the Wendigo is
+ * within the beam and reports a tunable suspicion score to the SuspicionComponent.
  *
  * Performance: A movable spotlight with shadow casting + Lumen GI costs 2-5ms GPU.
  * VolumetricScatteringIntensity is tunable to reduce ghosting artifacts from
  * temporal reprojection in volumetric fog.
  *
  * No Tick -- the spotlight moves with the camera attachment automatically.
+ * Detection uses a timer-based trace (default 0.5s interval).
  */
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class PROJECTWALKINGSIM_API UFlashlightComponent : public UActorComponent
@@ -39,6 +41,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	// --- Beam Configuration ---
 
@@ -70,8 +73,34 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight|Beam", meta = (ClampMin = "0.0", ClampMax = "5.0"))
 	float VolumetricScatteringIntensity = 1.0f;
 
+	// --- Detection Configuration ---
+
+	/** Half-angle (degrees) of the detection cone. Should be <= OuterConeAngle. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight|Detection")
+	float DetectionHalfAngle = 15.0f;
+
+	/** Range (cm) of the detection trace. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight|Detection")
+	float DetectionRange = 1500.0f;
+
+	/** Interval (seconds) between detection checks. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Flashlight|Detection")
+	float DetectionInterval = 0.5f;
+
 private:
 	/** The runtime spot light, created in BeginPlay and attached to the camera. */
 	UPROPERTY()
 	TObjectPtr<USpotLightComponent> SpotLight;
+
+	/** Timer for periodic Wendigo detection check. */
+	FTimerHandle DetectionTimerHandle;
+
+	/** Cached Wendigo reference for detection checks. */
+	TWeakObjectPtr<AWendigoCharacter> CachedWendigo;
+
+	/** Periodic check: is the flashlight beam hitting the Wendigo? */
+	void FlashlightDetectionTrace();
+
+	/** Find the Wendigo in the world (lazy cache). */
+	void FindWendigo();
 };
