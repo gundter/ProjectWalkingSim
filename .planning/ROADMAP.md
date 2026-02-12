@@ -181,11 +181,11 @@ Plans:
 **Plans:** 5 plans
 
 Plans:
-- [ ] 06-01-PLAN.md -- FlashlightComponent + AudioConstants foundation
-- [ ] 06-02-PLAN.md -- MonsterAudioComponent (behavior-state-driven spatial audio)
-- [ ] 06-03-PLAN.md -- MusicTensionSystem + AmbientAudioManager
-- [ ] 06-04-PLAN.md -- PlayerAudioComponent (footstep playback + heartbeat proximity)
-- [ ] 06-05-PLAN.md -- Character wiring, flashlight-AI detection, PIE verification
+- [x] 06-01-PLAN.md -- FlashlightComponent + AudioConstants foundation
+- [x] 06-02-PLAN.md -- MonsterAudioComponent (behavior-state-driven spatial audio)
+- [x] 06-03-PLAN.md -- MusicTensionSystem + AmbientAudioManager
+- [x] 06-04-PLAN.md -- PlayerAudioComponent (footstep playback + heartbeat proximity)
+- [x] 06-05-PLAN.md -- Character wiring, flashlight-AI detection, PIE verification
 
 **Success Criteria:**
 1. Player flashlight illuminates environment with Lumen GI bounce
@@ -198,19 +198,29 @@ Plans:
 
 ### Phase 7: Save System
 
-**Goal:** Player can save progress and resume play.
+**Goal:** Manual save-point system at world-placed tape recorders with 3 save slots, screenshot thumbnails, Game Over screen on death that loads last save, and pause menu with Continue/Load Game. Wendigo resets on load. No auto-saves -- purely manual saves create survival horror tension.
 
 **Dependencies:** Phase 6 (all saveable systems complete)
 
 **Requirements:**
-- SAVE-01: Checkpoint auto-saves
-- SAVE-02: Manual save anywhere
+- SAVE-01: Save points at tape recorder objects (replaces checkpoint auto-saves per CONTEXT.md)
+- SAVE-02: Manual save at tape recorders with 3-slot picker (replaces save-anywhere per CONTEXT.md)
+
+**Plans:** 4 plans
+
+Plans:
+- [ ] 07-01-PLAN.md -- Save data foundation: SaveTypes, SereneSaveGame, SaveSubsystem
+- [ ] 07-02-PLAN.md -- ISaveable implementation on actors, death system, GameMode load flow
+- [ ] 07-03-PLAN.md -- UI widgets: GameOverWidget, SaveSlotWidget, SaveLoadMenuWidget
+- [ ] 07-04-PLAN.md -- TapeRecorderActor, PauseMenuWidget, Esc binding, final wiring
 
 **Success Criteria:**
-1. Game auto-saves when player reaches checkpoint locations
-2. Player can manually save from pause menu
-3. Loading a save restores player position, inventory, and world state
-4. Save/load does not cause crashes or corrupt state
+1. Player can interact with tape recorder to save game to one of 3 slots
+2. Save slot shows screenshot thumbnail and timestamp
+3. Death shows Game Over screen with Load Last Save / Quit options
+4. Pause menu has Continue (latest save) and Load Game (slot picker)
+5. Loading a save restores player position, inventory, and world state (doors, pickups)
+6. Save/load does not cause crashes or corrupt state
 
 ---
 
@@ -245,7 +255,7 @@ Plans:
 | 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | ✓ Complete |
 | 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | ✓ Complete |
 | 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | ✓ Complete |
-| 7 | Save System | SAVE-01, SAVE-02 | Not Started |
+| 7 | Save System | SAVE-01, SAVE-02 | Planning Complete |
 | 8 | Demo Polish | DEMO-01, DEMO-02, DEMO-03, DEMO-04 | Not Started |
 
 **Coverage:** 29/29 requirements mapped
@@ -253,4 +263,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 6 complete)*
+*Last updated: 2026-02-12 (Phase 7 planned)*
