@@ -4,14 +4,26 @@
 
 #include "CoreMinimal.h"
 #include "AIController.h"
+#include "Components/StateTreeAIComponent.h"
 #include "WendigoAIController.generated.h"
 
-class UStateTreeAIComponent;
 class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 class UAISenseConfig_Hearing;
 
 enum class EHidingState : uint8;
+
+/**
+ * Disables bStartLogicAutomatically so the AI controller's two-flag guard
+ * controls StartLogic timing (avoids premature start before OnPossess).
+ */
+UCLASS()
+class UWendigoStateTreeAIComponent : public UStateTreeAIComponent
+{
+	GENERATED_BODY()
+public:
+	UWendigoStateTreeAIComponent() { bStartLogicAutomatically = false; }
+};
 
 /**
  * AI controller for the Wendigo monster.

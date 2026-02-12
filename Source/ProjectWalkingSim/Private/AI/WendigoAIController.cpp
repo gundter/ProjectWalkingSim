@@ -20,7 +20,7 @@ AWendigoAIController::AWendigoAIController()
 	PrimaryActorTick.bCanEverTick = true;
 
 	// ---- State Tree AI Component ----
-	StateTreeAIComponent = CreateDefaultSubobject<UStateTreeAIComponent>(
+	StateTreeAIComponent = CreateDefaultSubobject<UWendigoStateTreeAIComponent>(
 		TEXT("StateTreeAIComponent"));
 
 	// ---- AI Perception Component ----
