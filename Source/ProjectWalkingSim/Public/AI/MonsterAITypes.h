@@ -21,6 +21,36 @@ enum class EAlertLevel : uint8
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAlertLevelChanged, EAlertLevel, NewLevel);
 
 /**
+ * Behavioral state of the Wendigo.
+ * More granular than EAlertLevel -- tracks what the Wendigo is *doing*,
+ * not just its perception-driven alert state.
+ */
+UENUM(BlueprintType)
+enum class EWendigoBehaviorState : uint8
+{
+	Patrol        UMETA(DisplayName = "Patrol"),
+	Investigating UMETA(DisplayName = "Investigating"),
+	Chasing       UMETA(DisplayName = "Chasing"),
+	Searching     UMETA(DisplayName = "Searching"),
+	GrabAttack    UMETA(DisplayName = "Grab Attack")
+};
+
+/** Broadcast when the Wendigo's behavior state changes. */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBehaviorStateChanged, EWendigoBehaviorState, NewState);
+
+/**
+ * Type of stimulus that triggered the current suspicion/investigation.
+ * Used to differentiate investigation speed and behavior.
+ */
+UENUM(BlueprintType)
+enum class EStimulusType : uint8
+{
+	None  UMETA(DisplayName = "None"),
+	Sound UMETA(DisplayName = "Sound"),
+	Sight UMETA(DisplayName = "Sight")
+};
+
+/**
  * AI tuning constants.
  * Centralized defaults for perception, suspicion, and movement parameters.
  * Individual components may override these via UPROPERTY editable values.
@@ -59,4 +89,28 @@ namespace AIConstants
 
 	/** Range at which sprint footsteps generate noise events in cm. */
 	constexpr float SprintNoiseRange = 2000.0f;
+
+	/** Wendigo chase speed in cm/s (~15% faster than player sprint 500). */
+	constexpr float WendigoChaseSpeed = 575.0f;
+
+	/** Wendigo search speed in cm/s (between patrol 150 and investigate 200). */
+	constexpr float WendigoSearchSpeed = 180.0f;
+
+	/** Wendigo investigation speed for visual stimulus in cm/s (faster than hearing). */
+	constexpr float WendigoInvestigateSightSpeed = 250.0f;
+
+	/** Seconds of lost line-of-sight before chase transitions to search. */
+	constexpr float LOSLostTimeout = 3.0f;
+
+	/** Distance in cm for grab attack (~1.5m). */
+	constexpr float GrabRange = 150.0f;
+
+	/** Radius in cm for random search points around last-known location. */
+	constexpr float SearchRadius = 600.0f;
+
+	/** Total search duration in seconds before returning to patrol. */
+	constexpr float SearchDuration = 18.0f;
+
+	/** Number of random navmesh points to visit during search. */
+	constexpr int32 NumSearchPoints = 3;
 }

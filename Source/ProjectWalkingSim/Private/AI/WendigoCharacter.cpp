@@ -4,6 +4,7 @@
 #include "AI/SuspicionComponent.h"
 #include "AI/WendigoAIController.h"
 #include "AI/MonsterAITypes.h"
+#include "Core/SereneLogChannels.h"
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
@@ -28,4 +29,42 @@ AWendigoCharacter::AWendigoCharacter()
 	// ---- Suspicion Component ----
 	SuspicionComponent = CreateDefaultSubobject<USuspicionComponent>(
 		TEXT("SuspicionComponent"));
+}
+
+void AWendigoCharacter::SetBehaviorState(EWendigoBehaviorState NewState)
+{
+	if (NewState != BehaviorState)
+	{
+		const EWendigoBehaviorState PreviousState = BehaviorState;
+		BehaviorState = NewState;
+
+		UE_LOG(LogSerene, Log, TEXT("WendigoCharacter [%s]: Behavior state changed %d -> %d"),
+			*GetName(),
+			static_cast<uint8>(PreviousState),
+			static_cast<uint8>(NewState));
+
+		OnBehaviorStateChanged.Broadcast(NewState);
+	}
+}
+
+void AWendigoCharacter::SetLastKnownPlayerLocation(const FVector& Location)
+{
+	LastKnownPlayerLocation = Location;
+	bHasLastKnownPlayerLocation = true;
+}
+
+void AWendigoCharacter::ClearLastKnownPlayerLocation()
+{
+	LastKnownPlayerLocation = FVector::ZeroVector;
+	bHasLastKnownPlayerLocation = false;
+}
+
+void AWendigoCharacter::SetWitnessedHidingSpot(AActor* Spot)
+{
+	WitnessedHidingSpot = Spot;
+}
+
+void AWendigoCharacter::ClearWitnessedHidingSpot()
+{
+	WitnessedHidingSpot = nullptr;
 }

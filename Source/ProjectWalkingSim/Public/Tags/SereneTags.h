@@ -45,4 +45,14 @@ namespace SereneTags
 	// AI stimulus types
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_AI_Stimulus_Sight);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_AI_Stimulus_Hearing);
+
+	// AI behavior states
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_AI_Behavior_Patrol);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_AI_Behavior_Investigating);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_AI_Behavior_Chasing);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_AI_Behavior_Searching);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_AI_Behavior_GrabAttack);
+
+	// AI spawn
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_AI_Spawn_Zone);
 }
