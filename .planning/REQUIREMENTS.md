@@ -30,10 +30,10 @@ Requirements for initial demo release. Each maps to roadmap phases.
 
 - [x] **WNDG-01**: State Tree-driven AI controller
 - [x] **WNDG-02**: Patrol behavior within designated patrol zones
-- [ ] **WNDG-03**: Investigate sounds and visual disturbances
-- [ ] **WNDG-04**: Chase player when spotted
-- [ ] **WNDG-05**: Search behavior when player escapes/hides
-- [ ] **WNDG-06**: Multiple spawn locations with per-spawn patrol zones
+- [x] **WNDG-03**: Investigate sounds and visual disturbances
+- [x] **WNDG-04**: Chase player when spotted
+- [x] **WNDG-05**: Search behavior when player escapes/hides
+- [x] **WNDG-06**: Multiple spawn locations with per-spawn patrol zones
 - [x] **WNDG-07**: AI Perception system (sight + hearing)
 
 ### Light System
@@ -122,10 +122,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | HIDE-02 | Phase 3: Hiding System | Complete |
 | WNDG-01 | Phase 4: Monster AI Core | Complete |
 | WNDG-02 | Phase 4: Monster AI Core | Complete |
-| WNDG-03 | Phase 5: Monster Behaviors | Pending |
-| WNDG-04 | Phase 5: Monster Behaviors | Pending |
-| WNDG-05 | Phase 5: Monster Behaviors | Pending |
-| WNDG-06 | Phase 5: Monster Behaviors | Pending |
+| WNDG-03 | Phase 5: Monster Behaviors | Complete |
+| WNDG-04 | Phase 5: Monster Behaviors | Complete |
+| WNDG-05 | Phase 5: Monster Behaviors | Complete |
+| WNDG-06 | Phase 5: Monster Behaviors | Complete |
 | WNDG-07 | Phase 4: Monster AI Core | Complete |
 | LGHT-01 | Phase 6: Light and Audio | Pending |
 | LGHT-02 | Phase 6: Light and Audio | Pending |
@@ -147,4 +147,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-10 (Phase 3 complete)*
+*Last updated: 2026-02-12 (Phase 5 complete)*
