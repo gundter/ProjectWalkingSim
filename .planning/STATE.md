@@ -8,13 +8,13 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 6 in progress (Light and Audio) -- Plans 01, 02, 03, 04 complete. Remaining: 05.
+**Current Focus:** Phase 6 complete (Light and Audio) -- All 5 plans done. Performance audit required before marking phase complete. Next: Phase 7 (Save System).
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
 - Quality: High-quality C++ with performance reviews after each phase
 - AI: State Tree (not Behavior Trees)
-- Rendering: Lumen GI + Virtual Shadow Maps
+- Rendering: Lumen GI + MegaLights + Virtual Shadow Maps
 - Player: First-person with visible body
 - Process: Performance + code quality audit required before phase is marked complete (Epic coding standards, tick overhead, memory patterns, UE5 pitfalls)
 
@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 6 of 8 (Light and Audio)
-**Plan:** 4 of 5 complete (06-01, 06-02, 06-03, 06-04)
-**Status:** In progress
-**Last activity:** 2026-02-12 - Completed 06-03-PLAN.md (MusicTensionSystem + AmbientAudioManager)
+**Plan:** 5 of 5 complete (06-01, 06-02, 06-03, 06-04, 06-05)
+**Status:** Phase 6 plans complete -- awaiting performance audit
+**Last activity:** 2026-02-12 - Completed 06-05-PLAN.md (System Integration + Lumen/MegaLights)
 
 **Progress:**
 ```
@@ -34,8 +34,8 @@ Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
-Phase 6: [####.] 4/5 plans complete (06-01, 06-02, 06-03, 06-04)
-Overall: [█████░...] 6/8 phases in progress
+Phase 6: [#####] 5/5 plans complete (06-01, 06-02, 06-03, 06-04, 06-05)
+Overall: [██████░.] 6/8 phases complete (audit pending)
 ```
 
 ---
@@ -77,6 +77,7 @@ Overall: [█████░...] 6/8 phases in progress
 | 6-02  | 2/5   | 2/2   | ~5m  | 2      |
 | 6-03  | 4/5   | 2/2   | ~9m  | 0      |
 | 6-04  | 1/5   | 2/2   | ~4m  | 0      |
+| 6-05  | 5/5   | 3/3*  | ~5m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -175,6 +176,9 @@ Overall: [█████░...] 6/8 phases in progress
 | NewObject + RegisterComponent for runtime sub-components | CreateDefaultSubobject only works in actor constructors; components creating sub-components must use NewObject in BeginPlay | 06-01 |
 | No Tick on FlashlightComponent | Spotlight moves with camera via SetupAttachment; no per-frame updates needed | 06-01 |
 | AudioConstants namespace for Phase 6 tuning | Mirrors AIConstants pattern; centralized constexpr values overridable by UPROPERTY | 06-01 |
+| MusicTensionSystem on Wendigo for demo | Single-level single-Wendigo demo; move to world subsystem for multi-Wendigo | 06-05 |
+| FlashlightSuspicionScore 0.3f for ~2s beam-to-Alert | 1.0f causes instant aggro (~0.5s); 0.3f gives meaningful gameplay tension | 06-05 |
+| MegaLights enabled (r.MegaLights=1) | Runtime enable alongside EnableForProject=True for enhanced light rendering | 06-05 |
 
 ### Technical Discoveries
 
@@ -217,14 +221,15 @@ Overall: [█████░...] 6/8 phases in progress
 - [x] Plan Phase 5: Monster Behaviors
 - [x] Execute Phase 5 (all 5 plans)
 - [x] Performance audit for Phase 5
-- [ ] Plan Phase 6: Light and Audio
-- [ ] Execute Phase 6
+- [x] Plan Phase 6: Light and Audio
+- [x] Execute Phase 6 (all 5 plans)
+- [ ] Performance audit for Phase 6
 - [ ] Future: Consider spline-based patrol routes for polish/main release (current MakeEditWidget waypoints work but less designer-friendly; may not need static routes in main release)
 - [ ] Future: Replace On Tick State Tree transitions with event-driven triggers (OnAlertLevelChanged delegate, gameplay tags, or reduced tick interval) for performance -- On Tick is fine for demo but won't scale for complex Alien: Isolation-style State Trees
 
 ### Blockers
 
-None -- Phase 6 in progress.
+None -- Phase 6 plans complete, awaiting performance audit.
 
 ---
 
@@ -234,14 +239,15 @@ None -- Phase 6 in progress.
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 06-03-PLAN.md: MusicTensionSystem + AmbientAudioManager
-- Task 1 (MusicTensionSystem) was pre-implemented by wave-parallel 06-04 execution -- verified complete
-- Task 2 (AmbientAudioManager): looping ambient bed, randomized one-shots on timer, predator silence API
-- Build verified: zero errors, zero warnings
+- Executed 06-05-PLAN.md: System Integration + Lumen/MegaLights Configuration
+- Task 1 (wire components): FlashlightComponent + PlayerAudioComponent on SereneCharacter, MonsterAudioComponent + MusicTensionSystem on WendigoCharacter
+- Task 2 (flashlight AI detection): periodic cone trace with tunable 0.3f suspicion score
+- Task 3 (Lumen/MegaLights settings): Verified all Lumen GI settings, added r.MegaLights=1 runtime enable
+- Phase 6 all 5 plans complete
 
-**Stopped at:** Completed 06-03-PLAN.md
+**Stopped at:** Completed 06-05-PLAN.md (final plan in Phase 6)
 
-**Next:** Continue Phase 6 execution (plan 05 remaining)
+**Next:** Performance audit for Phase 6, then Phase 7 planning (Save System)
 
 ### Context for Next Session
 
@@ -253,35 +259,28 @@ The roadmap has 8 phases:
 3. Hiding - Hide spots and visibility COMPLETE
 4. Monster AI Core - State Tree, patrol, perception COMPLETE
 5. Monster Behaviors - Chase, investigate, search, spawns COMPLETE
-6. Light and Audio - Flashlight, Lumen, spatial audio
+6. Light and Audio - Flashlight, Lumen, spatial audio COMPLETE (awaiting audit)
 7. Save System - Checkpoints and manual saves
 8. Demo Polish - Environment, story, optimization
 
-Phase 5 complete. The project now has:
-- All Phase 1-4 features (character, movement, interaction, HUD, inventory, hiding, AI core)
-- Complete predator behavior loop validated in PIE:
-  - Patrol -> Suspicious (investigate sound at 200cm/s or sight at 250cm/s) -> Alert (chase at 575cm/s)
-  - Chase -> LOS lost -> Search (last-known + 2-3 random NavMesh points, 18s timeout)
-  - Chase -> grab range -> GrabAttack (disable input, 2s, restart level)
-  - Search complete -> ReturnToNearestWaypoint -> Patrol resume
-- State Tree hierarchy: Alert > Suspicious > Patrol (top-to-bottom priority)
-- On Tick transitions for escalation during investigation (Suspicious -> Alert)
-- AWendigoSpawnPoint with zone-based patrol route selection
-- Witnessed-hiding detection (AI sees player enter hiding spot)
-- AI door opening (respects lock state)
-- 30+ AI source files, ~2500 lines of C++
+Phase 6 complete. The project now has:
+- All Phase 1-5 features (character, movement, interaction, HUD, inventory, hiding, AI core, monster behaviors)
+- Complete atmosphere system:
+  - FlashlightComponent: narrow-cone spotlight on player camera with Lumen GI bounce
+  - MonsterAudioComponent: behavior-state-driven breathing, footsteps, vocalizations (3D spatial)
+  - MusicTensionSystem: 3-layer crossfade music driven by alert level with stingers
+  - AmbientAudioManager: continuous ambient bed + randomized one-shots + predator silence
+  - PlayerAudioComponent: surface-aware footsteps + heartbeat proximity to Wendigo
+  - Flashlight AI detection: cone trace raises suspicion at tunable rate (0.3f)
+- Rendering pipeline: Lumen GI + MegaLights + Virtual Shadow Maps + HW ray tracing
+- 23/29 v1 requirements complete
 
-17/29 v1 requirements complete. No orphans.
-
-**Phase 6 will deliver:**
-- LGHT-01: Flashlight (always on for demo)
-- LGHT-02: Lumen GI atmospheric lighting
-- AUDO-01: Spatial audio (3D monster sounds)
-- AUDO-02: Ambient horror soundscape
-- AUDO-03: Monster audio cues (footsteps, breathing, growls)
-- AUDO-04: Dynamic music and tension stingers
+**Phase 7 will deliver:**
+- SAVE-01: Save/load system with checkpoints
+- SAVE-02: Manual save slots
+- SAVE-03: Settings persistence
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 6 plan 03 complete -- MusicTensionSystem + AmbientAudioManager)*
+*Last updated: 2026-02-12 (Phase 6 plan 05 complete -- System Integration + Lumen/MegaLights)*
