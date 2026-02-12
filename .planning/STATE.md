@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 5 complete (Monster Behaviors) -- all 5 plans executed, full predator loop verified in PIE. Ready for Phase 6 (Light and Audio).
+**Current Focus:** Phase 6 in progress (Light and Audio) -- Plan 04 (PlayerAudioComponent) complete. Remaining: 01, 02, 03, 05.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,10 +22,10 @@
 
 ## Current Position
 
-**Phase:** 5 of 8 (Monster Behaviors)
-**Plan:** 5 of 5 complete
-**Status:** Phase complete, verified ✓, audited ✓
-**Last activity:** 2026-02-12 - Completed 05-05-PLAN.md (State Tree wiring, PIE verification)
+**Phase:** 6 of 8 (Light and Audio)
+**Plan:** 1 of 5 complete (06-04)
+**Status:** In progress
+**Last activity:** 2026-02-12 - Completed 06-04-PLAN.md (PlayerAudioComponent)
 
 **Progress:**
 ```
@@ -34,7 +34,8 @@ Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
-Overall: [█████...] 5/8 phases complete
+Phase 6: [#....] 1/5 plans complete (06-04)
+Overall: [█████░...] 6/8 phases in progress
 ```
 
 ---
@@ -72,6 +73,7 @@ Overall: [█████...] 5/8 phases complete
 | 5-03  | 3/5   | 2/2   | ~6m  | 2      |
 | 5-04  | 4/5   | 2/2   | ~8m  | 0      |
 | 5-05  | 5/5   | 2/2*  | ~15m | 1      |
+| 6-04  | 1/5   | 2/2   | ~4m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -160,6 +162,10 @@ Overall: [█████...] 5/8 phases complete
 | SearchRadius 600cm max | GetRandomReachablePointInRadius degrades >1500cm; 600cm is reliable for tight search pattern | 05-02 |
 | SearchArea ExitState wipes all chase/search state | Prevents stale LastKnownPlayerLocation and WitnessedHidingSpot from influencing next alert cycle | 05-02 |
 | Option A for ReturnToPatrol in State Tree | Dedicated leaf state inside Alert container after Search for smooth patrol resumption | 05-05 |
+| PlaySound2D for player footsteps | Non-spatialized; player hears own steps centered, not world-positioned | 06-04 |
+| bIsUISound=true for heartbeat | Non-spatialized player-internal sound; stays centered regardless of camera | 06-04 |
+| TWeakObjectPtr<AActor> for CachedWendigo | Safe reference that auto-invalidates on destroy/respawn; re-cached on next timer tick | 06-04 |
+| No AudioConstants.h dependency in PlayerAudioComponent | Inline UPROPERTY defaults enable Wave 1 parallel execution | 06-04 |
 
 ### Technical Discoveries
 
@@ -209,7 +215,7 @@ Overall: [█████...] 5/8 phases complete
 
 ### Blockers
 
-None -- Phase 5 complete, performance audit pending before phase sign-off.
+None -- Phase 6 in progress.
 
 ---
 
@@ -219,16 +225,14 @@ None -- Phase 5 complete, performance audit pending before phase sign-off.
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 05-05-PLAN.md: State Tree wiring, SpawnPoint Blueprint, PIE verification
-- Committed build fix: HidingSpotActor.h include in WendigoAIController.cpp
-- All 5 PIE tests passed: chase, search, hide-to-escape, investigation differentiation, spawn point
-- Updated ST_WendigoAI with Alert container (Chase/GrabAttack/Search/ReturnToPatrol)
-- Stimulus-type investigation branching (InvestigateSight/InvestigateSound)
-- BP_WendigoSpawnPoint created
+- Executed 06-04-PLAN.md: PlayerAudioComponent (footstep playback + heartbeat proximity)
+- Surface-type footstep sounds via OnFootstep delegate binding
+- Heartbeat proximity system with 4Hz timer, MetaSound Intensity parameter
+- Build verified: all Audio files compile and link cleanly
 
-**Stopped at:** Completed 05-05-PLAN.md -- Phase 5 complete
+**Stopped at:** Completed 06-04-PLAN.md
 
-**Next:** Performance audit for Phase 5, then plan Phase 6 (Light and Audio)
+**Next:** Continue Phase 6 execution (plans 01, 02, 03, 05 remaining)
 
 ### Context for Next Session
 
@@ -271,4 +275,4 @@ Phase 5 complete. The project now has:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 5 complete -- all 5 plans executed, PIE verified)*
+*Last updated: 2026-02-12 (Phase 6 plan 04 complete -- PlayerAudioComponent)*
