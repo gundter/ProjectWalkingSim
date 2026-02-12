@@ -72,6 +72,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AI|Suspicion")
 	void ClearStimulusLocation();
 
+	/** Get the type of the last stimulus that raised suspicion. */
+	UFUNCTION(BlueprintCallable, Category = "AI|Suspicion")
+	EStimulusType GetLastStimulusType() const { return LastStimulusType; }
+
+	/** Set the last stimulus type (typically called internally by Process methods). */
+	void SetLastStimulusType(EStimulusType Type) { LastStimulusType = Type; }
+
 	/** Reset suspicion to zero and return to Patrol state. */
 	UFUNCTION(BlueprintCallable, Category = "AI|Suspicion")
 	void ResetSuspicion();
@@ -122,6 +129,9 @@ private:
 
 	/** Whether a stimulus location has been recorded since last clear. */
 	bool bHasStimulusLocation = false;
+
+	/** Type of the last stimulus that raised suspicion. Persists until full reset. */
+	EStimulusType LastStimulusType = EStimulusType::None;
 
 	/** Evaluate suspicion thresholds and broadcast if alert level changed. */
 	void UpdateAlertLevel();

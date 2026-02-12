@@ -24,6 +24,8 @@ void USuspicionComponent::ProcessSightStimulus(float PlayerVisibilityScore, floa
 	const float SuspicionGain = BaseSuspicionRate * EffectiveVisibility * DeltaTime;
 	CurrentSuspicion = FMath::Clamp(CurrentSuspicion + SuspicionGain, 0.0f, 1.0f);
 
+	LastStimulusType = EStimulusType::Sight;
+
 	UpdateAlertLevel();
 }
 
@@ -32,6 +34,8 @@ void USuspicionComponent::ProcessHearingStimulus(const FVector& StimulusLocation
 	// Record stimulus location for investigation
 	LastKnownStimulusLocation = StimulusLocation;
 	bHasStimulusLocation = true;
+
+	LastStimulusType = EStimulusType::Sound;
 
 	// Apply fixed hearing suspicion bump
 	CurrentSuspicion = FMath::Clamp(CurrentSuspicion + HearingSuspicionBump, 0.0f, 1.0f);
@@ -62,6 +66,7 @@ void USuspicionComponent::ResetSuspicion()
 	CurrentSuspicion = 0.0f;
 	bHasStimulusLocation = false;
 	LastKnownStimulusLocation = FVector::ZeroVector;
+	LastStimulusType = EStimulusType::None;
 
 	const EAlertLevel PreviousLevel = CurrentAlertLevel;
 	CurrentAlertLevel = EAlertLevel::Patrol;
