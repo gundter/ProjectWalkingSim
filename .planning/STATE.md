@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 5 in progress (Monster Behaviors) -- data layer complete, chase/search/grab/spawn plans remain.
+**Current Focus:** Phase 5 in progress (Monster Behaviors) -- data layer + chase + grab/investigate done, search/spawn plans remain.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 5 of 8 (Monster Behaviors)
-**Plan:** 1 of 5 complete
+**Plan:** 3 of 5 complete
 **Status:** In progress
-**Last activity:** 2026-02-12 - Completed 05-01-PLAN.md (AI data layer extensions)
+**Last activity:** 2026-02-12 - Completed 05-03-PLAN.md (grab attack, stimulus condition, investigation enhancement)
 
 **Progress:**
 ```
@@ -33,7 +33,7 @@ Phase 1: [######] 6/6 plans complete
 Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
-Phase 5: [#....] 1/5 plans complete
+Phase 5: [###..] 3/5 plans complete
 Overall: [████....] 4/8 phases complete
 ```
 
@@ -68,6 +68,7 @@ Overall: [████....] 4/8 phases complete
 | 4-05  | 5/7   | 2/2   | ~14m | 0      |
 | 4-06  | 6/7   | 2/2   | ~5m  | 0      |
 | 5-01  | 1/5   | 2/2   | ~6m  | 0      |
+| 5-03  | 3/5   | 2/2   | ~6m  | 2      |
 
 *Checkpoint tasks require human verification
 
@@ -144,6 +145,9 @@ Overall: [████....] 4/8 phases complete
 | AActor* for WitnessedHidingSpot | Avoids circular header dependency between AI and Hiding modules; cast at use-site | 05-01 |
 | BehaviorState separate from AlertLevel | EWendigoBehaviorState tracks actions (Patrol/Chasing/etc), EAlertLevel tracks perception; orthogonal | 05-01 |
 | LastStimulusType persists through ClearStimulusLocation | Investigation reads type after location consumed; only full reset clears it | 05-01 |
+| RestartLevel console command for demo death | Simple demo-scope approach; Phase 8 replaces with proper death/respawn system | 05-03 |
+| bUseStimulusTypeSpeed defaults true | New stimulus-aware speed is desired default; flag preserves backward compatibility | 05-03 |
+| BehaviorState lifecycle in tasks | Set in EnterState, restore to Patrol in ExitState; clean state for next task | 05-03 |
 
 ### Technical Discoveries
 
@@ -168,6 +172,7 @@ Overall: [████....] 4/8 phases complete
 | State Tree tasks need explicit includes for linker and context | StateTreeLinker.h and StateTreeExecutionContext.h not transitively included from StateTreeTaskBase.h | 04-04 |
 | Parallel wave agents may pre-implement cross-plan work | 04-04 implemented 04-05 Task 1 (perception wiring) as part of its own scope | 04-05 |
 | StateTreeConditionBase.h includes StateTreeConditionCommonBase | Both base and common base in same header; conditions need StateTreeConditionBase.h not a separate file | 04-06 |
+| UE5.7 SpawnActor<T> with UClass requires references not pointers | 4-arg overload: SpawnActor<T>(UClass*, FVector const&, FRotator const&, FActorSpawnParameters); pass values not &GetActorTransform() | 05-03 |
 
 ### TODOs
 
@@ -181,13 +186,13 @@ Overall: [████....] 4/8 phases complete
 - [x] Plan Phase 4: Monster AI Core
 - [x] Execute Phase 4 (all 7 plans)
 - [x] Plan Phase 5: Monster Behaviors
-- [ ] Execute Phase 5 (1/5 plans complete)
+- [ ] Execute Phase 5 (3/5 plans complete)
 - [ ] Future: Consider spline-based patrol routes for polish/main release (current MakeEditWidget waypoints work but less designer-friendly; may not need static routes in main release)
 - [ ] Future: Replace On Tick State Tree transitions with event-driven triggers (OnAlertLevelChanged delegate, gameplay tags, or reduced tick interval) for performance — On Tick is fine for demo but won't scale for complex Alien: Isolation-style State Trees
 
 ### Blockers
 
-None -- Phase 5 data layer complete, ready for behavior plans.
+None -- Phase 5 grab/investigate/condition tasks complete, search and spawn plans remain.
 
 ---
 
@@ -197,16 +202,16 @@ None -- Phase 5 data layer complete, ready for behavior plans.
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 05-01-PLAN.md: AI data layer extensions for Phase 5
-- Extended MonsterAITypes.h with EWendigoBehaviorState (5 values), EStimulusType (3 values), FOnBehaviorStateChanged, 8 new AIConstants
-- Extended WendigoCharacter with chase/search persistent state and behavior state tracking
-- Extended SuspicionComponent with LastStimulusType tracking
-- Added 6 new gameplay tags (AI.Behavior.*, AI.Spawn.Zone)
-- All changes compile cleanly (zero errors, zero warnings)
+- Executed 05-03-PLAN.md: Grab attack, stimulus condition, investigation enhancement
+- Created FSTT_GrabAttack: cinematic kill sequence (disable input, wait GrabDuration, RestartLevel)
+- Created FSTC_StimulusType: State Tree condition for stimulus type branching
+- Enhanced STT_InvestigateLocation with stimulus-type-aware speed (sight=250, sound=200 cm/s)
+- Fixed pre-existing 05-02 compilation errors (ChasePlayer missing include, SpawnPoint wrong SpawnActor signature)
+- All files compile cleanly (zero errors, zero warnings)
 
-**Stopped at:** Completed 05-01-PLAN.md
+**Stopped at:** Completed 05-03-PLAN.md
 
-**Next:** Execute remaining Phase 5 plans (05-02 through 05-05)
+**Next:** Execute remaining Phase 5 plans (05-04 search behavior, 05-05 spawn system)
 
 ### Context for Next Session
 
@@ -268,4 +273,4 @@ Phase 4 AI core building. The project now has:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 5 plan 05-01 complete)*
+*Last updated: 2026-02-12 (Phase 5 plan 05-03 complete)*
