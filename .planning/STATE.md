@@ -167,6 +167,9 @@ Overall: [█████░...] 6/8 phases in progress
 | bIsUISound=true for heartbeat | Non-spatialized player-internal sound; stays centered regardless of camera | 06-04 |
 | TWeakObjectPtr<AActor> for CachedWendigo | Safe reference that auto-invalidates on destroy/respawn; re-cached on next timer tick | 06-04 |
 | No AudioConstants.h dependency in PlayerAudioComponent | Inline UPROPERTY defaults enable Wave 1 parallel execution | 06-04 |
+| GrabAttack footstep interval = 0.0f | Wendigo is stationary during grab; no footstep sounds should play | 06-02 |
+| Half-duration breathing crossfade per phase | FadeOut and FadeIn each use 0.5x configured duration for overlapping transition | 06-02 |
+| EndPlay unbinds OnBehaviorStateChanged delegate | RemoveDynamic prevents dangling delegate references on component destruction | 06-02 |
 
 ### Technical Discoveries
 
@@ -226,14 +229,15 @@ None -- Phase 6 in progress.
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 06-04-PLAN.md: PlayerAudioComponent (footstep playback + heartbeat proximity)
-- Surface-type footstep sounds via OnFootstep delegate binding
-- Heartbeat proximity system with 4Hz timer, MetaSound Intensity parameter
-- Build verified: all Audio files compile and link cleanly
+- Executed 06-02-PLAN.md: MonsterAudioComponent (behavior-state-driven spatial audio)
+- Per-state breathing crossfade via OnBehaviorStateChanged delegate
+- Timer-based 3D footsteps with state-dependent intervals (0.0f for GrabAttack)
+- Random vocalizations with configurable chance on state entry
+- Build verified: zero errors, zero warnings
 
-**Stopped at:** Completed 06-04-PLAN.md
+**Stopped at:** Completed 06-02-PLAN.md
 
-**Next:** Continue Phase 6 execution (plans 01, 02, 03, 05 remaining)
+**Next:** Continue Phase 6 execution (plans 01, 03, 05 remaining)
 
 ### Context for Next Session
 
@@ -276,4 +280,4 @@ Phase 5 complete. The project now has:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 6 plan 04 complete -- PlayerAudioComponent)*
+*Last updated: 2026-02-12 (Phase 6 plan 02 complete -- MonsterAudioComponent)*
