@@ -4,6 +4,8 @@
 #include "AI/WendigoCharacter.h"
 #include "AI/SuspicionComponent.h"
 #include "Visibility/VisibilityScoreComponent.h"
+#include "Hiding/HidingComponent.h"
+#include "Hiding/HidingTypes.h"
 #include "Components/StateTreeAIComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
@@ -122,6 +124,9 @@ void AWendigoAIController::Tick(float DeltaTime)
 			// Record player location as stimulus for investigation
 			SuspicionComp->SetStimulusLocation(Actor->GetActorLocation());
 
+			// Keep last-known player location current on the character every tick while visible
+			WendigoChar->SetLastKnownPlayerLocation(Actor->GetActorLocation());
+
 			SuspicionComp->ProcessSightStimulus(VisibilityScore, DeltaTime);
 			bSeeingPlayer = true;
 
@@ -172,6 +177,10 @@ void AWendigoAIController::ProcessSightPerception(AActor* Player, bool bCurrentl
 		const float Visibility = VisComp ? VisComp->GetVisibilityScore() : 1.0f;
 		UE_LOG(LogSerene, Log, TEXT("Wendigo sees %s (Visibility: %.2f)"),
 			*Player->GetName(), Visibility);
+
+		// Bind to player's HidingComponent delegate on first sight detection.
+		// No-op on subsequent calls (bPlayerDelegateBound guard).
+		BindToPlayerDelegates(Player);
 	}
 	else
 	{
@@ -195,4 +204,77 @@ void AWendigoAIController::ProcessHearingPerception(AActor* NoiseInstigator, FVe
 
 	SuspicionComp->ProcessHearingStimulus(StimulusLocation);
 	UE_LOG(LogSerene, Log, TEXT("Wendigo heard noise at %s"), *StimulusLocation.ToString());
+}
+
+void AWendigoAIController::BindToPlayerDelegates(AActor* PlayerActor)
+{
+	// Guard: only bind once
+	if (bPlayerDelegateBound && TrackedPlayer.IsValid())
+	{
+		return;
+	}
+
+	if (!PlayerActor)
+	{
+		return;
+	}
+
+	UHidingComponent* HidingComp = PlayerActor->FindComponentByClass<UHidingComponent>();
+	if (HidingComp)
+	{
+		HidingComp->OnHidingStateChanged.AddDynamic(
+			this, &AWendigoAIController::OnPlayerHidingStateChanged);
+
+		TrackedPlayer = PlayerActor;
+		bPlayerDelegateBound = true;
+
+		UE_LOG(LogSerene, Log, TEXT("Wendigo AI: Bound to player hiding delegate"));
+	}
+}
+
+void AWendigoAIController::OnPlayerHidingStateChanged(EHidingState NewState)
+{
+	// Only care about the moment the player starts entering a hiding spot
+	if (NewState != EHidingState::Entering)
+	{
+		return;
+	}
+
+	// Check if we currently see the player
+	if (!AIPerceptionComponent || !TrackedPlayer.IsValid())
+	{
+		return;
+	}
+
+	TArray<AActor*> PerceivedActors;
+	AIPerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), PerceivedActors);
+
+	const bool bCanSeePlayer = PerceivedActors.Contains(TrackedPlayer.Get());
+	if (!bCanSeePlayer)
+	{
+		// Player hid without being seen -- hiding is safe
+		return;
+	}
+
+	// Wendigo saw the player enter hiding -- record the spot
+	AActor* PlayerActor = TrackedPlayer.Get();
+	UHidingComponent* HidingComp = PlayerActor->FindComponentByClass<UHidingComponent>();
+	if (!HidingComp)
+	{
+		return;
+	}
+
+	AActor* HidingSpot = HidingComp->GetCurrentHidingSpot();
+	if (!HidingSpot)
+	{
+		return;
+	}
+
+	AWendigoCharacter* WendigoChar = Cast<AWendigoCharacter>(GetPawn());
+	if (WendigoChar)
+	{
+		WendigoChar->SetWitnessedHidingSpot(HidingSpot);
+		UE_LOG(LogSerene, Log, TEXT("Wendigo witnessed player entering hiding spot %s"),
+			*HidingSpot->GetName());
+	}
 }

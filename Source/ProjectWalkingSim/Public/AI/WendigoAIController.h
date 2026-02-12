@@ -11,6 +11,8 @@ class UAIPerceptionComponent;
 class UAISenseConfig_Sight;
 class UAISenseConfig_Hearing;
 
+enum class EHidingState : uint8;
+
 /**
  * AI controller for the Wendigo monster.
  * Coordinates State Tree behavior with AI Perception (sight + hearing).
@@ -76,4 +78,27 @@ private:
 
 	/** Debug timer for periodic sight logging (avoids log spam). */
 	float SightDebugTimer = 0.0f;
+
+	// --- Player Hiding Detection ---
+
+	/**
+	 * Delegate callback for player hiding state changes.
+	 * When the player enters hiding while the Wendigo can see them,
+	 * records the hiding spot as WitnessedHidingSpot on the character.
+	 */
+	UFUNCTION()
+	void OnPlayerHidingStateChanged(EHidingState NewState);
+
+	/**
+	 * Binds to the player's HidingComponent delegate on first sight detection.
+	 * Only binds once (bPlayerDelegateBound guard). Called from ProcessSightPerception
+	 * when the player is first spotted, not from constructor or BeginPlay.
+	 */
+	void BindToPlayerDelegates(AActor* PlayerActor);
+
+	/** Whether we've already bound to the player's HidingComponent delegate. */
+	bool bPlayerDelegateBound = false;
+
+	/** The player actor we've bound delegates to. */
+	TWeakObjectPtr<AActor> TrackedPlayer;
 };
