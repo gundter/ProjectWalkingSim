@@ -33,6 +33,20 @@ void UMusicTensionSystem::BeginPlay()
 
 void UMusicTensionSystem::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	// Unbind delegates to prevent dangling callbacks.
+	if (AActor* Owner = GetOwner())
+	{
+		if (AWendigoCharacter* Wendigo = Cast<AWendigoCharacter>(Owner))
+		{
+			Wendigo->OnBehaviorStateChanged.RemoveDynamic(this, &UMusicTensionSystem::OnBehaviorStateChangedForStingers);
+
+			if (USuspicionComponent* Suspicion = Wendigo->GetSuspicionComponent())
+			{
+				Suspicion->OnAlertLevelChanged.RemoveDynamic(this, &UMusicTensionSystem::OnAlertLevelChanged);
+			}
+		}
+	}
+
 	// Stop all music layers and stinger.
 	for (int32 i = 0; i < 3; ++i)
 	{

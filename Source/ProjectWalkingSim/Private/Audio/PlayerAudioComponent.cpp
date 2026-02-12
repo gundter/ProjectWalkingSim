@@ -4,6 +4,7 @@
 #include "Player/Components/FootstepComponent.h"
 #include "AI/WendigoCharacter.h"
 #include "Components/AudioComponent.h"
+#include "Core/SereneLogChannels.h"
 #include "Kismet/GameplayStatics.h"
 
 UPlayerAudioComponent::UPlayerAudioComponent()
@@ -28,7 +29,7 @@ void UPlayerAudioComponent::BeginPlay()
 	}
 	else
 	{
-		UE_LOG(LogTemp, Warning, TEXT("PlayerAudioComponent: No FootstepComponent found on %s"), *Owner->GetName());
+		UE_LOG(LogSerene, Warning, TEXT("PlayerAudioComponent: No FootstepComponent found on %s"), *Owner->GetName());
 	}
 
 	// --- Create heartbeat audio component (2D, non-spatialized) ---
@@ -56,13 +57,16 @@ void UPlayerAudioComponent::BeginPlay()
 
 	// --- Start heartbeat proximity timer ---
 	const float Interval = (HeartbeatUpdateRate > 0.0f) ? (1.0f / HeartbeatUpdateRate) : 0.25f;
-	GetWorld()->GetTimerManager().SetTimer(
-		HeartbeatTimerHandle,
-		this,
-		&UPlayerAudioComponent::UpdateHeartbeatProximity,
-		Interval,
-		true // bLoop
-	);
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			HeartbeatTimerHandle,
+			this,
+			&UPlayerAudioComponent::UpdateHeartbeatProximity,
+			Interval,
+			true // bLoop
+		);
+	}
 
 	// Cache initial Wendigo reference
 	FindWendigo();
@@ -134,8 +138,14 @@ void UPlayerAudioComponent::UpdateHeartbeatProximity()
 		}
 	}
 
+	AActor* Owner = GetOwner();
+	if (!Owner)
+	{
+		return;
+	}
+
 	const float Distance = FVector::Dist(
-		GetOwner()->GetActorLocation(),
+		Owner->GetActorLocation(),
 		CachedWendigo->GetActorLocation()
 	);
 
