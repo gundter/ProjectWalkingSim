@@ -166,7 +166,7 @@ Plans:
 
 ### Phase 6: Light and Audio
 
-**Goal:** Atmosphere systems create dread and inform player of threats.
+**Goal:** Atmosphere systems create dread and inform player of threats. Flashlight with Lumen GI bounce, behavior-state-driven monster spatial audio, alert-level-driven dynamic music with crossfade, ambient horror soundscape, player footstep audio, heartbeat proximity system, and flashlight-attracts-Wendigo mechanic.
 
 **Dependencies:** Phase 5 (AI needs audio/light integration for perception)
 
@@ -177,6 +177,15 @@ Plans:
 - AUDO-02: Ambient horror soundscape
 - AUDO-03: Monster audio cues (footsteps, breathing, growls)
 - AUDO-04: Dynamic music and tension stingers
+
+**Plans:** 5 plans
+
+Plans:
+- [ ] 06-01-PLAN.md -- FlashlightComponent + AudioConstants foundation
+- [ ] 06-02-PLAN.md -- MonsterAudioComponent (behavior-state-driven spatial audio)
+- [ ] 06-03-PLAN.md -- MusicTensionSystem + AmbientAudioManager
+- [ ] 06-04-PLAN.md -- PlayerAudioComponent (footstep playback + heartbeat proximity)
+- [ ] 06-05-PLAN.md -- Character wiring, flashlight-AI detection, PIE verification
 
 **Success Criteria:**
 1. Player flashlight illuminates environment with Lumen GI bounce
@@ -235,7 +244,7 @@ Plans:
 | 3 | Hiding System | HIDE-01, HIDE-02 | ✓ Complete |
 | 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | ✓ Complete |
 | 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | ✓ Complete |
-| 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | Not Started |
+| 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | In Progress |
 | 7 | Save System | SAVE-01, SAVE-02 | Not Started |
 | 8 | Demo Polish | DEMO-01, DEMO-02, DEMO-03, DEMO-04 | Not Started |
 
@@ -244,4 +253,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 5 complete)*
+*Last updated: 2026-02-12 (Phase 6 planned)*
