@@ -63,7 +63,6 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Door")
 	FText LockedText;
 
-private:
 	/** Whether the door is currently open. */
 	bool bIsOpen = false;
 
@@ -75,4 +74,12 @@ private:
 
 	/** Direction multiplier: +1 or -1 based on which side the player approached. */
 	float OpenDirection = 1.0f;
+
+public:
+	/**
+	 * Open this door for an AI actor. AI cannot open locked doors.
+	 * Uses the same swing-direction logic as player interaction.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Door")
+	void OpenForAI(AActor* AIActor);
 };

@@ -108,6 +108,37 @@ void ADoorActor::OnInteract_Implementation(AActor* Interactor)
 	SetActorTickEnabled(true);
 }
 
+void ADoorActor::OpenForAI(AActor* AIActor)
+{
+	// AI cannot open locked doors
+	if (bIsLocked)
+	{
+		return;
+	}
+
+	// Already open -- nothing to do
+	if (bIsOpen)
+	{
+		return;
+	}
+
+	bIsOpen = true;
+
+	// Determine swing direction using the same dot product pattern as player interaction
+	if (AIActor)
+	{
+		const FVector ToAI = AIActor->GetActorLocation() - GetActorLocation();
+		const float DotProduct = FVector::DotProduct(GetActorForwardVector(), ToAI);
+		OpenDirection = (DotProduct >= 0.0f) ? 1.0f : -1.0f;
+	}
+
+	TargetAngle = OpenAngle * OpenDirection;
+	SetActorTickEnabled(true);
+
+	UE_LOG(LogSerene, Log, TEXT("ADoorActor [%s]: Opened for AI. Direction=%.0f, TargetAngle=%.1f"),
+		*GetName(), OpenDirection, TargetAngle);
+}
+
 void ADoorActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);

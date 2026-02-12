@@ -88,6 +88,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "AI|Chase")
 	void ClearWitnessedHidingSpot();
 
+	/** Assign a patrol route at runtime (e.g., from WendigoSpawnPoint). Resets waypoint index to 0. */
+	void SetPatrolRoute(APatrolRouteActor* Route) { PatrolRoute = Route; CurrentWaypointIndex = 0; }
+
 protected:
 	/** Suspicion component -- tracks detection state and alert levels. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI")
