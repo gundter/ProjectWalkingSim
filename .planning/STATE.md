@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 4 complete. Ready for Phase 5 (Monster Behaviors) — chase, investigate, search, spawns.
+**Current Focus:** Phase 5 in progress (Monster Behaviors) -- data layer complete, chase/search/grab/spawn plans remain.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -23,16 +23,17 @@
 ## Current Position
 
 **Phase:** 5 of 8 (Monster Behaviors)
-**Plan:** 0 of ? (not yet planned)
-**Status:** Ready to plan Phase 5
-**Last activity:** 2026-02-11 - Phase 4 complete, all features verified
+**Plan:** 1 of 5 complete
+**Status:** In progress
+**Last activity:** 2026-02-12 - Completed 05-01-PLAN.md (AI data layer extensions)
 
 **Progress:**
 ```
-Phase 1: [######] 6/6 plans complete ✓
-Phase 2: [######] 6/6 plans complete ✓
-Phase 3: [######] 6/6 plans complete ✓
-Phase 4: [#######] 7/7 plans complete ✓
+Phase 1: [######] 6/6 plans complete
+Phase 2: [######] 6/6 plans complete
+Phase 3: [######] 6/6 plans complete
+Phase 4: [#######] 7/7 plans complete
+Phase 5: [#....] 1/5 plans complete
 Overall: [████....] 4/8 phases complete
 ```
 
@@ -66,6 +67,7 @@ Overall: [████....] 4/8 phases complete
 | 4-04  | 4/7   | 2/2   | ~6m  | 1      |
 | 4-05  | 5/7   | 2/2   | ~14m | 0      |
 | 4-06  | 6/7   | 2/2   | ~5m  | 0      |
+| 5-01  | 1/5   | 2/2   | ~6m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -139,6 +141,9 @@ Overall: [████....] 4/8 phases complete
 | Empty instance data struct required for ST conditions | State Tree conditions need GetInstanceDataType() even if stateless; "missing instance value" error otherwise | 04-06 |
 | InvestigateLocation clears stimulus on completion | Allows natural return to patrol without stale stimulus data | 04-06 |
 | STC_ prefix for State Tree condition structs | Parallel to STT_ for tasks: FSTC_SuspicionLevel | 04-06 |
+| AActor* for WitnessedHidingSpot | Avoids circular header dependency between AI and Hiding modules; cast at use-site | 05-01 |
+| BehaviorState separate from AlertLevel | EWendigoBehaviorState tracks actions (Patrol/Chasing/etc), EAlertLevel tracks perception; orthogonal | 05-01 |
+| LastStimulusType persists through ClearStimulusLocation | Investigation reads type after location consumed; only full reset clears it | 05-01 |
 
 ### Technical Discoveries
 
@@ -175,14 +180,14 @@ Overall: [████....] 4/8 phases complete
 - [x] Execute Phase 3 (all 6 plans)
 - [x] Plan Phase 4: Monster AI Core
 - [x] Execute Phase 4 (all 7 plans)
-- [ ] Plan Phase 5: Monster Behaviors
-- [ ] Execute Phase 5
+- [x] Plan Phase 5: Monster Behaviors
+- [ ] Execute Phase 5 (1/5 plans complete)
 - [ ] Future: Consider spline-based patrol routes for polish/main release (current MakeEditWidget waypoints work but less designer-friendly; may not need static routes in main release)
 - [ ] Future: Replace On Tick State Tree transitions with event-driven triggers (OnAlertLevelChanged delegate, gameplay tags, or reduced tick interval) for performance — On Tick is fine for demo but won't scale for complex Alien: Isolation-style State Trees
 
 ### Blockers
 
-None — Phase 4 complete, ready for Phase 5.
+None -- Phase 5 data layer complete, ready for behavior plans.
 
 ---
 
@@ -190,30 +195,18 @@ None — Phase 4 complete, ready for Phase 5.
 
 ### Last Session
 
-**Date:** 2026-02-11
+**Date:** 2026-02-12
 **Completed:**
-- Executed all 7 Phase 4 plans across 5 waves
-- Wave 1: AI foundation types (04-01)
-- Wave 2: WendigoCharacter + SuspicionComponent (04-02) + WendigoAIController (04-03) in parallel
-- Wave 3: PatrolRouteActor + patrol tasks (04-04) + perception-to-suspicion wiring (04-05) in parallel
-- Wave 4: Investigation tasks + suspicion condition (04-06)
-- Wave 5: Editor assets + PIE verification (04-07) with interactive checkpoint
-- Fixed 7 integration issues during PIE verification:
-  1. STC_SuspicionLevel missing instance data struct (State Tree requirement)
-  2. Waypoints world-space vs local-space mismatch (MakeEditWidget is local)
-  3. CurrentWaypointIndex reset on state re-entry (moved to character)
-  4. Player missing AIPerceptionStimuliSourceComponent for sight
-  5. Sight didn't set stimulus location for investigation
-  6. VisibilityScore too low for default threshold (0.16 in full light vs 0.3 threshold)
-  7. Sight suspicion accumulation too slow for practical gameplay
-- Collaboratively designed hierarchical State Tree structure:
-  Patrol (container) > Suspicious/Investigate (reactive), Move to Waypoint/Idle (default)
-- On Tick transitions on Move to Waypoint and Patrol Idle for suspicion interrupts
-- Verified patrol (loop + ping-pong), sight detection, hearing detection, state transitions
+- Executed 05-01-PLAN.md: AI data layer extensions for Phase 5
+- Extended MonsterAITypes.h with EWendigoBehaviorState (5 values), EStimulusType (3 values), FOnBehaviorStateChanged, 8 new AIConstants
+- Extended WendigoCharacter with chase/search persistent state and behavior state tracking
+- Extended SuspicionComponent with LastStimulusType tracking
+- Added 6 new gameplay tags (AI.Behavior.*, AI.Spawn.Zone)
+- All changes compile cleanly (zero errors, zero warnings)
 
-**Stopped at:** Phase 4 complete
+**Stopped at:** Completed 05-01-PLAN.md
 
-**Next:** Plan Phase 5 (Monster Behaviors)
+**Next:** Execute remaining Phase 5 plans (05-02 through 05-05)
 
 ### Context for Next Session
 
@@ -275,4 +268,4 @@ Phase 4 AI core building. The project now has:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-11 (Phase 4 plan 04-06 complete)*
+*Last updated: 2026-02-12 (Phase 5 plan 05-01 complete)*
