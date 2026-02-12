@@ -24,7 +24,7 @@
 
 **Phase:** 5 of 8 (Monster Behaviors)
 **Plan:** 5 of 5 complete
-**Status:** Phase complete, verified ✓ (pending performance audit)
+**Status:** Phase complete, verified ✓, audited ✓
 **Last activity:** 2026-02-12 - Completed 05-05-PLAN.md (State Tree wiring, PIE verification)
 
 **Progress:**
@@ -201,7 +201,7 @@ Overall: [█████...] 5/8 phases complete
 - [x] Execute Phase 4 (all 7 plans)
 - [x] Plan Phase 5: Monster Behaviors
 - [x] Execute Phase 5 (all 5 plans)
-- [ ] Performance audit for Phase 5
+- [x] Performance audit for Phase 5
 - [ ] Plan Phase 6: Light and Audio
 - [ ] Execute Phase 6
 - [ ] Future: Consider spline-based patrol routes for polish/main release (current MakeEditWidget waypoints work but less designer-friendly; may not need static routes in main release)
