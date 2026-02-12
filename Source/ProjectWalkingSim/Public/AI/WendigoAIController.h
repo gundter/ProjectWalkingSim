@@ -79,6 +79,9 @@ private:
 	/** Debug timer for periodic sight logging (avoids log spam). */
 	float SightDebugTimer = 0.0f;
 
+	/** Reusable array for perceived actors query (avoids per-tick allocation). */
+	TArray<AActor*> CachedPerceivedActors;
+
 	// --- Player Hiding Detection ---
 
 	/**

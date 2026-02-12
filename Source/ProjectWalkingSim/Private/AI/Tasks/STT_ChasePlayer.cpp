@@ -100,8 +100,14 @@ EStateTreeRunStatus FSTT_ChasePlayer::Tick(
 		return EStateTreeRunStatus::Failed;
 	}
 
-	// Check line-of-sight
-	const bool bCanSeePlayer = Controller.LineOfSightTo(Target);
+	// Throttled line-of-sight check (collision trace is expensive every frame)
+	InstanceData.LOSCheckTimer += DeltaTime;
+	if (InstanceData.LOSCheckTimer >= LOSCheckInterval)
+	{
+		InstanceData.LOSCheckTimer = 0.0f;
+		InstanceData.bLastLOSResult = Controller.LineOfSightTo(Target);
+	}
+	const bool bCanSeePlayer = InstanceData.bLastLOSResult;
 
 	if (bCanSeePlayer)
 	{

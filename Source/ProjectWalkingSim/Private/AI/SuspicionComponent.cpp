@@ -17,8 +17,8 @@ void USuspicionComponent::ProcessSightStimulus(float PlayerVisibilityScore, floa
 	}
 
 	// Normalize effective visibility to 0-1 range above threshold
-	const float EffectiveVisibility = (PlayerVisibilityScore - VisibilityThreshold)
-		/ (1.0f - VisibilityThreshold);
+	const float Divisor = FMath::Max(1.0f - VisibilityThreshold, KINDA_SMALL_NUMBER);
+	const float EffectiveVisibility = (PlayerVisibilityScore - VisibilityThreshold) / Divisor;
 
 	// Accumulate suspicion scaled by visibility
 	const float SuspicionGain = BaseSuspicionRate * EffectiveVisibility * DeltaTime;

@@ -104,12 +104,12 @@ void AWendigoAIController::Tick(float DeltaTime)
 	}
 
 	// Check if any player is currently perceived by sight
-	TArray<AActor*> PerceivedActors;
-	AIPerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), PerceivedActors);
+	CachedPerceivedActors.Reset();
+	AIPerceptionComponent->GetCurrentlyPerceivedActors(UAISense_Sight::StaticClass(), CachedPerceivedActors);
 
 	bool bSeeingPlayer = false;
 
-	for (AActor* Actor : PerceivedActors)
+	for (AActor* Actor : CachedPerceivedActors)
 	{
 		if (!Actor)
 		{

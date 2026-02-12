@@ -29,10 +29,17 @@ AWendigoCharacter* AWendigoSpawnPoint::SpawnWendigo()
 		return nullptr;
 	}
 
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		UE_LOG(LogSerene, Warning, TEXT("AWendigoSpawnPoint [%s]: No world. Cannot spawn."), *GetName());
+		return nullptr;
+	}
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-	AWendigoCharacter* SpawnedWendigo = GetWorld()->SpawnActor<AWendigoCharacter>(
+	AWendigoCharacter* SpawnedWendigo = World->SpawnActor<AWendigoCharacter>(
 		WendigoClass, GetActorLocation(), GetActorRotation(), SpawnParams);
 
 	if (!SpawnedWendigo)

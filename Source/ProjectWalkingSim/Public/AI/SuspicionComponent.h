@@ -92,7 +92,7 @@ public:
 	// --- Tunable Properties ---
 
 	/** Player visibility score below this threshold is invisible to the AI. */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Suspicion|Tuning")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Suspicion|Tuning", meta = (ClampMin = "0.0", ClampMax = "0.99"))
 	float VisibilityThreshold = AIConstants::VisibilityThreshold;
 
 	/** Base suspicion gain per second at full visibility. */

@@ -24,6 +24,12 @@ struct PROJECTWALKINGSIM_API FSTT_ChasePlayerInstanceData
 	/** Seconds since the Wendigo last had line-of-sight to the player. */
 	float LOSLostTimer = 0.0f;
 
+	/** Timer for throttling LineOfSightTo checks. */
+	float LOSCheckTimer = 0.0f;
+
+	/** Cached result of last LOS check. */
+	bool bLastLOSResult = true;
+
 	/** True while a MoveToActor request is active. */
 	bool bMoveRequestActive = false;
 
@@ -91,4 +97,8 @@ struct PROJECTWALKINGSIM_API FSTT_ChasePlayer : public FStateTreeTaskCommonBase
 	/** Pathfinding acceptance radius for MoveToActor. */
 	UPROPERTY(EditAnywhere, Category = "Chase", meta = (ClampMin = "10.0"))
 	float AcceptanceRadius = 50.0f;
+
+	/** Interval in seconds between LineOfSightTo trace checks. */
+	UPROPERTY(EditAnywhere, Category = "Chase", meta = (ClampMin = "0.05", ClampMax = "0.5"))
+	float LOSCheckInterval = 0.15f;
 };

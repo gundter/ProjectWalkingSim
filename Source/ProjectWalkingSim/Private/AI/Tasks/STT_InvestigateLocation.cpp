@@ -139,7 +139,8 @@ void FSTT_InvestigateLocation::ExitState(
 	FInstanceDataType& InstanceData = Context.GetInstanceData<FInstanceDataType>(*this);
 	AAIController& Controller = Context.GetExternalData(ControllerHandle);
 
-	// Restore patrol walk speed and behavior state
+	// Restore patrol walk speed; only reset behavior state if task completed normally
+	// (avoids spurious Investigating->Patrol flash when escalating to Chase)
 	APawn* Pawn = Controller.GetPawn();
 	AWendigoCharacter* Wendigo = Cast<AWendigoCharacter>(Pawn);
 	if (Wendigo)
@@ -148,7 +149,10 @@ void FSTT_InvestigateLocation::ExitState(
 		{
 			MoveComp->MaxWalkSpeed = AIConstants::WendigoWalkSpeed;
 		}
-		Wendigo->SetBehaviorState(EWendigoBehaviorState::Patrol);
+		if (Transition.CurrentRunStatus == EStateTreeRunStatus::Succeeded)
+		{
+			Wendigo->SetBehaviorState(EWendigoBehaviorState::Patrol);
+		}
 	}
 
 	// Stop any active movement
