@@ -244,7 +244,7 @@ Plans:
 | 3 | Hiding System | HIDE-01, HIDE-02 | ✓ Complete |
 | 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | ✓ Complete |
 | 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | ✓ Complete |
-| 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | In Progress |
+| 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | ✓ Complete |
 | 7 | Save System | SAVE-01, SAVE-02 | Not Started |
 | 8 | Demo Polish | DEMO-01, DEMO-02, DEMO-03, DEMO-04 | Not Started |
 
@@ -253,4 +253,4 @@ Plans:
 ---
 
 *Roadmap created: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 6 planned)*
+*Last updated: 2026-02-12 (Phase 6 complete)*

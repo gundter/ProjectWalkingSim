@@ -38,15 +38,15 @@ Requirements for initial demo release. Each maps to roadmap phases.
 
 ### Light System
 
-- [ ] **LGHT-01**: Flashlight (always on, no battery drain for demo)
-- [ ] **LGHT-02**: Lumen GI atmospheric lighting
+- [x] **LGHT-01**: Flashlight (always on, no battery drain for demo)
+- [x] **LGHT-02**: Lumen GI atmospheric lighting
 
 ### Audio
 
-- [ ] **AUDO-01**: Spatial audio (3D positioning for monster sounds)
-- [ ] **AUDO-02**: Ambient horror soundscape
-- [ ] **AUDO-03**: Monster audio cues (footsteps, breathing, growls)
-- [ ] **AUDO-04**: Dynamic music and tension stingers
+- [x] **AUDO-01**: Spatial audio (3D positioning for monster sounds)
+- [x] **AUDO-02**: Ambient horror soundscape
+- [x] **AUDO-03**: Monster audio cues (footsteps, breathing, growls)
+- [x] **AUDO-04**: Dynamic music and tension stingers
 
 ### Save System
 
@@ -127,12 +127,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WNDG-05 | Phase 5: Monster Behaviors | Complete |
 | WNDG-06 | Phase 5: Monster Behaviors | Complete |
 | WNDG-07 | Phase 4: Monster AI Core | Complete |
-| LGHT-01 | Phase 6: Light and Audio | Pending |
-| LGHT-02 | Phase 6: Light and Audio | Pending |
-| AUDO-01 | Phase 6: Light and Audio | Pending |
-| AUDO-02 | Phase 6: Light and Audio | Pending |
-| AUDO-03 | Phase 6: Light and Audio | Pending |
-| AUDO-04 | Phase 6: Light and Audio | Pending |
+| LGHT-01 | Phase 6: Light and Audio | Complete |
+| LGHT-02 | Phase 6: Light and Audio | Complete |
+| AUDO-01 | Phase 6: Light and Audio | Complete |
+| AUDO-02 | Phase 6: Light and Audio | Complete |
+| AUDO-03 | Phase 6: Light and Audio | Complete |
+| AUDO-04 | Phase 6: Light and Audio | Complete |
 | SAVE-01 | Phase 7: Save System | Pending |
 | SAVE-02 | Phase 7: Save System | Pending |
 | DEMO-01 | Phase 8: Demo Polish | Pending |
@@ -147,4 +147,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 5 complete)*
+*Last updated: 2026-02-12 (Phase 6 complete)*
