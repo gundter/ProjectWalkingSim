@@ -331,6 +331,22 @@ void USaveSubsystem::ClearDestroyedPickupTracker()
 	DestroyedPickupTracker.Empty();
 }
 
+void USaveSubsystem::SetPendingSaveLocation(const FVector& Location, const FRotator& Rotation)
+{
+	PendingSaveLocation = Location;
+	PendingSaveRotation = Rotation;
+	bHasPendingSaveLocation = true;
+
+	UE_LOG(LogSerene, Log, TEXT("SetPendingSaveLocation: %s"), *Location.ToString());
+}
+
+void USaveSubsystem::ClearPendingSaveLocation()
+{
+	bHasPendingSaveLocation = false;
+	PendingSaveLocation = FVector::ZeroVector;
+	PendingSaveRotation = FRotator::ZeroRotator;
+}
+
 // ---------------------------------------------------------------------------
 // Private Helpers
 // ---------------------------------------------------------------------------
@@ -382,12 +398,22 @@ void USaveSubsystem::GatherPlayerState(USereneSaveGame* SaveGame, UWorld* World)
 		return;
 	}
 
-	SaveGame->PlayerLocation = PlayerPawn->GetActorLocation();
-
-	AController* Controller = PlayerPawn->GetController();
-	if (Controller)
+	// Use pending save location (tape recorder) if set, otherwise use player's actual position
+	if (bHasPendingSaveLocation)
 	{
-		SaveGame->PlayerRotation = Controller->GetControlRotation();
+		SaveGame->PlayerLocation = PendingSaveLocation;
+		SaveGame->PlayerRotation = PendingSaveRotation;
+		UE_LOG(LogSerene, Log, TEXT("GatherPlayerState: using pending save location %s"), *PendingSaveLocation.ToString());
+	}
+	else
+	{
+		SaveGame->PlayerLocation = PlayerPawn->GetActorLocation();
+
+		AController* Controller = PlayerPawn->GetController();
+		if (Controller)
+		{
+			SaveGame->PlayerRotation = Controller->GetControlRotation();
+		}
 	}
 
 	// Gather inventory

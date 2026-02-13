@@ -116,6 +116,18 @@ public:
 	/** Clear the destroyed pickup tracker (called after applying save data). */
 	void ClearDestroyedPickupTracker();
 
+	// --- Pending Save Location (Tape Recorder) ---
+
+	/**
+	 * Set a pending save location override. When set, SaveToSlot writes this
+	 * location/rotation instead of the player pawn's actual position.
+	 * Used by TapeRecorderActor so the player respawns at the save point.
+	 */
+	void SetPendingSaveLocation(const FVector& Location, const FRotator& Rotation);
+
+	/** Clear the pending save location override. Called after save completes or menu closes. */
+	void ClearPendingSaveLocation();
+
 private:
 	/** Generate the platform slot name for a given index. */
 	FString GetSlotName(int32 SlotIndex) const;
@@ -149,4 +161,15 @@ private:
 
 	/** Runtime tracking of destroyed level-placed pickups. */
 	TSet<FName> DestroyedPickupTracker;
+
+	// --- Pending Save Location ---
+
+	/** Override location for next save (e.g., tape recorder position). */
+	FVector PendingSaveLocation = FVector::ZeroVector;
+
+	/** Override rotation for next save. */
+	FRotator PendingSaveRotation = FRotator::ZeroRotator;
+
+	/** Whether PendingSaveLocation/Rotation should be used instead of player position. */
+	bool bHasPendingSaveLocation = false;
 };
