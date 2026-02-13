@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 7 complete (Save System) -- All 4 plans executed, verified ✓, audited ✓. Ready for Phase 8 (Demo Polish).
+**Current Focus:** Phase 8 in progress (Demo Polish) -- Plans 08-01 and 08-02 complete. Storytelling UI (DocumentReaderWidget + InspectableActor) ready.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,10 +22,10 @@
 
 ## Current Position
 
-**Phase:** 7 of 8 (Save System)
-**Plan:** 4 of 4 complete (07-01, 07-02, 07-03, 07-04)
-**Status:** Phase complete, verified ✓, audited ✓
-**Last activity:** 2026-02-12 - Phase 7 verified and audited
+**Phase:** 8 of 8 (Demo Polish)
+**Plan:** 2 of 5 complete (08-01, 08-02)
+**Status:** In progress
+**Last activity:** 2026-02-13 - Completed 08-02-PLAN.md (Storytelling UI)
 
 **Progress:**
 ```
@@ -36,7 +36,8 @@ Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
 Phase 6: [#####] 5/5 plans complete
 Phase 7: [####] 4/4 plans complete
-Overall: [███████░] 7/8 phases complete
+Phase 8: [##---] 2/5 plans complete
+Overall: [███████░] 7.4/8 phases complete
 ```
 
 ---
@@ -83,6 +84,8 @@ Overall: [███████░] 7/8 phases complete
 | 7-02  | 2/4   | 2/2   | ~8m  | 1      |
 | 7-03  | 3/4   | 2/2   | ~9m  | 0      |
 | 7-04  | 4/4   | 2/2   | ~10m | 0      |
+| 8-01  | 1/5   | 1/1   | ~3m  | 0      |
+| 8-02  | 2/5   | 2/2   | ~3m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -200,6 +203,9 @@ Overall: [███████░] 7/8 phases complete
 | Esc context-sensitive: inventory close vs pause | Natural UX: single escape key handles all overlay dismissal | 07-04 |
 | SetPendingSaveLocation API on SaveSubsystem | Decouples tape recorder from save internals; respawn at save point | 07-04 |
 | Pause blocked during hiding and Game Over | Prevents invalid state combinations; hiding has own interaction model | 07-04 |
+| DocumentReaderWidget created per-use, not pre-created | Avoids stale state; each interaction gets fresh widget instance | 08-02 |
+| E and Esc both close DocumentReaderWidget | E matches interaction key, Esc is universal close; keyboard-driven, no mouse cursor | 08-02 |
+| Dual-mode widget: ShowDocument/ShowInspection | Single widget handles both readable documents and inspectable objects | 08-02 |
 
 ### Technical Discoveries
 
@@ -254,7 +260,7 @@ Overall: [███████░] 7/8 phases complete
 
 ### Blockers
 
-None -- Phase 7 complete.
+None -- Phase 8 in progress.
 
 ---
 
@@ -262,16 +268,16 @@ None -- Phase 7 complete.
 
 ### Last Session
 
-**Date:** 2026-02-12
+**Date:** 2026-02-13
 **Completed:**
-- Executed all 4 Phase 7 plans (3 waves: 07-01 → 07-02+07-03 parallel → 07-04)
-- Verification passed: 6/6 must-haves verified against codebase
-- Performance audit passed: 2 critical fixes (DrawerInitialLocation cache, UFUNCTION on HandlePauseMenuClosed), 4 warnings deferred
-- ROADMAP.md, STATE.md, REQUIREMENTS.md updated
+- Executed 08-02-PLAN.md (Storytelling UI: DocumentReaderWidget + InspectableActor)
+- 2 tasks, 2 commits, zero deviations
+- DocumentReaderWidget: dual-mode full-screen reader (document + inspection)
+- InspectableActor: story object examination with image, text, one-time monologue
 
-**Stopped at:** Phase 7 complete
+**Stopped at:** Phase 8 plan 2 of 5 complete
 
-**Next:** Phase 8 (Demo Polish) — environment, narrative, optimization
+**Next:** Continue Phase 8 plans 03-05 (controller wiring, demo level, optimization)
 
 ### Context for Next Session
 
@@ -319,4 +325,4 @@ Phase 7 is now fully implemented:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 7 complete -- verified ✓, audited ✓)*
+*Last updated: 2026-02-13 (Phase 8 plan 02 complete)*
