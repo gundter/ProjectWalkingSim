@@ -50,8 +50,8 @@ Requirements for initial demo release. Each maps to roadmap phases.
 
 ### Save System
 
-- [ ] **SAVE-01**: Checkpoint auto-saves at specific locations
-- [ ] **SAVE-02**: Manual save anywhere
+- [x] **SAVE-01**: Save points at tape recorder objects (manual save with 3-slot picker)
+- [x] **SAVE-02**: Manual save at tape recorders with screenshot thumbnails and timestamp
 
 ### Demo Content
 
@@ -133,8 +133,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUDO-02 | Phase 6: Light and Audio | Complete |
 | AUDO-03 | Phase 6: Light and Audio | Complete |
 | AUDO-04 | Phase 6: Light and Audio | Complete |
-| SAVE-01 | Phase 7: Save System | Pending |
-| SAVE-02 | Phase 7: Save System | Pending |
+| SAVE-01 | Phase 7: Save System | Complete |
+| SAVE-02 | Phase 7: Save System | Complete |
 | DEMO-01 | Phase 8: Demo Polish | Pending |
 | DEMO-02 | Phase 8: Demo Polish | Pending |
 | DEMO-03 | Phase 8: Demo Polish | Pending |
@@ -147,4 +147,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 6 complete)*
+*Last updated: 2026-02-12 (Phase 7 complete)*
