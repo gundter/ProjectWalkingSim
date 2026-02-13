@@ -34,15 +34,10 @@ struct PROJECTWALKINGSIM_API FSTT_GrabAttackInstanceData
  *   1. Disables all player input (no escape)
  *   2. Stops the Wendigo and focuses on the player
  *   3. Waits GrabDuration seconds (struggle phase)
- *   4. Restarts the level (demo-scope death)
+ *   4. Triggers GameMode::OnPlayerDeath (shows Game Over screen)
  *
  * ExitState safely re-enables player input in case the task is interrupted
  * by a State Tree transition (prevents permanent input lock).
- *
- * NOTE: The RestartLevel approach is intentionally simple for demo scope.
- * Phase 8 Polish will replace with a proper death/respawn system (fade to black,
- * death screen, checkpoint reload). The task structure will remain; only the
- * death handler changes.
  */
 USTRUCT(meta = (DisplayName = "Grab Attack"))
 struct PROJECTWALKINGSIM_API FSTT_GrabAttack : public FStateTreeTaskCommonBase

@@ -4,6 +4,7 @@
 #include "AIController.h"
 #include "AI/WendigoCharacter.h"
 #include "AI/MonsterAITypes.h"
+#include "Core/SereneGameMode.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Core/SereneLogChannels.h"
@@ -71,16 +72,15 @@ EStateTreeRunStatus FSTT_GrabAttack::Tick(
 
 	if (InstanceData.ElapsedTime >= GrabDuration)
 	{
-		// Demo-scope death: restart the level
+		// Trigger death via GameMode -- shows Game Over screen instead of restarting
 		AAIController& Controller = Context.GetExternalData(ControllerHandle);
 		APawn* Pawn = Controller.GetPawn();
 		if (Pawn)
 		{
 			UWorld* World = Pawn->GetWorld();
-			APlayerController* PlayerController = UGameplayStatics::GetPlayerController(World, 0);
-			if (PlayerController)
+			if (ASereneGameMode* GM = Cast<ASereneGameMode>(World->GetAuthGameMode()))
 			{
-				PlayerController->ConsoleCommand(TEXT("RestartLevel"));
+				GM->OnPlayerDeath();
 			}
 		}
 		return EStateTreeRunStatus::Succeeded;
