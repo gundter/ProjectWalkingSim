@@ -43,6 +43,12 @@ public:
 	/** Toggle the pause menu on/off. Can be called externally. */
 	void TogglePauseMenu();
 
+	/** Set whether a document/inspection overlay is currently open. Called by DocumentReaderWidget. */
+	void SetDocumentOpen(bool bOpen);
+
+	/** Query whether a document/inspection overlay is currently displayed. */
+	bool IsDocumentOpen() const { return bIsDocumentOpen; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -124,6 +130,11 @@ private:
 
 	/** Populate cached component pointers from the possessed pawn. */
 	void CacheComponentPointers(APawn* InPawn);
+
+	// --- Document/Inspection State ---
+
+	/** Whether a document or inspection overlay is currently displayed. */
+	bool bIsDocumentOpen = false;
 
 	// --- Inventory Toggle ---
 

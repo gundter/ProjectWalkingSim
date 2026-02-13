@@ -6,6 +6,7 @@
 #include "Components/Image.h"
 #include "Engine/Texture2D.h"
 #include "Core/SereneLogChannels.h"
+#include "Player/SerenePlayerController.h"
 
 void UDocumentReaderWidget::ShowDocument(const FText& Title, const FText& Content)
 {
@@ -33,6 +34,11 @@ void UDocumentReaderWidget::ShowDocument(const FText& Title, const FText& Conten
 		FInputModeUIOnly InputMode;
 		InputMode.SetWidgetToFocus(TakeWidget());
 		PC->SetInputMode(InputMode);
+
+		if (ASerenePlayerController* SPC = Cast<ASerenePlayerController>(PC))
+		{
+			SPC->SetDocumentOpen(true);
+		}
 	}
 
 	SetKeyboardFocus();
@@ -73,6 +79,11 @@ void UDocumentReaderWidget::ShowInspection(const FText& Description, UTexture2D*
 		FInputModeUIOnly InputMode;
 		InputMode.SetWidgetToFocus(TakeWidget());
 		PC->SetInputMode(InputMode);
+
+		if (ASerenePlayerController* SPC = Cast<ASerenePlayerController>(PC))
+		{
+			SPC->SetDocumentOpen(true);
+		}
 	}
 
 	SetKeyboardFocus();
@@ -96,6 +107,11 @@ void UDocumentReaderWidget::CloseDocument()
 	{
 		FInputModeGameOnly InputMode;
 		PC->SetInputMode(InputMode);
+
+		if (ASerenePlayerController* SPC = Cast<ASerenePlayerController>(PC))
+		{
+			SPC->SetDocumentOpen(false);
+		}
 	}
 
 	OnDocumentClosed.Broadcast();

@@ -225,8 +225,19 @@ void ASerenePlayerController::HandleCrouchToggle(const FInputActionValue& Value)
 	}
 }
 
+void ASerenePlayerController::SetDocumentOpen(bool bOpen)
+{
+	bIsDocumentOpen = bOpen;
+}
+
 void ASerenePlayerController::HandleInteract(const FInputActionValue& Value)
 {
+	// Block interaction while a document/inspection overlay is open
+	if (bIsDocumentOpen)
+	{
+		return;
+	}
+
 	ASereneCharacter* SereneChar = GetSereneCharacter();
 	if (!SereneChar)
 	{
@@ -281,6 +292,12 @@ void ASerenePlayerController::HandleLeanRightStop(const FInputActionValue& Value
 
 void ASerenePlayerController::HandleToggleInventory(const FInputActionValue& Value)
 {
+	// Block inventory while a document/inspection overlay is open
+	if (bIsDocumentOpen)
+	{
+		return;
+	}
+
 	if (bIsInventoryOpen)
 	{
 		CloseInventory();
@@ -338,6 +355,13 @@ void ASerenePlayerController::CloseInventory()
 
 void ASerenePlayerController::HandlePause(const FInputActionValue& Value)
 {
+	// Esc while document is open: widget handles close via NativeOnKeyDown.
+	// Block pause from opening as defense-in-depth.
+	if (bIsDocumentOpen)
+	{
+		return;
+	}
+
 	// Esc while inventory is open closes inventory instead
 	if (bIsInventoryOpen)
 	{
