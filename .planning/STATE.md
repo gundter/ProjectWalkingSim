@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 7 in progress (Save System) -- Plan 07-01 complete. Save data types + SaveSubsystem foundation built.
+**Current Focus:** Phase 7 in progress (Save System) -- Plans 07-01 and 07-02 complete. ISaveable actors + death system + GameMode load flow wired.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 7 of 8 (Save System)
-**Plan:** 1 of 4 complete (07-01)
+**Plan:** 2 of 4 complete (07-01, 07-02)
 **Status:** In progress
-**Last activity:** 2026-02-12 - Completed 07-01-PLAN.md (Save Data Foundation)
+**Last activity:** 2026-02-12 - Completed 07-02-PLAN.md (ISaveable Actors + Death System)
 
 **Progress:**
 ```
@@ -35,7 +35,7 @@ Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
 Phase 6: [#####] 5/5 plans complete
-Phase 7: [#...] 1/4 plans complete (07-01)
+Phase 7: [##..] 2/4 plans complete (07-01, 07-02)
 Overall: [██████░.] 6/8 phases complete
 ```
 
@@ -80,6 +80,7 @@ Overall: [██████░.] 6/8 phases complete
 | 6-04  | 1/5   | 2/2   | ~4m  | 0      |
 | 6-05  | 5/5   | 3/3*  | ~5m  | 0      |
 | 7-01  | 1/4   | 2/2   | ~10m | 1      |
+| 7-02  | 2/4   | 2/2   | ~8m  | 1      |
 
 *Checkpoint tasks require human verification
 
@@ -185,6 +186,11 @@ Overall: [██████░.] 6/8 phases complete
 | FImageUtils::CompressImage with "jpg" for screenshots | CompressImageArray deprecated; CompressImage with FImageView is current UE5 API | 07-01 |
 | GetPendingSaveData() accessor on SaveSubsystem | Character/controller can independently restore inventory, solving BeginPlay timing | 07-01 |
 | BlueprintType on all save structs | UHT requires BlueprintType for structs returned by BlueprintCallable functions | 07-01 |
+| ISaveable GetSaveId returns FName via GetFName() | Stable for level-placed actors; no FGuid needed for demo scope | 07-02 |
+| Door ReadSaveData snaps rotation immediately | No interpolation on load; player sees correct state instantly | 07-02 |
+| PickupActor ISaveable methods are no-ops | Destruction tracked centrally by SaveSubsystem, not per-actor | 07-02 |
+| OnActorsInitialized for save data application | InitGame too early; OnActorsInitialized fires after all actors spawned | 07-02 |
+| OnPlayerDeath replaces RestartLevel | Death goes through GameMode -> Game Over widget -> save system | 07-02 |
 
 ### Technical Discoveries
 
@@ -246,14 +252,14 @@ None -- Phase 7 in progress.
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 07-01-PLAN.md: Save Data Foundation
-- Task 1: SaveTypes.h (FSavedDoorState, FSavedDrawerState, FSaveSlotInfo) + SereneSaveGame.h (USereneSaveGame : USaveGame)
-- Task 2: SaveSubsystem.h/cpp (USaveSubsystem : UGameInstanceSubsystem) with save/load/screenshot API
-- Both tasks compiled and committed
+- Executed 07-02-PLAN.md: ISaveable Actors + Death System + Load Flow
+- Task 1: ISaveable interface expanded; DoorActor/PickupActor/DrawerActor implement WriteSaveData/ReadSaveData
+- Task 2: SereneGameMode::OnPlayerDeath + InitGame load flow + STT_GrabAttack replacement + GameOverWidget
+- All tasks compiled and committed
 
-**Stopped at:** Completed 07-01-PLAN.md
+**Stopped at:** Completed 07-02-PLAN.md
 
-**Next:** 07-02-PLAN.md (ISaveable expansion + actor implementations + death system + GameMode load flow)
+**Next:** 07-03-PLAN.md (Save/Load UI)
 
 ### Context for Next Session
 
@@ -266,10 +272,10 @@ The roadmap has 8 phases:
 4. Monster AI Core - State Tree, patrol, perception COMPLETE
 5. Monster Behaviors - Chase, investigate, search, spawns COMPLETE
 6. Light and Audio - Flashlight, Lumen, spatial audio COMPLETE
-7. Save System - IN PROGRESS (1/4 plans complete)
+7. Save System - IN PROGRESS (2/4 plans complete)
 8. Demo Polish - Environment, story, optimization
 
-Phase 7 plan 01 complete. The save system now has:
+Phase 7 plans 01-02 complete. The save system now has:
 - SaveTypes.h: FSavedDoorState, FSavedDrawerState, FSaveSlotInfo data structures
 - USereneSaveGame: USaveGame subclass with player state, inventory, world state fields
 - USaveSubsystem: UGameInstanceSubsystem with full save/load orchestration
@@ -277,13 +283,20 @@ Phase 7 plan 01 complete. The save system now has:
   - Async screenshot capture with JPEG compression
   - Destroyed pickup tracking at runtime
   - Level restart load flow with pending data pattern
+- ISaveable interface expanded on DoorActor, PickupActor, DrawerActor
+- SaveSubsystem GatherWorldState/ApplyPendingSaveData uses ISaveable interface
+- Death pipeline: GrabAttack -> GameMode::OnPlayerDeath -> Game Over widget -> LoadLatestSave/Restart
+- GameMode::InitGame hooks OnActorsInitialized for post-reload save data application
+- InventoryComponent::RestoreSavedInventory for save-load inventory restoration
+- UGameOverWidget with Load Last Save / Restart / Quit buttons
 
 **Remaining Phase 7 plans:**
-- 07-02: ISaveable expansion + actor implementations + death system + GameMode load flow
-- 07-03: Game Over widget + save/load UI
+- 07-03: Save/Load UI (save slot picker widget)
 - 07-04: Tape recorder save point actor + pause menu integration
+
+**User action needed:** Create WBP_GameOver Blueprint in editor (reparent to UGameOverWidget), add BindWidget elements, assign to SereneGameMode's GameOverWidgetClass.
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (07-01 complete)*
+*Last updated: 2026-02-12 (07-02 complete)*
