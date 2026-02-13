@@ -5,6 +5,8 @@
 #include "Core/SereneLogChannels.h"
 #include "Interaction/DoorActor.h"
 #include "Interaction/DrawerActor.h"
+#include "Interaction/PickupActor.h"
+#include "Interaction/SaveableInterface.h"
 #include "Player/SereneCharacter.h"
 #include "Inventory/InventoryComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -236,54 +238,40 @@ void USaveSubsystem::ApplyPendingSaveData(UWorld* World)
 
 	UE_LOG(LogSerene, Log, TEXT("ApplyPendingSaveData: restoring saved state"));
 
-	// 1. Restore door states
+	// 1. Restore door states via ISaveable
 	for (TActorIterator<ADoorActor> It(World); It; ++It)
 	{
 		ADoorActor* Door = *It;
-		const FName DoorId = Door->GetFName();
-
-		for (const FSavedDoorState& SavedState : PendingSaveData->DoorStates)
+		if (Door)
 		{
-			if (SavedState.DoorId == DoorId)
-			{
-				// Door state will be restored by ISaveable::ReadSaveData in 07-02.
-				// For now, log the match.
-				UE_LOG(LogSerene, Verbose, TEXT("  Matched door: %s"), *DoorId.ToString());
-				break;
-			}
+			ISaveable::Execute_ReadSaveData(Door, PendingSaveData);
 		}
 	}
 
-	// 2. Restore drawer states
+	// 2. Restore drawer states via ISaveable
 	for (TActorIterator<ADrawerActor> It(World); It; ++It)
 	{
 		ADrawerActor* Drawer = *It;
-		const FName DrawerId = Drawer->GetFName();
-
-		for (const FSavedDrawerState& SavedState : PendingSaveData->DrawerStates)
+		if (Drawer)
 		{
-			if (SavedState.DrawerId == DrawerId)
-			{
-				UE_LOG(LogSerene, Verbose, TEXT("  Matched drawer: %s"), *DrawerId.ToString());
-				break;
-			}
+			ISaveable::Execute_ReadSaveData(Drawer, PendingSaveData);
 		}
 	}
 
 	// 3. Destroy picked-up items
-	TArray<AActor*> ToDestroy;
-	for (TActorIterator<AActor> It(World); It; ++It)
+	TArray<APickupActor*> ToDestroy;
+	for (TActorIterator<APickupActor> It(World); It; ++It)
 	{
-		AActor* Actor = *It;
-		if (PendingSaveData->DestroyedPickupIds.Contains(Actor->GetFName()))
+		APickupActor* Pickup = *It;
+		if (Pickup && PendingSaveData->DestroyedPickupIds.Contains(Pickup->GetFName()))
 		{
-			ToDestroy.Add(Actor);
+			ToDestroy.Add(Pickup);
 		}
 	}
-	for (AActor* Actor : ToDestroy)
+	for (APickupActor* Pickup : ToDestroy)
 	{
-		UE_LOG(LogSerene, Verbose, TEXT("  Destroying pickup: %s"), *Actor->GetFName().ToString());
-		Actor->Destroy();
+		UE_LOG(LogSerene, Verbose, TEXT("  Destroying pickup: %s"), *Pickup->GetFName().ToString());
+		Pickup->Destroy();
 	}
 
 	// 4. Set player position
@@ -302,8 +290,18 @@ void USaveSubsystem::ApplyPendingSaveData(UWorld* World)
 			*PendingSaveData->PlayerLocation.ToString());
 	}
 
-	// 5. Inventory restoration is deferred to character/controller check
-	// (07-02 will add RestoreSavedInventory to InventoryComponent)
+	// 5. Restore inventory
+	ASereneCharacter* Character = Cast<ASereneCharacter>(PlayerPawn);
+	if (Character)
+	{
+		UInventoryComponent* Inventory = Character->FindComponentByClass<UInventoryComponent>();
+		if (Inventory)
+		{
+			Inventory->RestoreSavedInventory(PendingSaveData->InventorySlots);
+			UE_LOG(LogSerene, Log, TEXT("  Inventory restored (%d slots)"),
+				PendingSaveData->InventorySlots.Num());
+		}
+	}
 
 	// 6. Repopulate destroyed pickup tracker
 	DestroyedPickupTracker.Empty();
@@ -347,7 +345,7 @@ void USaveSubsystem::GatherWorldState(USereneSaveGame* SaveGame, UWorld* World)
 	SaveGame->DoorStates.Empty();
 	SaveGame->DrawerStates.Empty();
 
-	// Gather door states
+	// Gather door states via ISaveable
 	for (TActorIterator<ADoorActor> It(World); It; ++It)
 	{
 		ADoorActor* Door = *It;
@@ -356,14 +354,10 @@ void USaveSubsystem::GatherWorldState(USereneSaveGame* SaveGame, UWorld* World)
 			continue;
 		}
 
-		// Door state will be gathered via ISaveable::WriteSaveData in 07-02.
-		// For now, add a placeholder entry with the actor name.
-		FSavedDoorState DoorState;
-		DoorState.DoorId = Door->GetFName();
-		SaveGame->DoorStates.Add(DoorState);
+		ISaveable::Execute_WriteSaveData(Door, SaveGame);
 	}
 
-	// Gather drawer states
+	// Gather drawer states via ISaveable
 	for (TActorIterator<ADrawerActor> It(World); It; ++It)
 	{
 		ADrawerActor* Drawer = *It;
@@ -372,9 +366,7 @@ void USaveSubsystem::GatherWorldState(USereneSaveGame* SaveGame, UWorld* World)
 			continue;
 		}
 
-		FSavedDrawerState DrawerState;
-		DrawerState.DrawerId = Drawer->GetFName();
-		SaveGame->DrawerStates.Add(DrawerState);
+		ISaveable::Execute_WriteSaveData(Drawer, SaveGame);
 	}
 
 	UE_LOG(LogSerene, Verbose, TEXT("GatherWorldState: %d doors, %d drawers"),

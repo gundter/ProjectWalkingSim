@@ -2,6 +2,7 @@
 
 #include "Interaction/DrawerActor.h"
 
+#include "Save/SereneSaveGame.h"
 #include "Tags/SereneTags.h"
 #include "Core/SereneLogChannels.h"
 
@@ -65,5 +66,64 @@ void ADrawerActor::Tick(float DeltaTime)
 		FinalLocation.X += CurrentSlide;
 		DrawerMesh->SetRelativeLocation(FinalLocation);
 		SetActorTickEnabled(false);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ISaveable
+// ---------------------------------------------------------------------------
+
+FName ADrawerActor::GetSaveId_Implementation() const
+{
+	return GetFName();
+}
+
+void ADrawerActor::WriteSaveData_Implementation(USereneSaveGame* SaveGame)
+{
+	if (!SaveGame)
+	{
+		return;
+	}
+
+	FSavedDrawerState State;
+	State.DrawerId = GetFName();
+	State.bIsOpen = bIsOpen;
+	State.CurrentSlide = CurrentSlide;
+
+	SaveGame->DrawerStates.Add(State);
+}
+
+void ADrawerActor::ReadSaveData_Implementation(USereneSaveGame* SaveGame)
+{
+	if (!SaveGame)
+	{
+		return;
+	}
+
+	const FName MyId = GetFName();
+	for (const FSavedDrawerState& State : SaveGame->DrawerStates)
+	{
+		if (State.DrawerId == MyId)
+		{
+			bIsOpen = State.bIsOpen;
+			CurrentSlide = State.CurrentSlide;
+
+			// Snap drawer mesh to saved position (no interpolation on load)
+			if (DrawerMesh)
+			{
+				FVector NewLocation = DrawerInitialLocation;
+				NewLocation.X += CurrentSlide;
+				DrawerMesh->SetRelativeLocation(NewLocation);
+			}
+
+			// Update interaction text to match state
+			InteractionText = bIsOpen
+				? NSLOCTEXT("Interaction", "DrawerClose", "Close")
+				: NSLOCTEXT("Interaction", "DrawerOpen", "Open");
+
+			UE_LOG(LogSerene, Verbose, TEXT("ADrawerActor [%s]: Restored from save (open=%d, slide=%.1f)"),
+				*MyId.ToString(), bIsOpen, CurrentSlide);
+			return;
+		}
 	}
 }

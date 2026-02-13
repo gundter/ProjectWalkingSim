@@ -294,6 +294,15 @@ void UInventoryComponent::InitCombineRecipes()
 	UE_LOG(LogSerene, Log, TEXT("UInventoryComponent::InitCombineRecipes - %d recipes loaded."), CombineRecipes.Num());
 }
 
+void UInventoryComponent::RestoreSavedInventory(const TArray<FInventorySlot>& SavedSlots)
+{
+	Slots = SavedSlots;
+	Slots.SetNum(MaxSlots); // Ensure exactly 8 slots
+	OnInventoryChanged.Broadcast();
+
+	UE_LOG(LogSerene, Log, TEXT("UInventoryComponent::RestoreSavedInventory - Restored %d slots"), SavedSlots.Num());
+}
+
 bool UInventoryComponent::TryCombineItems(int32 SlotIndexA, int32 SlotIndexB)
 {
 	// Validate slot indices

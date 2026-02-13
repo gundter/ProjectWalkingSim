@@ -6,6 +6,8 @@
 #include "UObject/Interface.h"
 #include "SaveableInterface.generated.h"
 
+class USereneSaveGame;
+
 UINTERFACE(MinimalAPI, Blueprintable)
 class USaveable : public UInterface
 {
@@ -14,22 +16,26 @@ class USaveable : public UInterface
 
 /**
  * Contract for actors that persist state across save/load cycles.
- * Stub interface -- fully implemented in Phase 7: Save System.
+ *
+ * Actors implementing this interface write their state into and read
+ * it back from USereneSaveGame. The save subsystem calls WriteSaveData
+ * during save and ReadSaveData during load for every ISaveable actor
+ * found in the world.
  */
 class PROJECTWALKINGSIM_API ISaveable
 {
 	GENERATED_BODY()
 
 public:
-	/** Return a unique identifier for this saveable instance. */
+	/** Return a unique, stable identifier for this actor instance. */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Save")
-	FString GetSaveId() const;
+	FName GetSaveId() const;
 
-	/** Serialize this actor's state for saving. Parameters will be expanded in Phase 7. */
+	/** Write this actor's state into the save game object. */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Save")
-	void WriteSaveData();
+	void WriteSaveData(USereneSaveGame* SaveGame);
 
-	/** Restore this actor's state from saved data. Parameters will be expanded in Phase 7. */
+	/** Restore this actor's state from saved data. */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "Save")
-	void ReadSaveData();
+	void ReadSaveData(USereneSaveGame* SaveGame);
 };

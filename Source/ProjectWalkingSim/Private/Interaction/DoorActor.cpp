@@ -3,6 +3,7 @@
 #include "Interaction/DoorActor.h"
 
 #include "Inventory/InventoryComponent.h"
+#include "Save/SereneSaveGame.h"
 #include "Tags/SereneTags.h"
 #include "Core/SereneLogChannels.h"
 
@@ -163,5 +164,67 @@ void ADoorActor::Tick(float DeltaTime)
 		CurrentAngle = TargetAngle;
 		DoorMesh->SetRelativeRotation(FRotator(0.0f, CurrentAngle, 0.0f));
 		SetActorTickEnabled(false);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ISaveable
+// ---------------------------------------------------------------------------
+
+FName ADoorActor::GetSaveId_Implementation() const
+{
+	return GetFName();
+}
+
+void ADoorActor::WriteSaveData_Implementation(USereneSaveGame* SaveGame)
+{
+	if (!SaveGame)
+	{
+		return;
+	}
+
+	FSavedDoorState State;
+	State.DoorId = GetFName();
+	State.bIsOpen = bIsOpen;
+	State.bIsLocked = bIsLocked;
+	State.CurrentAngle = CurrentAngle;
+	State.OpenDirection = OpenDirection;
+
+	SaveGame->DoorStates.Add(State);
+}
+
+void ADoorActor::ReadSaveData_Implementation(USereneSaveGame* SaveGame)
+{
+	if (!SaveGame)
+	{
+		return;
+	}
+
+	const FName MyId = GetFName();
+	for (const FSavedDoorState& State : SaveGame->DoorStates)
+	{
+		if (State.DoorId == MyId)
+		{
+			bIsOpen = State.bIsOpen;
+			bIsLocked = State.bIsLocked;
+			CurrentAngle = State.CurrentAngle;
+			OpenDirection = State.OpenDirection;
+			TargetAngle = bIsOpen ? (OpenAngle * OpenDirection) : 0.0f;
+
+			// Snap door mesh to saved rotation (no interpolation on load)
+			if (DoorMesh)
+			{
+				DoorMesh->SetRelativeRotation(FRotator(0.0f, CurrentAngle, 0.0f));
+			}
+
+			// Update interaction text to match state
+			InteractionText = bIsOpen
+				? NSLOCTEXT("Interaction", "DoorClose", "Close")
+				: NSLOCTEXT("Interaction", "DoorOpen", "Open");
+
+			UE_LOG(LogSerene, Verbose, TEXT("ADoorActor [%s]: Restored from save (open=%d, locked=%d, angle=%.1f)"),
+				*MyId.ToString(), bIsOpen, bIsLocked, CurrentAngle);
+			return;
+		}
 	}
 }

@@ -4,6 +4,7 @@
 
 #include "Inventory/InventoryComponent.h"
 #include "Inventory/ItemDataAsset.h"
+#include "Save/SaveSubsystem.h"
 #include "Tags/SereneTags.h"
 #include "Core/SereneLogChannels.h"
 #include "Engine/AssetManager.h"
@@ -128,6 +129,14 @@ void APickupActor::OnInteract_Implementation(AActor* Interactor)
 
 		if (bDestroyOnPickup)
 		{
+			// Notify save subsystem before destruction so reload can re-destroy this pickup
+			if (UGameInstance* GI = GetGameInstance())
+			{
+				if (USaveSubsystem* SaveSys = GI->GetSubsystem<USaveSubsystem>())
+				{
+					SaveSys->TrackDestroyedPickup(GetFName());
+				}
+			}
 			Destroy();
 		}
 	}
@@ -173,4 +182,25 @@ void APickupActor::InitFromItemData(FName InItemId, int32 InQuantity, const UIte
 
 	UE_LOG(LogSerene, Log, TEXT("APickupActor::InitFromItemData - Initialized with ItemId=%s, Quantity=%d"),
 		*InItemId.ToString(), InQuantity);
+}
+
+// ---------------------------------------------------------------------------
+// ISaveable
+// ---------------------------------------------------------------------------
+
+FName APickupActor::GetSaveId_Implementation() const
+{
+	return GetFName();
+}
+
+void APickupActor::WriteSaveData_Implementation(USereneSaveGame* SaveGame)
+{
+	// Pickup destruction is tracked by SaveSubsystem::DestroyedPickupTracker,
+	// not by individual actor write. No-op.
+}
+
+void APickupActor::ReadSaveData_Implementation(USereneSaveGame* SaveGame)
+{
+	// Pickup destruction is handled by SaveSubsystem::ApplyPendingSaveData
+	// which destroys pickups by FName. No-op.
 }

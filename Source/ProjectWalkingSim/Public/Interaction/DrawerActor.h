@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Interaction/InteractableBase.h"
+#include "Interaction/SaveableInterface.h"
 #include "DrawerActor.generated.h"
 
 /**
@@ -16,7 +17,7 @@
  * Uses tick-based FInterpTo for smooth slide animation.
  */
 UCLASS()
-class PROJECTWALKINGSIM_API ADrawerActor : public AInteractableBase
+class PROJECTWALKINGSIM_API ADrawerActor : public AInteractableBase, public ISaveable
 {
 	GENERATED_BODY()
 
@@ -24,6 +25,11 @@ public:
 	ADrawerActor();
 
 	virtual void Tick(float DeltaTime) override;
+
+	// --- ISaveable ---
+	virtual FName GetSaveId_Implementation() const override;
+	virtual void WriteSaveData_Implementation(USereneSaveGame* SaveGame) override;
+	virtual void ReadSaveData_Implementation(USereneSaveGame* SaveGame) override;
 
 protected:
 	virtual void OnInteract_Implementation(AActor* Interactor) override;

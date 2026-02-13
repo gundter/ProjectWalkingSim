@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Interaction/InteractableBase.h"
+#include "Interaction/SaveableInterface.h"
 #include "PickupActor.generated.h"
 
 class UItemDataAsset;
@@ -19,7 +20,7 @@ class UItemDataAsset;
  * physical item in the world.
  */
 UCLASS()
-class PROJECTWALKINGSIM_API APickupActor : public AInteractableBase
+class PROJECTWALKINGSIM_API APickupActor : public AInteractableBase, public ISaveable
 {
 	GENERATED_BODY()
 
@@ -52,6 +53,11 @@ protected:
 	/** If true, the actor is destroyed after successful pickup. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pickup")
 	bool bDestroyOnPickup = true;
+
+	// --- ISaveable ---
+	virtual FName GetSaveId_Implementation() const override;
+	virtual void WriteSaveData_Implementation(USereneSaveGame* SaveGame) override;
+	virtual void ReadSaveData_Implementation(USereneSaveGame* SaveGame) override;
 
 private:
 	/** Cached state from CanInteract for GetInteractionText. Mutable because CanInteract is const. */

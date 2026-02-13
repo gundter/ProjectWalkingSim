@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Interaction/InteractableBase.h"
+#include "Interaction/SaveableInterface.h"
 #include "DoorActor.generated.h"
 
 /**
@@ -19,7 +20,7 @@
  * Uses tick-based FInterpTo for smooth rotation animation.
  */
 UCLASS()
-class PROJECTWALKINGSIM_API ADoorActor : public AInteractableBase
+class PROJECTWALKINGSIM_API ADoorActor : public AInteractableBase, public ISaveable
 {
 	GENERATED_BODY()
 
@@ -82,4 +83,9 @@ public:
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Door")
 	void OpenForAI(AActor* AIActor);
+
+	// --- ISaveable ---
+	virtual FName GetSaveId_Implementation() const override;
+	virtual void WriteSaveData_Implementation(USereneSaveGame* SaveGame) override;
+	virtual void ReadSaveData_Implementation(USereneSaveGame* SaveGame) override;
 };

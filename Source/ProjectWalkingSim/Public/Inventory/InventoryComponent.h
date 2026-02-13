@@ -144,6 +144,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool TryCombineItems(int32 SlotIndexA, int32 SlotIndexB);
 
+	/**
+	 * Restore inventory from saved data. Replaces all current slots.
+	 * Broadcasts OnInventoryChanged after restoration.
+	 * @param SavedSlots Array of saved inventory slots to restore
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void RestoreSavedInventory(const TArray<FInventorySlot>& SavedSlots);
+
 	// --- Delegates ---
 
 	/** Broadcast when any slot changes (add, remove, modify). */
