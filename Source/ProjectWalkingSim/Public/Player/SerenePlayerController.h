@@ -143,5 +143,8 @@ private:
 	TObjectPtr<UPauseMenuWidget> PauseMenuInstance;
 
 	void HandlePause(const FInputActionValue& Value);
+
+	/** Callback for pause menu OnPauseMenuClosed delegate. Must be UFUNCTION for AddDynamic. */
+	UFUNCTION()
 	void HandlePauseMenuClosed();
 };

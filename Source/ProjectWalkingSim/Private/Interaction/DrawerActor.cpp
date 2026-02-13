@@ -19,6 +19,18 @@ ADrawerActor::ADrawerActor()
 	InteractionTag = SereneTags::TAG_Interaction_Drawer;
 }
 
+void ADrawerActor::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Cache the drawer mesh's initial relative location so Tick and ReadSaveData
+	// can offset from it correctly (supports Blueprint-placed mesh offsets).
+	if (DrawerMesh)
+	{
+		DrawerInitialLocation = DrawerMesh->GetRelativeLocation();
+	}
+}
+
 void ADrawerActor::OnInteract_Implementation(AActor* Interactor)
 {
 	bIsOpen = !bIsOpen;

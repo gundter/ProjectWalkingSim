@@ -24,6 +24,7 @@ class PROJECTWALKINGSIM_API ADrawerActor : public AInteractableBase, public ISav
 public:
 	ADrawerActor();
 
+	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
 	// --- ISaveable ---
@@ -53,6 +54,6 @@ private:
 	/** Current interpolated slide position. */
 	float CurrentSlide = 0.0f;
 
-	/** Initial relative location of the DrawerMesh, cached on construction. */
+	/** Initial relative location of the DrawerMesh, cached in BeginPlay. */
 	FVector DrawerInitialLocation = FVector::ZeroVector;
 };
