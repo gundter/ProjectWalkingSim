@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 7 in progress (Save System) -- Plans 07-01 and 07-02 complete. ISaveable actors + death system + GameMode load flow wired.
+**Current Focus:** Phase 7 in progress (Save System) -- Plans 07-01, 07-02, 07-03 complete. Save UI widgets built.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 7 of 8 (Save System)
-**Plan:** 2 of 4 complete (07-01, 07-02)
+**Plan:** 3 of 4 complete (07-01, 07-02, 07-03)
 **Status:** In progress
-**Last activity:** 2026-02-12 - Completed 07-02-PLAN.md (ISaveable Actors + Death System)
+**Last activity:** 2026-02-12 - Completed 07-03-PLAN.md (Game Over Widget + Save/Load UI)
 
 **Progress:**
 ```
@@ -35,7 +35,7 @@ Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
 Phase 6: [#####] 5/5 plans complete
-Phase 7: [##..] 2/4 plans complete (07-01, 07-02)
+Phase 7: [###.] 3/4 plans complete (07-01, 07-02, 07-03)
 Overall: [██████░.] 6/8 phases complete
 ```
 
@@ -81,6 +81,7 @@ Overall: [██████░.] 6/8 phases complete
 | 6-05  | 5/5   | 3/3*  | ~5m  | 0      |
 | 7-01  | 1/4   | 2/2   | ~10m | 1      |
 | 7-02  | 2/4   | 2/2   | ~8m  | 1      |
+| 7-03  | 3/4   | 2/2   | ~9m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -191,6 +192,9 @@ Overall: [██████░.] 6/8 phases complete
 | PickupActor ISaveable methods are no-ops | Destruction tracked centrally by SaveSubsystem, not per-actor | 07-02 |
 | OnActorsInitialized for save data application | InitGame too early; OnActorsInitialized fires after all actors spawned | 07-02 |
 | OnPlayerDeath replaces RestartLevel | Death goes through GameMode -> Game Over widget -> save system | 07-02 |
+| Forward-declare FSaveSlotInfo in SaveSlotWidget.h | Include only in .cpp; struct passed by const ref so forward decl works | 07-03 |
+| ConfirmOverlay as UWidget not UOverlay | UMG Blueprint designer can use any container for confirmation prompt | 07-03 |
+| FOnSaveSlotClicked distinct from FOnSlotClicked | Avoids name collision with InventorySlotWidget delegate | 07-03 |
 
 ### Technical Discoveries
 
@@ -252,14 +256,14 @@ None -- Phase 7 in progress.
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 07-02-PLAN.md: ISaveable Actors + Death System + Load Flow
-- Task 1: ISaveable interface expanded; DoorActor/PickupActor/DrawerActor implement WriteSaveData/ReadSaveData
-- Task 2: SereneGameMode::OnPlayerDeath + InitGame load flow + STT_GrabAttack replacement + GameOverWidget
-- All tasks compiled and committed
+- Executed 07-03-PLAN.md: Game Over Widget + Save/Load UI
+- Task 1: UGameOverWidget with BindWidget for GameOverText, LoadLastSaveButton, QuitButton; dynamic "Load Last Save" / "Restart" text
+- Task 2: USaveSlotWidget (JPEG thumbnail reconstruction, timestamp display) + USaveLoadMenuWidget (3-slot dual-mode menu with overwrite confirmation)
+- Both tasks compiled and committed
 
-**Stopped at:** Completed 07-02-PLAN.md
+**Stopped at:** Completed 07-03-PLAN.md
 
-**Next:** 07-03-PLAN.md (Save/Load UI)
+**Next:** 07-04-PLAN.md (Tape recorder save point actor + pause menu integration)
 
 ### Context for Next Session
 
@@ -272,10 +276,10 @@ The roadmap has 8 phases:
 4. Monster AI Core - State Tree, patrol, perception COMPLETE
 5. Monster Behaviors - Chase, investigate, search, spawns COMPLETE
 6. Light and Audio - Flashlight, Lumen, spatial audio COMPLETE
-7. Save System - IN PROGRESS (2/4 plans complete)
+7. Save System - IN PROGRESS (3/4 plans complete)
 8. Demo Polish - Environment, story, optimization
 
-Phase 7 plans 01-02 complete. The save system now has:
+Phase 7 plans 01-03 complete. The save system now has:
 - SaveTypes.h: FSavedDoorState, FSavedDrawerState, FSaveSlotInfo data structures
 - USereneSaveGame: USaveGame subclass with player state, inventory, world state fields
 - USaveSubsystem: UGameInstanceSubsystem with full save/load orchestration
@@ -284,19 +288,22 @@ Phase 7 plans 01-02 complete. The save system now has:
   - Destroyed pickup tracking at runtime
   - Level restart load flow with pending data pattern
 - ISaveable interface expanded on DoorActor, PickupActor, DrawerActor
-- SaveSubsystem GatherWorldState/ApplyPendingSaveData uses ISaveable interface
 - Death pipeline: GrabAttack -> GameMode::OnPlayerDeath -> Game Over widget -> LoadLatestSave/Restart
 - GameMode::InitGame hooks OnActorsInitialized for post-reload save data application
-- InventoryComponent::RestoreSavedInventory for save-load inventory restoration
-- UGameOverWidget with Load Last Save / Restart / Quit buttons
+- UGameOverWidget: death screen with Load Last Save / Restart / Quit
+- USaveSlotWidget: individual slot display with JPEG thumbnail reconstruction
+- USaveLoadMenuWidget: 3-slot menu for Save and Load modes with overwrite confirmation
+- ESaveLoadMode enum (Save/Load) for dual-mode menu operation
 
 **Remaining Phase 7 plans:**
-- 07-03: Save/Load UI (save slot picker widget)
 - 07-04: Tape recorder save point actor + pause menu integration
 
-**User action needed:** Create WBP_GameOver Blueprint in editor (reparent to UGameOverWidget), add BindWidget elements, assign to SereneGameMode's GameOverWidgetClass.
+**User action needed:** Create UMG Blueprints in editor:
+- WBP_GameOver (reparent to UGameOverWidget)
+- WBP_SaveSlot (reparent to USaveSlotWidget)
+- WBP_SaveLoadMenu (reparent to USaveLoadMenuWidget)
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (07-02 complete)*
+*Last updated: 2026-02-12 (07-03 complete)*
