@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 8 in progress (Demo Polish) -- Plans 08-01 and 08-02 complete. Storytelling UI (DocumentReaderWidget + InspectableActor) ready.
+**Current Focus:** Phase 8 in progress (Demo Polish) -- Plans 08-01 through 08-03 complete. Controller wiring done (ReadableActor->DocumentReaderWidget, input guards).
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 8 of 8 (Demo Polish)
-**Plan:** 2 of 5 complete (08-01, 08-02)
+**Plan:** 3 of 5 complete (08-01, 08-02, 08-03)
 **Status:** In progress
-**Last activity:** 2026-02-13 - Completed 08-02-PLAN.md (Storytelling UI)
+**Last activity:** 2026-02-13 - Completed 08-03-PLAN.md (Controller Wiring)
 
 **Progress:**
 ```
@@ -36,8 +36,8 @@ Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
 Phase 6: [#####] 5/5 plans complete
 Phase 7: [####] 4/4 plans complete
-Phase 8: [##---] 2/5 plans complete
-Overall: [███████░] 7.4/8 phases complete
+Phase 8: [###--] 3/5 plans complete
+Overall: [███████░] 7.6/8 phases complete
 ```
 
 ---
@@ -86,6 +86,7 @@ Overall: [███████░] 7.4/8 phases complete
 | 7-04  | 4/4   | 2/2   | ~10m | 0      |
 | 8-01  | 1/5   | 2/2   | ~4m  | 0      |
 | 8-02  | 2/5   | 2/2   | ~3m  | 0      |
+| 8-03  | 3/5   | 2/2   | ~3m  | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -209,6 +210,8 @@ Overall: [███████░] 7.4/8 phases complete
 | DocumentReaderWidget created per-use, not pre-created | Avoids stale state; each interaction gets fresh widget instance | 08-02 |
 | E and Esc both close DocumentReaderWidget | E matches interaction key, Esc is universal close; keyboard-driven, no mouse cursor | 08-02 |
 | Dual-mode widget: ShowDocument/ShowInspection | Single widget handles both readable documents and inspectable objects | 08-02 |
+| Widget self-manages SetDocumentOpen on controller | Keeps state management in DocumentReaderWidget, no per-actor wiring needed | 08-03 |
+| Defense-in-depth input guards for document overlay | Widget NativeOnKeyDown + controller bIsDocumentOpen both block conflicting input | 08-03 |
 
 ### Technical Discoveries
 
@@ -273,14 +276,15 @@ None -- Phase 8 in progress.
 
 **Date:** 2026-02-13
 **Completed:**
-- Executed 08-02-PLAN.md (Storytelling UI: DocumentReaderWidget + InspectableActor)
+- Executed 08-03-PLAN.md (Controller Wiring: ReadableActor + document-open guards)
 - 2 tasks, 2 commits, zero deviations
-- DocumentReaderWidget: dual-mode full-screen reader (document + inspection)
-- InspectableActor: story object examination with image, text, one-time monologue
+- ReadableActor wired to DocumentReaderWidget (CreateWidget + ShowDocument on interact)
+- Controller bIsDocumentOpen guards on HandlePause, HandleToggleInventory, HandleInteract
+- DocumentReaderWidget self-manages controller state via SetDocumentOpen
 
-**Stopped at:** Phase 8 plan 2 of 5 complete
+**Stopped at:** Phase 8 plan 3 of 5 complete
 
-**Next:** Continue Phase 8 plans 03-05 (controller wiring, demo level, optimization)
+**Next:** Continue Phase 8 plans 04-05 (demo level, optimization)
 
 ### Context for Next Session
 
@@ -328,4 +332,4 @@ Phase 7 is now fully implemented:
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-13 (Phase 8 plan 02 complete)*
+*Last updated: 2026-02-13 (Phase 8 plan 03 complete)*
