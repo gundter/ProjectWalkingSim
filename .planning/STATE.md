@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 7 in progress (Save System) -- Plans 07-01, 07-02, 07-03 complete. Save UI widgets built.
+**Current Focus:** Phase 7 complete (Save System) -- All 4 plans done. Performance audit pending before phase marked complete.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 7 of 8 (Save System)
-**Plan:** 3 of 4 complete (07-01, 07-02, 07-03)
-**Status:** In progress
-**Last activity:** 2026-02-12 - Completed 07-03-PLAN.md (Game Over Widget + Save/Load UI)
+**Plan:** 4 of 4 complete (07-01, 07-02, 07-03, 07-04)
+**Status:** Phase complete (audit pending)
+**Last activity:** 2026-02-12 - Completed 07-04-PLAN.md (Tape Recorder Save Point + Pause Menu)
 
 **Progress:**
 ```
@@ -35,8 +35,8 @@ Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
 Phase 6: [#####] 5/5 plans complete
-Phase 7: [###.] 3/4 plans complete (07-01, 07-02, 07-03)
-Overall: [██████░.] 6/8 phases complete
+Phase 7: [####] 4/4 plans complete
+Overall: [███████░] 7/8 phases complete
 ```
 
 ---
@@ -82,6 +82,7 @@ Overall: [██████░.] 6/8 phases complete
 | 7-01  | 1/4   | 2/2   | ~10m | 1      |
 | 7-02  | 2/4   | 2/2   | ~8m  | 1      |
 | 7-03  | 3/4   | 2/2   | ~9m  | 0      |
+| 7-04  | 4/4   | 2/2   | ~10m | 0      |
 
 *Checkpoint tasks require human verification
 
@@ -195,6 +196,10 @@ Overall: [██████░.] 6/8 phases complete
 | Forward-declare FSaveSlotInfo in SaveSlotWidget.h | Include only in .cpp; struct passed by const ref so forward decl works | 07-03 |
 | ConfirmOverlay as UWidget not UOverlay | UMG Blueprint designer can use any container for confirmation prompt | 07-03 |
 | FOnSaveSlotClicked distinct from FOnSlotClicked | Avoids name collision with InventorySlotWidget delegate | 07-03 |
+| PauseMenuWidget managed by PlayerController | Controller owns input mode and pause state; cleaner than HUD ownership | 07-04 |
+| Esc context-sensitive: inventory close vs pause | Natural UX: single escape key handles all overlay dismissal | 07-04 |
+| SetPendingSaveLocation API on SaveSubsystem | Decouples tape recorder from save internals; respawn at save point | 07-04 |
+| Pause blocked during hiding and Game Over | Prevents invalid state combinations; hiding has own interaction model | 07-04 |
 
 ### Technical Discoveries
 
@@ -246,7 +251,7 @@ Overall: [██████░.] 6/8 phases complete
 
 ### Blockers
 
-None -- Phase 7 in progress.
+None -- Phase 7 plans complete, audit pending.
 
 ---
 
@@ -256,14 +261,15 @@ None -- Phase 7 in progress.
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 07-03-PLAN.md: Game Over Widget + Save/Load UI
-- Task 1: UGameOverWidget with BindWidget for GameOverText, LoadLastSaveButton, QuitButton; dynamic "Load Last Save" / "Restart" text
-- Task 2: USaveSlotWidget (JPEG thumbnail reconstruction, timestamp display) + USaveLoadMenuWidget (3-slot dual-mode menu with overwrite confirmation)
+- Executed 07-04-PLAN.md: Tape Recorder Save Point + Pause Menu Integration
+- Task 1: ATapeRecorderActor (world save point with IInteractable) + SaveSubsystem SetPendingSaveLocation/ClearPendingSaveLocation API
+- Task 2: UPauseMenuWidget (Continue/Load/Resume/Quit) + Esc binding on PlayerController + SereneGameMode::IsGameOver()
 - Both tasks compiled and committed
+- Phase 7 (Save System) all 4 plans complete
 
-**Stopped at:** Completed 07-03-PLAN.md
+**Stopped at:** Completed 07-04-PLAN.md (Phase 7 plans complete)
 
-**Next:** 07-04-PLAN.md (Tape recorder save point actor + pause menu integration)
+**Next:** Performance audit for Phase 7, then Phase 8 (Demo Polish)
 
 ### Context for Next Session
 
@@ -276,10 +282,10 @@ The roadmap has 8 phases:
 4. Monster AI Core - State Tree, patrol, perception COMPLETE
 5. Monster Behaviors - Chase, investigate, search, spawns COMPLETE
 6. Light and Audio - Flashlight, Lumen, spatial audio COMPLETE
-7. Save System - IN PROGRESS (3/4 plans complete)
+7. Save System - COMPLETE (all 4 plans, audit pending)
 8. Demo Polish - Environment, story, optimization
 
-Phase 7 plans 01-03 complete. The save system now has:
+Phase 7 is now fully implemented:
 - SaveTypes.h: FSavedDoorState, FSavedDrawerState, FSaveSlotInfo data structures
 - USereneSaveGame: USaveGame subclass with player state, inventory, world state fields
 - USaveSubsystem: UGameInstanceSubsystem with full save/load orchestration
@@ -287,23 +293,28 @@ Phase 7 plans 01-03 complete. The save system now has:
   - Async screenshot capture with JPEG compression
   - Destroyed pickup tracking at runtime
   - Level restart load flow with pending data pattern
-- ISaveable interface expanded on DoorActor, PickupActor, DrawerActor
+  - SetPendingSaveLocation/ClearPendingSaveLocation for tape recorder position override
+- ISaveable interface on DoorActor, PickupActor, DrawerActor
 - Death pipeline: GrabAttack -> GameMode::OnPlayerDeath -> Game Over widget -> LoadLatestSave/Restart
 - GameMode::InitGame hooks OnActorsInitialized for post-reload save data application
+- GameMode::IsGameOver() state query
 - UGameOverWidget: death screen with Load Last Save / Restart / Quit
 - USaveSlotWidget: individual slot display with JPEG thumbnail reconstruction
 - USaveLoadMenuWidget: 3-slot menu for Save and Load modes with overwrite confirmation
-- ESaveLoadMode enum (Save/Load) for dual-mode menu operation
+- ATapeRecorderActor: world-placed save point opening SaveLoadMenuWidget in Save mode
+- UPauseMenuWidget: Esc pause menu with Continue/Load Game/Resume/Quit
+- Esc key context-sensitive: closes inventory if open, otherwise toggles pause
 
-**Remaining Phase 7 plans:**
-- 07-04: Tape recorder save point actor + pause menu integration
-
-**User action needed:** Create UMG Blueprints in editor:
+**User action needed:** Create UMG Blueprints + input actions in editor:
 - WBP_GameOver (reparent to UGameOverWidget)
 - WBP_SaveSlot (reparent to USaveSlotWidget)
 - WBP_SaveLoadMenu (reparent to USaveLoadMenuWidget)
+- WBP_PauseMenu (reparent to UPauseMenuWidget)
+- IA_Pause input action (Esc key, Started trigger)
+- Assign IA_Pause to BP_SerenePlayerController PauseAction property
+- Assign PauseMenuWidgetClass, SaveMenuWidgetClass, LoadMenuWidgetClass to relevant actors/widgets
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (07-03 complete)*
+*Last updated: 2026-02-12 (07-04 complete, Phase 7 plans done)*
