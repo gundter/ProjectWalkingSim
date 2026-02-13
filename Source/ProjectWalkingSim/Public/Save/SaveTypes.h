@@ -9,7 +9,7 @@
  * Serializable state snapshot of a single door actor.
  * Stored as flat array in USereneSaveGame for level-placed doors.
  */
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FSavedDoorState
 {
 	GENERATED_BODY()
@@ -35,7 +35,7 @@ struct FSavedDoorState
  * Serializable state snapshot of a single drawer actor.
  * Stored as flat array in USereneSaveGame for level-placed drawers.
  */
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FSavedDrawerState
 {
 	GENERATED_BODY()
@@ -55,7 +55,7 @@ struct FSavedDrawerState
  * Metadata for a single save slot.
  * Displayed in the save/load UI: screenshot thumbnail + timestamp.
  */
-USTRUCT()
+USTRUCT(BlueprintType)
 struct FSaveSlotInfo
 {
 	GENERATED_BODY()
