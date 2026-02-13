@@ -36,6 +36,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Game")
 	void OnPlayerDeath();
 
+	/** Returns true if the Game Over screen is currently displayed. */
+	UFUNCTION(BlueprintCallable, Category = "Game")
+	bool IsGameOver() const { return GameOverWidgetInstance != nullptr; }
+
 protected:
 	/** Blueprint subclass of UGameOverWidget to spawn on player death. */
 	UPROPERTY(EditDefaultsOnly, Category = "UI")

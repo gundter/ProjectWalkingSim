@@ -13,6 +13,7 @@ class ASereneHUD;
 class ULeanComponent;
 class UHidingComponent;
 class UInteractionComponent;
+class UPauseMenuWidget;
 struct FInputActionValue;
 
 /**
@@ -38,6 +39,9 @@ class PROJECTWALKINGSIM_API ASerenePlayerController : public APlayerController
 public:
 	/** Close the inventory UI. Public so widgets can call it for Tab key handling. */
 	void CloseInventory();
+
+	/** Toggle the pause menu on/off. Can be called externally. */
+	void TogglePauseMenu();
 
 protected:
 	virtual void BeginPlay() override;
@@ -82,6 +86,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	TObjectPtr<UInputAction> ToggleInventoryAction;
 
+	/** Bool: Esc key to toggle pause menu. */
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	TObjectPtr<UInputAction> PauseAction;
+
+	/** Blueprint subclass of UPauseMenuWidget. */
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UPauseMenuWidget> PauseMenuWidgetClass;
+
 private:
 	// --- Input Handlers ---
 
@@ -120,4 +132,16 @@ private:
 
 	void HandleToggleInventory(const FInputActionValue& Value);
 	void OpenInventory();
+
+	// --- Pause Menu ---
+
+	/** Whether the pause menu is currently open. */
+	bool bIsPaused = false;
+
+	/** Live instance of the pause menu widget. */
+	UPROPERTY()
+	TObjectPtr<UPauseMenuWidget> PauseMenuInstance;
+
+	void HandlePause(const FInputActionValue& Value);
+	void HandlePauseMenuClosed();
 };

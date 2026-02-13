@@ -10,8 +10,13 @@
 #include "Player/Components/LeanComponent.h"
 #include "Hiding/HidingComponent.h"
 #include "Player/HUD/SereneHUD.h"
+#include "Player/HUD/PauseMenuWidget.h"
 #include "Core/SereneLogChannels.h"
 #include "Core/SereneGameInstance.h"
+#include "Core/SereneGameMode.h"
+#include "Hiding/HidingTypes.h"
+#include "Save/SaveSubsystem.h"
+#include "Kismet/GameplayStatics.h"
 
 void ASerenePlayerController::BeginPlay()
 {
@@ -108,6 +113,13 @@ void ASerenePlayerController::SetupInputComponent()
 	{
 		EnhancedInput->BindAction(ToggleInventoryAction, ETriggerEvent::Started,
 			this, &ASerenePlayerController::HandleToggleInventory);
+	}
+
+	// Pause (Esc)
+	if (PauseAction)
+	{
+		EnhancedInput->BindAction(PauseAction, ETriggerEvent::Started,
+			this, &ASerenePlayerController::HandlePause);
 	}
 
 	UE_LOG(LogSerene, Log, TEXT("ASerenePlayerController::SetupInputComponent - Enhanced Input bindings configured."));
@@ -318,4 +330,103 @@ void ASerenePlayerController::CloseInventory()
 	}
 
 	UE_LOG(LogSerene, Verbose, TEXT("ASerenePlayerController::CloseInventory - Inventory closed, input mode set to GameOnly."));
+}
+
+// ---------------------------------------------------------------------------
+// Pause Menu
+// ---------------------------------------------------------------------------
+
+void ASerenePlayerController::HandlePause(const FInputActionValue& Value)
+{
+	// Esc while inventory is open closes inventory instead
+	if (bIsInventoryOpen)
+	{
+		CloseInventory();
+		return;
+	}
+
+	TogglePauseMenu();
+}
+
+void ASerenePlayerController::TogglePauseMenu()
+{
+	if (bIsPaused)
+	{
+		// Close pause menu
+		bIsPaused = false;
+
+		if (PauseMenuInstance)
+		{
+			PauseMenuInstance->RemoveFromParent();
+			PauseMenuInstance = nullptr;
+		}
+
+		SetShowMouseCursor(false);
+
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+
+		UGameplayStatics::SetGamePaused(GetWorld(), false);
+
+		UE_LOG(LogSerene, Log, TEXT("ASerenePlayerController::TogglePauseMenu - Unpaused"));
+	}
+	else
+	{
+		// Guard: don't open pause while hiding
+		if (CachedHidingComponent && CachedHidingComponent->GetHidingState() != EHidingState::Free)
+		{
+			return;
+		}
+
+		// Guard: don't open pause during Game Over
+		ASereneGameMode* GM = Cast<ASereneGameMode>(GetWorld()->GetAuthGameMode());
+		if (GM && GM->IsGameOver())
+		{
+			return;
+		}
+
+		// Open pause menu
+		bIsPaused = true;
+
+		if (!PauseMenuInstance && PauseMenuWidgetClass)
+		{
+			PauseMenuInstance = CreateWidget<UPauseMenuWidget>(this, PauseMenuWidgetClass);
+		}
+
+		if (PauseMenuInstance)
+		{
+			PauseMenuInstance->AddToViewport(90);
+			PauseMenuInstance->OnPauseMenuClosed.AddDynamic(this, &ASerenePlayerController::HandlePauseMenuClosed);
+		}
+
+		SetShowMouseCursor(true);
+
+		FInputModeGameAndUI InputMode;
+		InputMode.SetHideCursorDuringCapture(false);
+		SetInputMode(InputMode);
+
+		UGameplayStatics::SetGamePaused(GetWorld(), true);
+
+		UE_LOG(LogSerene, Log, TEXT("ASerenePlayerController::TogglePauseMenu - Paused"));
+	}
+}
+
+void ASerenePlayerController::HandlePauseMenuClosed()
+{
+	bIsPaused = false;
+
+	if (PauseMenuInstance)
+	{
+		PauseMenuInstance->RemoveFromParent();
+		PauseMenuInstance = nullptr;
+	}
+
+	SetShowMouseCursor(false);
+
+	FInputModeGameOnly InputMode;
+	SetInputMode(InputMode);
+
+	UGameplayStatics::SetGamePaused(GetWorld(), false);
+
+	UE_LOG(LogSerene, Log, TEXT("ASerenePlayerController::HandlePauseMenuClosed - Resumed"));
 }
