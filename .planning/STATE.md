@@ -8,7 +8,7 @@
 
 **Core Value:** The player must feel the dread of being hunted while slowly questioning their own reality and identity.
 
-**Current Focus:** Phase 6 complete (Light and Audio) -- All 5 plans executed, verified, audited. Ready for Phase 7 (Save System).
+**Current Focus:** Phase 7 in progress (Save System) -- Plan 07-01 complete. Save data types + SaveSubsystem foundation built.
 
 **Key Constraints:**
 - Engine: Unreal Engine 5.7.2
@@ -22,10 +22,10 @@
 
 ## Current Position
 
-**Phase:** 6 of 8 (Light and Audio)
-**Plan:** 5 of 5 complete (06-01, 06-02, 06-03, 06-04, 06-05)
-**Status:** Phase complete, verified ✓, audited ✓
-**Last activity:** 2026-02-12 - Completed 06-05-PLAN.md (System Integration + Lumen/MegaLights)
+**Phase:** 7 of 8 (Save System)
+**Plan:** 1 of 4 complete (07-01)
+**Status:** In progress
+**Last activity:** 2026-02-12 - Completed 07-01-PLAN.md (Save Data Foundation)
 
 **Progress:**
 ```
@@ -34,7 +34,8 @@ Phase 2: [######] 6/6 plans complete
 Phase 3: [######] 6/6 plans complete
 Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
-Phase 6: [#####] 5/5 plans complete (06-01, 06-02, 06-03, 06-04, 06-05)
+Phase 6: [#####] 5/5 plans complete
+Phase 7: [#...] 1/4 plans complete (07-01)
 Overall: [██████░.] 6/8 phases complete
 ```
 
@@ -78,6 +79,7 @@ Overall: [██████░.] 6/8 phases complete
 | 6-03  | 4/5   | 2/2   | ~9m  | 0      |
 | 6-04  | 1/5   | 2/2   | ~4m  | 0      |
 | 6-05  | 5/5   | 3/3*  | ~5m  | 0      |
+| 7-01  | 1/4   | 2/2   | ~10m | 1      |
 
 *Checkpoint tasks require human verification
 
@@ -179,6 +181,10 @@ Overall: [██████░.] 6/8 phases complete
 | MusicTensionSystem on Wendigo for demo | Single-level single-Wendigo demo; move to world subsystem for multi-Wendigo | 06-05 |
 | FlashlightSuspicionScore 0.3f for ~2s beam-to-Alert | 1.0f causes instant aggro (~0.5s); 0.3f gives meaningful gameplay tension | 06-05 |
 | MegaLights enabled (r.MegaLights=1) | Runtime enable alongside EnableForProject=True for enhanced light rendering | 06-05 |
+| Flat struct arrays in USaveGame | Known limited state types don't warrant per-actor binary serialization complexity | 07-01 |
+| FImageUtils::CompressImage with "jpg" for screenshots | CompressImageArray deprecated; CompressImage with FImageView is current UE5 API | 07-01 |
+| GetPendingSaveData() accessor on SaveSubsystem | Character/controller can independently restore inventory, solving BeginPlay timing | 07-01 |
+| BlueprintType on all save structs | UHT requires BlueprintType for structs returned by BlueprintCallable functions | 07-01 |
 
 ### Technical Discoveries
 
@@ -206,6 +212,7 @@ Overall: [██████░.] 6/8 phases complete
 | UE5.7 SpawnActor<T> with UClass requires references not pointers | 4-arg overload: SpawnActor<T>(UClass*, FVector const&, FRotator const&, FActorSpawnParameters); pass values not &GetActorTransform() | 05-03 |
 | Wave-parallel execution can pre-implement entire plan tasks | 05-02 committed WendigoSpawnPoint + OpenForAI + SetPatrolRoute which was Task 1 of 05-04 | 05-04 |
 | WendigoAIController.cpp needs HidingSpotActor.h for upcast | AActor* WitnessedHidingSpot needs full type include in .cpp for implicit upcast; forward decl insufficient | 05-05 |
+| UHT rejects non-BlueprintType structs as BlueprintCallable return types | FSaveSlotInfo returned by GetSlotInfo needs BlueprintType specifier; UHT fails before compilation | 07-01 |
 
 ### TODOs
 
@@ -229,7 +236,7 @@ Overall: [██████░.] 6/8 phases complete
 
 ### Blockers
 
-None -- Phase 6 complete.
+None -- Phase 7 in progress.
 
 ---
 
@@ -239,15 +246,14 @@ None -- Phase 6 complete.
 
 **Date:** 2026-02-12
 **Completed:**
-- Executed 06-05-PLAN.md: System Integration + Lumen/MegaLights Configuration
-- Task 1 (wire components): FlashlightComponent + PlayerAudioComponent on SereneCharacter, MonsterAudioComponent + MusicTensionSystem on WendigoCharacter
-- Task 2 (flashlight AI detection): periodic cone trace with tunable 0.3f suspicion score
-- Task 3 (Lumen/MegaLights settings): Verified all Lumen GI settings, added r.MegaLights=1 runtime enable
-- Phase 6 all 5 plans complete
+- Executed 07-01-PLAN.md: Save Data Foundation
+- Task 1: SaveTypes.h (FSavedDoorState, FSavedDrawerState, FSaveSlotInfo) + SereneSaveGame.h (USereneSaveGame : USaveGame)
+- Task 2: SaveSubsystem.h/cpp (USaveSubsystem : UGameInstanceSubsystem) with save/load/screenshot API
+- Both tasks compiled and committed
 
-**Stopped at:** Completed 06-05-PLAN.md (final plan in Phase 6)
+**Stopped at:** Completed 07-01-PLAN.md
 
-**Next:** Performance audit for Phase 6, then Phase 7 planning (Save System)
+**Next:** 07-02-PLAN.md (ISaveable expansion + actor implementations + death system + GameMode load flow)
 
 ### Context for Next Session
 
@@ -260,27 +266,24 @@ The roadmap has 8 phases:
 4. Monster AI Core - State Tree, patrol, perception COMPLETE
 5. Monster Behaviors - Chase, investigate, search, spawns COMPLETE
 6. Light and Audio - Flashlight, Lumen, spatial audio COMPLETE
-7. Save System - Checkpoints and manual saves
+7. Save System - IN PROGRESS (1/4 plans complete)
 8. Demo Polish - Environment, story, optimization
 
-Phase 6 complete. The project now has:
-- All Phase 1-5 features (character, movement, interaction, HUD, inventory, hiding, AI core, monster behaviors)
-- Complete atmosphere system:
-  - FlashlightComponent: narrow-cone spotlight on player camera with Lumen GI bounce
-  - MonsterAudioComponent: behavior-state-driven breathing, footsteps, vocalizations (3D spatial)
-  - MusicTensionSystem: 3-layer crossfade music driven by alert level with stingers
-  - AmbientAudioManager: continuous ambient bed + randomized one-shots + predator silence
-  - PlayerAudioComponent: surface-aware footsteps + heartbeat proximity to Wendigo
-  - Flashlight AI detection: cone trace raises suspicion at tunable rate (0.3f)
-- Rendering pipeline: Lumen GI + MegaLights + Virtual Shadow Maps + HW ray tracing
-- 23/29 v1 requirements complete
+Phase 7 plan 01 complete. The save system now has:
+- SaveTypes.h: FSavedDoorState, FSavedDrawerState, FSaveSlotInfo data structures
+- USereneSaveGame: USaveGame subclass with player state, inventory, world state fields
+- USaveSubsystem: UGameInstanceSubsystem with full save/load orchestration
+  - 3 named slots (SaveSlot_0 through SaveSlot_2)
+  - Async screenshot capture with JPEG compression
+  - Destroyed pickup tracking at runtime
+  - Level restart load flow with pending data pattern
 
-**Phase 7 will deliver:**
-- SAVE-01: Save/load system with checkpoints
-- SAVE-02: Manual save slots
-- SAVE-03: Settings persistence
+**Remaining Phase 7 plans:**
+- 07-02: ISaveable expansion + actor implementations + death system + GameMode load flow
+- 07-03: Game Over widget + save/load UI
+- 07-04: Tape recorder save point actor + pause menu integration
 
 ---
 
 *State initialized: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 6 complete -- verified ✓, audited ✓)*
+*Last updated: 2026-02-12 (07-01 complete)*
