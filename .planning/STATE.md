@@ -84,7 +84,7 @@ Overall: [███████░] 7.4/8 phases complete
 | 7-02  | 2/4   | 2/2   | ~8m  | 1      |
 | 7-03  | 3/4   | 2/2   | ~9m  | 0      |
 | 7-04  | 4/4   | 2/2   | ~10m | 0      |
-| 8-01  | 1/5   | 1/1   | ~3m  | 0      |
+| 8-01  | 1/5   | 2/2   | ~4m  | 0      |
 | 8-02  | 2/5   | 2/2   | ~3m  | 0      |
 
 *Checkpoint tasks require human verification
@@ -203,6 +203,9 @@ Overall: [███████░] 7.4/8 phases complete
 | Esc context-sensitive: inventory close vs pause | Natural UX: single escape key handles all overlay dismissal | 07-04 |
 | SetPendingSaveLocation API on SaveSubsystem | Decouples tape recorder from save internals; respawn at save point | 07-04 |
 | Pause blocked during hiding and Game Over | Prevents invalid state combinations; hiding has own interaction model | 07-04 |
+| OnComponentBeginOverlap for NarrativeTrigger box root | Component-level overlap more reliable than actor-level when box is root component | 08-01 |
+| bHasTriggered not UPROPERTY (transient runtime) | Resets on level reload; no need to serialize one-shot trigger state | 08-01 |
+| DemoEndingManager as UActorComponent | Flexible attachment to any actor; not tied to specific actor class | 08-01 |
 | DocumentReaderWidget created per-use, not pre-created | Avoids stale state; each interaction gets fresh widget instance | 08-02 |
 | E and Esc both close DocumentReaderWidget | E matches interaction key, Esc is universal close; keyboard-driven, no mouse cursor | 08-02 |
 | Dual-mode widget: ShowDocument/ShowInspection | Single widget handles both readable documents and inspectable objects | 08-02 |
