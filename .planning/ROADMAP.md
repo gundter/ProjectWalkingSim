@@ -226,7 +226,7 @@ Plans:
 
 ### Phase 8: Demo Polish
 
-**Goal:** Complete, polished demo experience ready for players.
+**Goal:** Complete, polished demo experience ready for players. Rural farmstead environment (cabin, cellar, woods, barn), opening detective monologue, environmental storytelling through notes/photos/inspectable objects, Wendigo activation at midpoint, and discovery cliffhanger ending with fade-to-black title card.
 
 **Dependencies:** Phase 7 (all systems operational)
 
@@ -235,6 +235,15 @@ Plans:
 - DEMO-02: Opening narrative hook
 - DEMO-03: Environmental storytelling (notes, photos, objects)
 - DEMO-04: Demo ending/cliffhanger
+
+**Plans:** 5 plans
+
+Plans:
+- [ ] 08-01-PLAN.md -- NarrativeTriggerActor + DemoEndingManager + narrative tags
+- [ ] 08-02-PLAN.md -- DocumentReaderWidget + InspectableActor
+- [ ] 08-03-PLAN.md -- ReadableActor widget wiring + controller document-open guards
+- [ ] 08-04-PLAN.md -- UMG Blueprints + actor Blueprints (editor checkpoint)
+- [ ] 08-05-PLAN.md -- Demo level building + full actor placement + playtesting (editor checkpoint)
 
 **Success Criteria:**
 1. Demo has complete, explorable abandoned building environment
@@ -249,18 +258,18 @@ Plans:
 
 | Phase | Name | Requirements | Status |
 |-------|------|--------------|--------|
-| 1 | Foundation | PLYR-01, PLYR-02, PLYR-03, PLYR-04 | ✓ Complete |
-| 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | ✓ Complete |
-| 3 | Hiding System | HIDE-01, HIDE-02 | ✓ Complete |
-| 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | ✓ Complete |
-| 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | ✓ Complete |
-| 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | ✓ Complete |
-| 7 | Save System | SAVE-01, SAVE-02 | ✓ Complete |
-| 8 | Demo Polish | DEMO-01, DEMO-02, DEMO-03, DEMO-04 | Not Started |
+| 1 | Foundation | PLYR-01, PLYR-02, PLYR-03, PLYR-04 | Complete |
+| 2 | Inventory System | INVT-01, INVT-02, INVT-03, INVT-04 | Complete |
+| 3 | Hiding System | HIDE-01, HIDE-02 | Complete |
+| 4 | Monster AI Core | WNDG-01, WNDG-02, WNDG-07 | Complete |
+| 5 | Monster Behaviors | WNDG-03, WNDG-04, WNDG-05, WNDG-06 | Complete |
+| 6 | Light and Audio | LGHT-01, LGHT-02, AUDO-01, AUDO-02, AUDO-03, AUDO-04 | Complete |
+| 7 | Save System | SAVE-01, SAVE-02 | Complete |
+| 8 | Demo Polish | DEMO-01, DEMO-02, DEMO-03, DEMO-04 | In Progress |
 
 **Coverage:** 29/29 requirements mapped
 
 ---
 
 *Roadmap created: 2026-02-07*
-*Last updated: 2026-02-12 (Phase 7 complete)*
+*Last updated: 2026-02-13 (Phase 8 planned)*
