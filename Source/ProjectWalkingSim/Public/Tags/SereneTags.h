@@ -55,4 +55,8 @@ namespace SereneTags
 
 	// AI spawn
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_AI_Spawn_Zone);
+
+	// Narrative
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Interaction_Inspectable);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Narrative_Trigger);
 }

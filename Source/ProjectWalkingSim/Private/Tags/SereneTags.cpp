@@ -52,4 +52,8 @@ namespace SereneTags
 
 	// AI spawn
 	UE_DEFINE_GAMEPLAY_TAG(TAG_AI_Spawn_Zone, "AI.Spawn.Zone");
+
+	// Narrative
+	UE_DEFINE_GAMEPLAY_TAG(TAG_Interaction_Inspectable, "Interaction.Inspectable");
+	UE_DEFINE_GAMEPLAY_TAG(TAG_Narrative_Trigger, "Narrative.Trigger");
 }
