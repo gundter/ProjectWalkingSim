@@ -19,3 +19,6 @@ Assets
 
 __pycache__/
 *.pyc
+
+# Windows reserved device names (phantom entries in git status)
+nul
