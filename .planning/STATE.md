@@ -23,9 +23,9 @@
 ## Current Position
 
 **Phase:** 8 of 8 (Demo Polish)
-**Plan:** 3 of 5 complete (08-01, 08-02, 08-03)
+**Plan:** 4 of 5 complete (08-01, 08-02, 08-03, 08-04)
 **Status:** In progress
-**Last activity:** 2026-02-13 - Completed 08-03-PLAN.md (Controller Wiring)
+**Last activity:** 2026-02-14 - Completed 08-04 checkpoint (Editor Blueprint Creation)
 
 **Progress:**
 ```
@@ -36,7 +36,7 @@ Phase 4: [#######] 7/7 plans complete
 Phase 5: [#####] 5/5 plans complete
 Phase 6: [#####] 5/5 plans complete
 Phase 7: [####] 4/4 plans complete
-Phase 8: [###--] 3/5 plans complete
+Phase 8: [####-] 4/5 plans complete
 Overall: [███████░] 7.6/8 phases complete
 ```
 
@@ -274,17 +274,14 @@ None -- Phase 8 in progress.
 
 ### Last Session
 
-**Date:** 2026-02-13
+**Date:** 2026-02-14
 **Completed:**
-- Executed 08-03-PLAN.md (Controller Wiring: ReadableActor + document-open guards)
-- 2 tasks, 2 commits, zero deviations
-- ReadableActor wired to DocumentReaderWidget (CreateWidget + ShowDocument on interact)
-- Controller bIsDocumentOpen guards on HandlePause, HandleToggleInventory, HandleInteract
-- DocumentReaderWidget self-manages controller state via SetDocumentOpen
+- 08-04 checkpoint (Editor Blueprint Creation) — all 5 assets verified
+- WBP_DocumentReader, WBP_TitleCard, BP_ReadableActor, BP_NarrativeTrigger, BP_InspectableActor
 
-**Stopped at:** Phase 8 plan 3 of 5 complete
+**Stopped at:** Phase 8 plan 4 of 5 complete
 
-**Next:** Continue Phase 8 plans 04-05 (demo level, optimization)
+**Next:** 08-05 (Demo Level Assembly — manual editor work)
 
 ### Context for Next Session
 
