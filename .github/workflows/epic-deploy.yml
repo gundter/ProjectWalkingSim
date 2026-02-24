@@ -1,0 +1,643 @@
+# Epic Deploy — Standalone workflow_dispatch for deploying Shipping builds to Epic Games Store Dev sandbox
+#
+# Secrets required:
+#   EPIC_BPT_CLIENT_ID      — BPT ClientId from Epic Dev Portal (BPT Credentials tab, NOT EOS SDK credentials)
+#   EPIC_BPT_CLIENT_SECRET  — BPT ClientSecret from Epic Dev Portal (same BPT Credentials tab)
+#   EPIC_ORGANIZATION_ID    — Organization ID from Epic Dev Portal > Organization Settings
+#   EPIC_PRODUCT_ID         — Product ID from Epic Dev Portal > Your Product > Product Settings > General tab
+#   EPIC_ARTIFACT_ID        — Artifact ID from Epic Dev Portal > Your Product > Epic Games Store > Artifacts and Binaries > [offer] > Edit Details
+#   EPIC_DEV_SANDBOX_ID     — Dev sandbox ID from Epic Dev Portal > Your Product > Product Settings > Sandboxes tab > Dev sandbox
+#   DISCORD_WEBHOOK_URL     — (optional) Discord webhook for failure notifications
+#
+# Prerequisites:
+#   - Product registered in Epic Dev Portal (https://dev.epicgames.com/portal)
+#   - BPT credentials created from "Build Patch Tool Credentials" tab (not EOS SDK credentials)
+#   - At least one GitHub Release with a Shipping ZIP attached (from release.yml)
+
+name: Epic Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to deploy (e.g. v1.2.0). Leave blank to auto-detect latest.'
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry run - log actions without uploading to Epic'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# === FORK CONFIGURATION ===
+# Search for "FORK CONFIGURATION" to find all config points across workflows.
+env:
+  PROJECT_NAME: 'ProjectWalkingSim'  # Must match your .uproject filename
+  RUNNER_LABEL: 'ue5'                # Documentation only — see docs/quick-start.md
+# === END FORK CONFIGURATION ===
+
+# Never cancel an in-progress Epic upload — queue the next run instead.
+concurrency:
+  group: epic-deploy
+  cancel-in-progress: false
+
+jobs:
+  epic-deploy:
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 60
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Resolve tag
+      # If tag input is blank, auto-detect the latest non-pre-release tag via
+      # GitHub CLI. Outputs: resolved_tag.
+      # -------------------------------------------------------------------------
+      - name: Resolve tag
+        id: resolve-tag
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tagInput = "${{ inputs.tag }}".Trim()
+          if (-not $tagInput) {
+            Write-Host "No tag specified — auto-detecting latest release..."
+            $latestTag = gh release list --limit 1 --exclude-pre-releases --json tagName --jq ".[0].tagName"
+            if (-not $latestTag) {
+              Write-Host "::error::Could not auto-detect latest release tag. No non-pre-release releases found."
+              Write-Host "::error::Either push a release tag first, or specify a tag input explicitly."
+              exit 1
+            }
+            $resolvedTag = $latestTag.Trim()
+            Write-Host "Auto-detected latest release tag: $resolvedTag"
+          } else {
+            $resolvedTag = $tagInput
+            Write-Host "Using specified tag: $resolvedTag"
+          }
+          echo "resolved_tag=$resolvedTag" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 2: Extract version from tag
+      # Parses semver and sha7 from the resolved tag and current commit.
+      # Outputs: semver, sha7.
+      # -------------------------------------------------------------------------
+      - name: Extract version from tag
+        id: extract-version
+        shell: powershell
+        run: |
+          $resolvedTag = "${{ steps.resolve-tag.outputs.resolved_tag }}"
+          $semver      = $resolvedTag.TrimStart('v')
+          $sha7        = "${{ github.sha }}".Substring(0, 7)
+
+          Write-Host "Resolved tag: $resolvedTag"
+          Write-Host "Semver:       $semver"
+          Write-Host "SHA7:         $sha7"
+
+          echo "semver=$semver" >> $env:GITHUB_OUTPUT
+          echo "sha7=$sha7"     >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 3: Checkout repository at resolved tag
+      # Required for build metadata access at the tagged version.
+      # -------------------------------------------------------------------------
+      - name: Checkout repository at tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve-tag.outputs.resolved_tag }}
+
+      # -------------------------------------------------------------------------
+      # Step 4: Validate secrets presence
+      # Checks all 6 Epic secrets are configured. In real deploy mode, fails
+      # immediately with ::error:: for each missing secret. In dry-run mode,
+      # emits ::warning:: for each missing secret and continues (exit 0) —
+      # allows pre-configuration validation without aborting the workflow.
+      # This step always runs (both dry-run and real mode).
+      # -------------------------------------------------------------------------
+      - name: Validate secrets presence
+        shell: powershell
+        env:
+          EPIC_BPT_CLIENT_ID:     ${{ secrets.EPIC_BPT_CLIENT_ID }}
+          EPIC_BPT_CLIENT_SECRET: ${{ secrets.EPIC_BPT_CLIENT_SECRET }}
+          EPIC_ORGANIZATION_ID:   ${{ secrets.EPIC_ORGANIZATION_ID }}
+          EPIC_PRODUCT_ID:        ${{ secrets.EPIC_PRODUCT_ID }}
+          EPIC_ARTIFACT_ID:       ${{ secrets.EPIC_ARTIFACT_ID }}
+          EPIC_DEV_SANDBOX_ID:    ${{ secrets.EPIC_DEV_SANDBOX_ID }}
+        run: |
+          $missing = @()
+
+          if (-not $env:EPIC_BPT_CLIENT_ID)     { $missing += "EPIC_BPT_CLIENT_ID" }
+          if (-not $env:EPIC_BPT_CLIENT_SECRET)  { $missing += "EPIC_BPT_CLIENT_SECRET" }
+          if (-not $env:EPIC_ORGANIZATION_ID)    { $missing += "EPIC_ORGANIZATION_ID" }
+          if (-not $env:EPIC_PRODUCT_ID)         { $missing += "EPIC_PRODUCT_ID" }
+          if (-not $env:EPIC_ARTIFACT_ID)        { $missing += "EPIC_ARTIFACT_ID" }
+          if (-not $env:EPIC_DEV_SANDBOX_ID)     { $missing += "EPIC_DEV_SANDBOX_ID" }
+
+          if ($missing.Count -gt 0) {
+            if ("${{ inputs.dry_run }}" -eq "true") {
+              foreach ($secret in $missing) {
+                Write-Host "::warning::secrets.$secret is not configured."
+              }
+              Write-Host "Dry-run mode: $($missing.Count) secret(s) not configured. Workflow will continue."
+            } else {
+              foreach ($secret in $missing) {
+                Write-Host "::error::Required secret '$secret' is not configured."
+              }
+              Write-Host "::error::$($missing.Count) required secret(s) missing. Configure all 6 Epic secrets before running this workflow."
+              Write-Host "::error::See the Epic Games Store Deployment Setup section in README.md for instructions."
+              exit 1
+            }
+          } else {
+            Write-Host "All 6 Epic secrets are configured."
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 5: Install BuildPatch Tool
+      # Downloads BPT ZIP from Epic's public CDN, extracts to runner.temp.
+      # Uses actions/cache@v4 with key 'bpt-v1' to skip re-download between runs.
+      # Validates BuildPatchTool.exe exists after extraction.
+      # Outputs: bpt_exe (full path to executable).
+      # -------------------------------------------------------------------------
+      - name: Restore BPT from cache
+        id: cache-bpt
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}\BuildPatchTool
+          key: bpt-v1
+
+      - name: Install BuildPatch Tool
+        id: install-bpt
+        shell: powershell
+        run: |
+          $bptDir = "${{ runner.temp }}\BuildPatchTool"
+          $bptExe = "$bptDir\Engine\Binaries\Win64\BuildPatchTool.exe"
+          $bptUrl = "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/BuildPatchTool.zip"
+          $bptZip = "${{ runner.temp }}\BuildPatchTool.zip"
+
+          if ((Test-Path $bptExe) -and "${{ steps.cache-bpt.outputs.cache-hit }}" -eq "true") {
+            Write-Host "BPT cache hit — skipping download."
+          } else {
+            Write-Host "Downloading BuildPatch Tool from Epic CDN..."
+            Invoke-WebRequest -Uri $bptUrl -OutFile $bptZip -UseBasicParsing
+            Write-Host "Extracting BuildPatch Tool to: $bptDir"
+            Expand-Archive -Path $bptZip -DestinationPath $bptDir -Force
+            Remove-Item $bptZip -Force -ErrorAction SilentlyContinue
+          }
+
+          if (-not (Test-Path $bptExe)) {
+            Write-Host "::error::BuildPatchTool.exe not found at expected path: $bptExe"
+            Write-Host "::error::Extraction may have failed or the BPT ZIP structure has changed."
+            exit 1
+          }
+
+          Write-Host "BuildPatch Tool ready: $bptExe"
+          echo "bpt_exe=$bptExe" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 6: BPT auth validation (ListBinaries)
+      # Runs ListBinaries -Num=1 to authenticate against Epic backend before
+      # starting the expensive upload. Fails fast on bad credentials.
+      # Guard: skipped in dry-run mode (no real auth check needed).
+      # All credential and ID secrets injected via env: block — never interpolated in shell.
+      # -------------------------------------------------------------------------
+      - name: BPT auth validation
+        id: auth-check
+        if: inputs.dry_run != true
+        shell: powershell
+        env:
+          EPIC_BPT_CLIENT_SECRET: ${{ secrets.EPIC_BPT_CLIENT_SECRET }}
+          EPIC_ORGANIZATION_ID:   ${{ secrets.EPIC_ORGANIZATION_ID }}
+          EPIC_PRODUCT_ID:        ${{ secrets.EPIC_PRODUCT_ID }}
+          EPIC_ARTIFACT_ID:       ${{ secrets.EPIC_ARTIFACT_ID }}
+          EPIC_BPT_CLIENT_ID:     ${{ secrets.EPIC_BPT_CLIENT_ID }}
+        run: |
+          $bptExe = "${{ steps.install-bpt.outputs.bpt_exe }}"
+
+          Write-Host "Running BPT auth validation (ListBinaries -Num=1)..."
+          & $bptExe `
+              -OrganizationId="$env:EPIC_ORGANIZATION_ID" `
+              -ProductId="$env:EPIC_PRODUCT_ID" `
+              -ArtifactId="$env:EPIC_ARTIFACT_ID" `
+              -ClientId="$env:EPIC_BPT_CLIENT_ID" `
+              -ClientSecretEnvVar="EPIC_BPT_CLIENT_SECRET" `
+              -mode=ListBinaries `
+              -Num="1"
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::BPT auth validation failed (exit code $LASTEXITCODE)."
+            Write-Host "::error::Check the following secrets: EPIC_BPT_CLIENT_ID, EPIC_BPT_CLIENT_SECRET, EPIC_ORGANIZATION_ID, EPIC_PRODUCT_ID, EPIC_ARTIFACT_ID, EPIC_DEV_SANDBOX_ID"
+            Write-Host "::error::Ensure BPT credentials are from 'Build Patch Tool Credentials' tab — NOT EOS SDK credentials."
+            exit $LASTEXITCODE
+          }
+
+          Write-Host "BPT auth validation passed."
+
+      # -------------------------------------------------------------------------
+      # Step 7: Download Shipping ZIP from GitHub Release
+      # Uses gh release download to fetch the Shipping ZIP attached to the
+      # GitHub Release for the resolved tag. Validates exactly one ZIP found.
+      # Guard: skipped in dry-run mode.
+      # Outputs: zip_path.
+      # -------------------------------------------------------------------------
+      - name: Download Shipping ZIP from GitHub Release
+        id: download-zip
+        if: inputs.dry_run != true
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag    = "${{ steps.resolve-tag.outputs.resolved_tag }}"
+          $outDir = "${{ runner.temp }}\shipping-epic-download"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          Write-Host "Downloading Shipping ZIP for tag: $tag"
+          gh release download $tag --pattern "*.zip" --dir $outDir
+
+          $zips = Get-ChildItem $outDir -Filter "*.zip"
+          if (-not $zips -or $zips.Count -eq 0) {
+            Write-Host "::error::No ZIP file found in GitHub Release '$tag'."
+            Write-Host "::error::Ensure the release has a Shipping ZIP asset attached (created by the release.yml github-deploy job)."
+            exit 1
+          }
+          if ($zips.Count -gt 1) {
+            Write-Host "::error::Multiple ZIP files found in release '$tag'. Expected exactly one."
+            $zips | ForEach-Object { Write-Host "  $($_.Name)" }
+            exit 1
+          }
+
+          $zipPath = $zips[0].FullName
+          $zipSizeMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
+          Write-Host "Downloaded: $zipPath ($zipSizeMB MB)"
+          echo "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 8: Extract Shipping ZIP for Epic
+      # Extracts to shipping-epic (separate from shipping-steam and shipping-butler
+      # to avoid interference with other platform deployments). Validates extraction
+      # produced files and confirms AppLaunch path exists (Pitfall 8).
+      # Guard: skipped in dry-run mode.
+      # -------------------------------------------------------------------------
+      - name: Extract Shipping ZIP for Epic
+        if: inputs.dry_run != true
+        shell: powershell
+        run: |
+          $zipPath    = "${{ steps.download-zip.outputs.zip_path }}"
+          $extractDir = "${{ runner.temp }}\shipping-epic"
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+
+          Write-Host "Extracting: $zipPath"
+          Write-Host "  -> To: $extractDir"
+          Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+
+          $fileCount = (Get-ChildItem $extractDir -Recurse -File -ErrorAction SilentlyContinue).Count
+          Write-Host "Extracted $fileCount files to: $extractDir"
+
+          if ($fileCount -eq 0) {
+            Write-Host "::error::Extraction produced no files. The Shipping ZIP may be corrupt or empty."
+            exit 1
+          }
+
+          # Validate AppLaunch path exists before BPT invocation (Pitfall 8)
+          $projectName   = $env:PROJECT_NAME
+          $appLaunchPath = "$extractDir\Windows\${projectName}.exe"
+          if (-not (Test-Path $appLaunchPath)) {
+            Write-Host "::error::AppLaunch executable not found at expected path: $appLaunchPath"
+            Write-Host "::error::BPT requires -AppLaunch to be relative to -BuildRoot (Windows/${projectName}.exe)."
+            Write-Host "::error::Check the Shipping ZIP structure — expected Windows\${projectName}.exe at ZIP root."
+            exit 1
+          }
+
+          Write-Host "Extraction validated: $fileCount files found"
+          Write-Host "AppLaunch path confirmed: $appLaunchPath"
+
+      # -------------------------------------------------------------------------
+      # Step 9: Generate BuildVersion string
+      # Constructs the unique BuildVersion as "{semver}+{run_number}" which
+      # satisfies BPT constraints (alphanumeric + .+-_, no whitespace, 1-100 chars).
+      # Also defines the isolated CloudDir for this run (Pitfall 3).
+      # This step always runs (needed for dry-run summary too).
+      # Outputs: build_version, cloud_dir.
+      # -------------------------------------------------------------------------
+      - name: Generate BuildVersion string
+        id: build-version
+        shell: powershell
+        run: |
+          $semver      = "${{ steps.extract-version.outputs.semver }}"
+          $runNumber   = "${{ github.run_number }}"
+          $buildVersion = "${semver}+${runNumber}"
+
+          # Isolated CloudDir per run — prevents state collision on concurrent/re-runs (Pitfall 3)
+          $cloudDir = "${{ runner.temp }}/bpt_cloud_${runNumber}"
+
+          Write-Host "BuildVersion: $buildVersion"
+          Write-Host "CloudDir:     $cloudDir"
+
+          echo "build_version=$buildVersion" >> $env:GITHUB_OUTPUT
+          echo "cloud_dir=$cloudDir"         >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 10: Upload to Epic via BPT UploadBinary
+      # Wraps BPT UploadBinary in a one-retry loop (per user decision: one
+      # automatic retry on failure for transient network issues; 30s wait between
+      # attempts). Forward slashes on all BPT path arguments (Pitfall 2).
+      # All 6 Epic IDs sourced from secrets context. -ClientSecretEnvVar used
+      # (never -ClientSecret= literal) with secret injected via env: block.
+      # Guard: skipped in dry-run mode.
+      # Outputs: exit_code.
+      # -------------------------------------------------------------------------
+      - name: Upload to Epic via BPT UploadBinary
+        id: upload
+        if: inputs.dry_run != true
+        shell: powershell
+        env:
+          EPIC_BPT_CLIENT_SECRET: ${{ secrets.EPIC_BPT_CLIENT_SECRET }}
+          EPIC_ORGANIZATION_ID:   ${{ secrets.EPIC_ORGANIZATION_ID }}
+          EPIC_PRODUCT_ID:        ${{ secrets.EPIC_PRODUCT_ID }}
+          EPIC_ARTIFACT_ID:       ${{ secrets.EPIC_ARTIFACT_ID }}
+          EPIC_BPT_CLIENT_ID:     ${{ secrets.EPIC_BPT_CLIENT_ID }}
+        run: |
+          $bptExe       = "${{ steps.install-bpt.outputs.bpt_exe }}"
+          $buildVersion = "${{ steps.build-version.outputs.build_version }}"
+          $cloudDir     = "${{ steps.build-version.outputs.cloud_dir }}"
+          $buildRoot    = "${{ runner.temp }}/shipping-epic"
+
+          # Create CloudDir before invocation
+          New-Item -ItemType Directory -Force -Path $cloudDir | Out-Null
+
+          Write-Host "========================================"
+          Write-Host "BPT UploadBinary"
+          Write-Host "========================================"
+          Write-Host "  Tag:          ${{ steps.resolve-tag.outputs.resolved_tag }}"
+          Write-Host "  BuildVersion: $buildVersion"
+          Write-Host "  BuildRoot:    $buildRoot"
+          Write-Host "  CloudDir:     $cloudDir"
+          Write-Host "  AppLaunch:    Windows/$env:PROJECT_NAME.exe"
+          Write-Host "========================================"
+
+          $maxAttempts = 2
+          $attempt = 0
+          $exitCode = 1
+
+          while ($attempt -lt $maxAttempts -and $exitCode -ne 0) {
+            $attempt++
+            Write-Host "BPT UploadBinary attempt $attempt of $maxAttempts..."
+
+            & $bptExe `
+                -OrganizationId="$env:EPIC_ORGANIZATION_ID" `
+                -ProductId="$env:EPIC_PRODUCT_ID" `
+                -ArtifactId="$env:EPIC_ARTIFACT_ID" `
+                -ClientId="$env:EPIC_BPT_CLIENT_ID" `
+                -ClientSecretEnvVar="EPIC_BPT_CLIENT_SECRET" `
+                -mode=UploadBinary `
+                -BuildRoot="$buildRoot" `
+                -CloudDir="$cloudDir" `
+                -BuildVersion="$buildVersion" `
+                -AppLaunch="Windows/$env:PROJECT_NAME.exe" `
+                -AppArgs="" `
+                -verboseLogs
+
+            $exitCode = $LASTEXITCODE
+
+            if ($exitCode -ne 0 -and $attempt -lt $maxAttempts) {
+              Write-Host "::warning::BPT UploadBinary failed (exit code $exitCode) on attempt $attempt. Retrying in 30 seconds..."
+              Start-Sleep -Seconds 30
+            }
+          }
+
+          echo "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
+
+          if ($exitCode -ne 0) {
+            Write-Host "::error::BPT UploadBinary failed after $maxAttempts attempts. Exit code: $exitCode"
+            Write-Host "::error::Check the BPT logs artifact for details (uploaded on failure)."
+            exit $exitCode
+          }
+
+          Write-Host "BPT UploadBinary completed successfully."
+          Write-Host "BuildVersion '$buildVersion' uploaded to Epic Games Store Dev sandbox."
+
+      # -------------------------------------------------------------------------
+      # Step 11: Label binary in Dev sandbox via LabelBinary
+      # Applies the 'Live' label to the uploaded artifact in the Dev sandbox,
+      # making it accessible for internal testing via Epic Games Launcher.
+      # -SandboxId is required in practice despite docs saying optional (Pitfall 4).
+      # Guard: skipped in dry-run mode.
+      # -------------------------------------------------------------------------
+      - name: Label binary in Dev sandbox via LabelBinary
+        if: inputs.dry_run != true
+        shell: powershell
+        env:
+          EPIC_BPT_CLIENT_SECRET: ${{ secrets.EPIC_BPT_CLIENT_SECRET }}
+          EPIC_ORGANIZATION_ID:   ${{ secrets.EPIC_ORGANIZATION_ID }}
+          EPIC_PRODUCT_ID:        ${{ secrets.EPIC_PRODUCT_ID }}
+          EPIC_ARTIFACT_ID:       ${{ secrets.EPIC_ARTIFACT_ID }}
+          EPIC_BPT_CLIENT_ID:     ${{ secrets.EPIC_BPT_CLIENT_ID }}
+          EPIC_DEV_SANDBOX_ID:    ${{ secrets.EPIC_DEV_SANDBOX_ID }}
+        run: |
+          $bptExe       = "${{ steps.install-bpt.outputs.bpt_exe }}"
+          $buildVersion = "${{ steps.build-version.outputs.build_version }}"
+
+          Write-Host "Running BPT LabelBinary..."
+          Write-Host "  BuildVersion: $buildVersion"
+          Write-Host "  Label:        Live"
+          Write-Host "  Platform:     Windows"
+
+          & $bptExe `
+              -OrganizationId="$env:EPIC_ORGANIZATION_ID" `
+              -ProductId="$env:EPIC_PRODUCT_ID" `
+              -ArtifactId="$env:EPIC_ARTIFACT_ID" `
+              -ClientId="$env:EPIC_BPT_CLIENT_ID" `
+              -ClientSecretEnvVar="EPIC_BPT_CLIENT_SECRET" `
+              -mode=LabelBinary `
+              -BuildVersion="$buildVersion" `
+              -Label="Live" `
+              -Platform="Windows" `
+              -SandboxId="$env:EPIC_DEV_SANDBOX_ID" `
+              -verboseLogs
+
+          $labelExitCode = $LASTEXITCODE
+          if ($labelExitCode -ne 0) {
+            Write-Host "::error::BPT LabelBinary failed with exit code $labelExitCode"
+            Write-Host "::error::Check the BPT logs artifact for details (uploaded on failure)."
+            exit $labelExitCode
+          }
+
+          Write-Host "BPT LabelBinary completed successfully."
+          Write-Host "BuildVersion '$buildVersion' is now labeled 'Live' in the Dev sandbox."
+          Write-Host "Internal testers can now access this build via Epic Games Launcher."
+
+      # -------------------------------------------------------------------------
+      # Step 12: Dry-run summary
+      # Outputs a GITHUB_STEP_SUMMARY table showing resolved deployment parameters
+      # and configuration status for all 6 Epic secrets.
+      # Emits ::warning:: for each missing secret.
+      # Guard: only runs in dry-run mode.
+      # -------------------------------------------------------------------------
+      - name: Dry-run summary
+        if: inputs.dry_run == true
+        shell: powershell
+        env:
+          EPIC_BPT_CLIENT_ID:     ${{ secrets.EPIC_BPT_CLIENT_ID }}
+          EPIC_BPT_CLIENT_SECRET: ${{ secrets.EPIC_BPT_CLIENT_SECRET }}
+          EPIC_ORGANIZATION_ID:   ${{ secrets.EPIC_ORGANIZATION_ID }}
+          EPIC_PRODUCT_ID:        ${{ secrets.EPIC_PRODUCT_ID }}
+          EPIC_ARTIFACT_ID:       ${{ secrets.EPIC_ARTIFACT_ID }}
+          EPIC_DEV_SANDBOX_ID:    ${{ secrets.EPIC_DEV_SANDBOX_ID }}
+        run: |
+          $resolvedTag  = "${{ steps.resolve-tag.outputs.resolved_tag }}"
+          $semver       = "${{ steps.extract-version.outputs.semver }}"
+          $sha7         = "${{ steps.extract-version.outputs.sha7 }}"
+          $buildVersion = "${{ steps.build-version.outputs.build_version }}"
+
+          # Check secret presence via env: block (never interpolate secrets in run:)
+          $hasClientId     = if ($env:EPIC_BPT_CLIENT_ID)     { 'yes' } else { 'NO - not configured' }
+          $hasClientSecret = if ($env:EPIC_BPT_CLIENT_SECRET)  { 'yes' } else { 'NO - not configured' }
+          $hasOrgId        = if ($env:EPIC_ORGANIZATION_ID)    { 'yes' } else { 'NO - not configured' }
+          $hasProductId    = if ($env:EPIC_PRODUCT_ID)         { 'yes' } else { 'NO - not configured' }
+          $hasArtifactId   = if ($env:EPIC_ARTIFACT_ID)        { 'yes' } else { 'NO - not configured' }
+          $hasSandboxId    = if ($env:EPIC_DEV_SANDBOX_ID)     { 'yes' } else { 'NO - not configured' }
+
+          # Emit warnings for missing configuration
+          if (-not $env:EPIC_BPT_CLIENT_ID)     { Write-Host "::warning::secrets.EPIC_BPT_CLIENT_ID is not set. Required for BPT authentication." }
+          if (-not $env:EPIC_BPT_CLIENT_SECRET)  { Write-Host "::warning::secrets.EPIC_BPT_CLIENT_SECRET is not set. Required for BPT authentication." }
+          if (-not $env:EPIC_ORGANIZATION_ID)    { Write-Host "::warning::secrets.EPIC_ORGANIZATION_ID is not set. Required for BPT invocation." }
+          if (-not $env:EPIC_PRODUCT_ID)         { Write-Host "::warning::secrets.EPIC_PRODUCT_ID is not set. Required for BPT invocation." }
+          if (-not $env:EPIC_ARTIFACT_ID)        { Write-Host "::warning::secrets.EPIC_ARTIFACT_ID is not set. Required for BPT invocation." }
+          if (-not $env:EPIC_DEV_SANDBOX_ID)     { Write-Host "::warning::secrets.EPIC_DEV_SANDBOX_ID is not set. Required for LabelBinary." }
+
+          $lines = @(
+            "## Epic Deploy (DRY RUN)",
+            "",
+            "> **No files were uploaded.** This is a preview of what would happen.",
+            "> Re-trigger with ``dry_run=false`` to perform a real Epic Games Store upload.",
+            "",
+            "### Resolved Deployment Parameters",
+            "",
+            "| Parameter | Value |",
+            "|-----------|-------|",
+            "| Tag | $resolvedTag |",
+            "| Version | $semver |",
+            "| Commit SHA | $sha7 |",
+            "| BuildVersion | $buildVersion |",
+            "| Sandbox target | Dev |",
+            "",
+            "### Configuration Status",
+            "",
+            "| Secret | Configured |",
+            "|--------|-----------|",
+            "| EPIC_BPT_CLIENT_ID (secret) | $hasClientId |",
+            "| EPIC_BPT_CLIENT_SECRET (secret) | $hasClientSecret |",
+            "| EPIC_ORGANIZATION_ID (secret) | $hasOrgId |",
+            "| EPIC_PRODUCT_ID (secret) | $hasProductId |",
+            "| EPIC_ARTIFACT_ID (secret) | $hasArtifactId |",
+            "| EPIC_DEV_SANDBOX_ID (secret) | $hasSandboxId |",
+            "",
+            "> Re-run with ``dry_run=false`` to upload to Epic Games Store Dev sandbox."
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+          Write-Host "Dry-run summary written to GITHUB_STEP_SUMMARY."
+
+      # -------------------------------------------------------------------------
+      # Step 13: Copy BPT logs to runner.temp
+      # BPT writes logs to %LocalAppData%\BuildPatchTool\Saved\Logs — NOT to
+      # runner.temp. Must copy to a known path before upload-artifact (Pitfall 5).
+      # Guard: only runs on failure.
+      # -------------------------------------------------------------------------
+      - name: Copy BPT logs to runner.temp
+        if: failure()
+        shell: powershell
+        run: |
+          $bptLogSrc = "$env:LOCALAPPDATA\BuildPatchTool\Saved\Logs"
+          $bptLogDst = "${{ runner.temp }}\bpt-logs"
+
+          if (Test-Path $bptLogSrc) {
+            New-Item -ItemType Directory -Force -Path $bptLogDst | Out-Null
+            Copy-Item -Path "$bptLogSrc\*" -Destination $bptLogDst -Recurse -Force
+            Write-Host "BPT logs copied from: $bptLogSrc"
+            Write-Host "BPT logs copied to:   $bptLogDst"
+          } else {
+            Write-Host "::warning::BPT log directory not found at: $bptLogSrc"
+            Write-Host "BPT may not have been invoked, or logs were not written."
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 14: Upload BPT logs on failure
+      # Uploads BPT diagnostic logs as a CI artifact for post-mortem investigation.
+      # retention-days: 7 — failure logs are short-lived, no need for full retention.
+      # Guard: only runs on failure.
+      # -------------------------------------------------------------------------
+      - name: Upload BPT logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bpt-logs-${{ github.run_id }}
+          path: ${{ runner.temp }}\bpt-logs\
+          retention-days: 7
+          if-no-files-found: warn
+
+      # -------------------------------------------------------------------------
+      # Step 15: Send Discord failure notification
+      # Sends a Discord embed with failure details and a link to the failed run.
+      # Skipped gracefully if DISCORD_WEBHOOK_URL is not configured.
+      # Pattern matches steam-deploy.yml Discord step exactly.
+      # Guard: only runs on failure.
+      # -------------------------------------------------------------------------
+      - name: Send Discord failure notification
+        if: failure()
+        shell: powershell
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if (-not $env:DISCORD_WEBHOOK_URL) {
+            Write-Host "No Discord webhook configured — skipping failure notification."
+            exit 0
+          }
+
+          $tag          = "${{ steps.resolve-tag.outputs.resolved_tag }}"
+          $runUrl       = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          $exitCode     = "${{ steps.upload.outputs.exit_code }}"
+          $buildVersion = "${{ steps.build-version.outputs.build_version }}"
+          if (-not $exitCode) { $exitCode = "N/A (failed before upload step)" }
+
+          $payload = @{
+            embeds = @(
+              @{
+                title       = "Epic Deploy FAILED"
+                description = "[View Run]($runUrl)"
+                color       = 15158332  # Red — matches notify.yml
+                fields      = @(
+                  @{ name = "Tag";          value = $tag;          inline = $true }
+                  @{ name = "Exit Code";    value = $exitCode;     inline = $true }
+                  @{ name = "BuildVersion"; value = $buildVersion; inline = $true }
+                )
+                footer    = @{ text = "GitHub Actions" }
+                timestamp = (Get-Date -Format "o")
+              }
+            )
+          } | ConvertTo-Json -Depth 10 -Compress
+
+          try {
+            Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json; charset=utf-8"
+            Write-Host "Discord failure notification sent."
+          } catch {
+            Write-Host "::warning::Failed to send Discord notification: $($_.Exception.Message)"
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 16: Cleanup temp files
+      # Removes all temporary files created by this workflow from runner.temp.
+      # BPT itself is left in place — the cache action handles persistence.
+      # Runs with if: always() to clean up even when prior steps fail.
+      # -------------------------------------------------------------------------
+      - name: Cleanup temp files
+        if: always()
+        shell: powershell
+        run: |
+          $runNumber = "${{ github.run_number }}"
+          Remove-Item "${{ runner.temp }}\shipping-epic-download" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\shipping-epic"          -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\bpt_cloud_${runNumber}" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\bpt-logs"               -Recurse -Force -ErrorAction SilentlyContinue
+          Write-Host "Cleanup complete."

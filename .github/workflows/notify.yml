@@ -1,0 +1,234 @@
+# .github/workflows/notify.yml
+# Reusable notification workflow - Sends failure/success notifications to Discord and Slack
+# Called from build.yml and package.yml (and any future workflow) via workflow_call
+#
+# Usage:
+#   notify:
+#     needs: [build]
+#     if: failure()
+#     uses: ./.github/workflows/notify.yml
+#     with:
+#       status: 'failed'
+#       workflow_name: 'UE5 Build'
+#       branch: ${{ github.ref_name }}
+#       commit_sha: ${{ github.sha }}
+#       duration: ${{ needs.build.outputs.duration || 'N/A' }}
+#       ...
+#     secrets: inherit
+#
+# Requires GitHub Secrets:
+#   DISCORD_WEBHOOK_URL - Discord webhook URL (optional, skips if not set)
+#   SLACK_WEBHOOK_URL   - Slack webhook URL (optional, skips if not set)
+name: Notify
+
+on:
+  workflow_call:
+    inputs:
+      status:
+        description: 'Build status: success or failed'
+        required: true
+        type: string
+      workflow_name:
+        description: 'Name of the calling workflow (e.g., UE5 Build, UE5 Package)'
+        required: true
+        type: string
+      branch:
+        description: 'Branch name'
+        required: true
+        type: string
+      commit_sha:
+        description: 'Full commit SHA'
+        required: true
+        type: string
+      duration:
+        description: 'Total duration string (e.g., 2m 15s)'
+        required: true
+        type: string
+      failed_tests:
+        description: 'Comma-separated list of failed test names (empty if none)'
+        required: false
+        type: string
+        default: ''
+      error_excerpt:
+        description: 'Error message excerpt (empty if success)'
+        required: false
+        type: string
+        default: ''
+      failed_stage:
+        description: 'Name of the failed stage (build/test/cook/package)'
+        required: false
+        type: string
+        default: ''
+      stage_duration:
+        description: 'Duration of the failed stage'
+        required: false
+        type: string
+        default: ''
+      run_url:
+        description: 'URL to the GitHub Actions run'
+        required: false
+        type: string
+        default: ''
+
+jobs:
+  notify:
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 5
+
+    steps:
+      # =========================================================================
+      # Discord Notification
+      # =========================================================================
+      - name: Send Discord notification
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        if: env.DISCORD_WEBHOOK_URL != ''
+        continue-on-error: true
+        shell: powershell
+        run: |
+          $status = "${{ inputs.status }}"
+          $color = if ($status -eq 'success') { 3066993 } else { 15158332 }
+          $statusText = if ($status -eq 'success') { '`SUCCESS`' } else { '`FAILED`' }
+          $shortSha = "${{ inputs.commit_sha }}".Substring(0, 7)
+
+          # Build fields array
+          $fields = @(
+              @{ name = "Branch"; value = "${{ inputs.branch }}"; inline = $true }
+              @{ name = "Commit"; value = $shortSha; inline = $true }
+              @{ name = "Duration"; value = "${{ inputs.duration }}"; inline = $true }
+          )
+
+          # Add failure-specific fields conditionally
+          $failedStage = "${{ inputs.failed_stage }}"
+          if ($failedStage) {
+              $fields += @{ name = "Failed Stage"; value = $failedStage; inline = $true }
+          }
+
+          $stageDuration = "${{ inputs.stage_duration }}"
+          if ($stageDuration) {
+              $fields += @{ name = "Stage Duration"; value = $stageDuration; inline = $true }
+          }
+
+          $failedTests = "${{ inputs.failed_tests }}"
+          if ($failedTests) {
+              $testList = ($failedTests -split ',') | ForEach-Object { "- $($_.Trim())" }
+              $testText = $testList -join "`n"
+              $fields += @{ name = "Failed Tests"; value = $testText; inline = $false }
+          }
+
+          $errorExcerpt = "${{ inputs.error_excerpt }}"
+          if ($errorExcerpt) {
+              # Truncate to 1000 chars to stay under Discord's 1024 field value limit
+              if ($errorExcerpt.Length -gt 1000) {
+                  $errorExcerpt = $errorExcerpt.Substring(0, 1000) + "..."
+              }
+              $codeBlock = '```'
+              $fields += @{ name = "Error"; value = "${codeBlock}${errorExcerpt}${codeBlock}"; inline = $false }
+          }
+
+          # Description with run link for failures
+          $runUrl = "${{ inputs.run_url }}"
+          $description = ""
+          if ($runUrl -and $status -ne 'success') {
+              $description = "[View Run]($runUrl)"
+          }
+
+          # Build the full payload using hashtables (never string concatenation)
+          $payload = @{
+              embeds = @(
+                  @{
+                      title = "${{ inputs.workflow_name }} $statusText"
+                      description = $description
+                      color = $color
+                      fields = $fields
+                      footer = @{ text = "GitHub Actions" }
+                      timestamp = (Get-Date -Format "o")
+                  }
+              )
+          } | ConvertTo-Json -Depth 10 -Compress
+
+          Write-Host "Sending Discord notification..."
+          Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json; charset=utf-8"
+          Write-Host "Discord notification sent successfully"
+
+      # =========================================================================
+      # Slack Notification
+      # =========================================================================
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.SLACK_WEBHOOK_URL != ''
+        continue-on-error: true
+        shell: powershell
+        run: |
+          $status = "${{ inputs.status }}"
+          $color = if ($status -eq 'success') { "#2ECC71" } else { "#E74C3C" }
+          $statusEmoji = if ($status -eq 'success') { ':white_check_mark:' } else { ':x:' }
+          $shortSha = "${{ inputs.commit_sha }}".Substring(0, 7)
+
+          # Build fields array
+          $fields = @(
+              @{ title = "Branch"; value = "${{ inputs.branch }}"; short = $true }
+              @{ title = "Commit"; value = $shortSha; short = $true }
+              @{ title = "Duration"; value = "${{ inputs.duration }}"; short = $true }
+          )
+
+          # Add failure-specific fields conditionally
+          $failedStage = "${{ inputs.failed_stage }}"
+          if ($failedStage) {
+              $fields += @{ title = "Failed Stage"; value = $failedStage; short = $true }
+          }
+
+          $failedTests = "${{ inputs.failed_tests }}"
+          if ($failedTests) {
+              $testList = ($failedTests -split ',') | ForEach-Object { "- $($_.Trim())" }
+              $testText = $testList -join "`n"
+              $fields += @{ title = "Failed Tests"; value = $testText; short = $false }
+          }
+
+          $errorExcerpt = "${{ inputs.error_excerpt }}"
+          if ($errorExcerpt) {
+              # Truncate to 1000 chars for safety
+              if ($errorExcerpt.Length -gt 1000) {
+                  $errorExcerpt = $errorExcerpt.Substring(0, 1000) + "..."
+              }
+              $codeBlock = '```'
+              $fields += @{ title = "Error"; value = "${codeBlock}${errorExcerpt}${codeBlock}"; short = $false }
+          }
+
+          # Build text with status and optional run link
+          $text = "$statusEmoji *${{ inputs.workflow_name }}* - $status"
+          $runUrl = "${{ inputs.run_url }}"
+          if ($runUrl -and $status -ne 'success') {
+              $text += " | <$runUrl|View Run>"
+          }
+
+          # Build the full payload using hashtables (never string concatenation)
+          $payload = @{
+              attachments = @(
+                  @{
+                      fallback = "${{ inputs.workflow_name }} $status"
+                      color = $color
+                      text = $text
+                      fields = $fields
+                      footer = "GitHub Actions"
+                      ts = [int](Get-Date -UFormat %s)
+                  }
+              )
+          } | ConvertTo-Json -Depth 10 -Compress
+
+          Write-Host "Sending Slack notification..."
+          Invoke-RestMethod -Uri $env:SLACK_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json; charset=utf-8"
+          Write-Host "Slack notification sent successfully"
+
+      # =========================================================================
+      # Skip Warning - Logs when no webhook secrets are configured
+      # =========================================================================
+      - name: Log skip warning (no webhooks configured)
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        if: env.DISCORD_WEBHOOK_URL == '' && env.SLACK_WEBHOOK_URL == ''
+        shell: powershell
+        run: |
+          Write-Host "::warning::No notification webhook secrets configured (DISCORD_WEBHOOK_URL, SLACK_WEBHOOK_URL). Skipping notifications."

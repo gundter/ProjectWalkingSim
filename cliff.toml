@@ -1,0 +1,52 @@
+# cliff.toml — git-cliff configuration for Keep a Changelog format
+# Source: https://github.com/orhun/git-cliff/blob/main/examples/keepachangelog.toml
+# Customized for this project's conventional commit usage
+
+[changelog]
+header = """
+# Changelog\n
+All notable changes to this project will be documented in this file.\n
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n
+"""
+
+body = """
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | upper_first }}
+{% for commit in commits %}
+- {{ commit.message | split(pat="\\n") | first | upper_first | trim }}\
+{% endfor %}
+{% endfor %}\n
+"""
+
+footer = ""
+trim = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+filter_commits = true
+
+commit_parsers = [
+  # User-facing — include in CHANGELOG
+  { message = "^feat",     group = "Added" },
+  { message = "^fix",      group = "Fixed" },
+  { message = "^perf",     group = "Changed" },
+  { message = "^refactor", group = "Changed" },
+
+  # Non-user-facing — exclude from CHANGELOG
+  { message = "^chore",    skip = true },
+  { message = "^ci",       skip = true },
+  { message = "^docs",     skip = true },
+  { message = "^test",     skip = true },
+  { message = "^revert",   skip = true },
+]
+
+tag_pattern = "v[0-9].*"
+topo_order = false
+sort_commits = "oldest"

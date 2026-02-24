@@ -1,0 +1,1104 @@
+# .github/workflows/build.yml
+# UE5 Build Pipeline - Foundation checks + multi-configuration C++ compilation
+# Triggers: push to main/development, PRs to main/development, manual dispatch
+#
+# Configuration matrix:
+#   push to development:     [Development] only (fast feedback)
+#   PR to development:       [Development] only (fast feedback)
+#   push to main:            [Development, Test, Shipping] (full validation)
+#   PR to main:              [Development, Test, Shipping] (pre-merge gate)
+#   workflow_dispatch "All":  [Development, Test, Shipping]
+#   workflow_dispatch single: [selected config]
+#
+# REUSE NOTE: This workflow assumes the repository name matches the .uproject
+# filename (e.g., repo "MyGame" expects "MyGame.uproject" in the root).
+name: UE5 Build
+
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main, development]
+  workflow_dispatch:
+    inputs:
+      clean_build:
+        description: 'Force clean build (removes Intermediate, Binaries, DDC)'
+        required: false
+        type: boolean
+        default: false
+      configuration:
+        description: 'Build configuration'
+        required: false
+        type: choice
+        options:
+          - Development
+          - Test
+          - Shipping
+          - All
+        default: 'Development'
+
+# Permissions required for test-reporter to create check runs
+permissions:
+  contents: read
+  checks: write
+
+# Shared concurrency group with package.yml prevents both workflows from running
+# simultaneously on the single self-hosted runner. Builds can be cancelled
+# (cheaper to restart); package.yml uses cancel-in-progress: false.
+concurrency:
+  group: ue5-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+# === FORK CONFIGURATION ===
+# Edit these values to match your environment.
+# Search for "FORK CONFIGURATION" to find all config points across workflows.
+# Full setup instructions: docs/quick-start.md
+env:
+  UE5_ROOT: 'E:\Epic Games\UE_5.7'  # Path to your UE5 installation
+  PROJECT_NAME: 'ProjectWalkingSim'                 # Must match your .uproject filename
+  RUNNER_LABEL: 'ue5'                               # Documentation only — runs-on labels must stay literal
+  UE5_ENGINE_VERSION: '5.7'
+# === END FORK CONFIGURATION ===
+
+jobs:
+  # =============================================================================
+  # Foundation Job - Validates runner infrastructure before build
+  # =============================================================================
+  foundation:
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: UE5 Setup
+        id: ue5-setup
+        uses: ./.github/actions/ue5-setup
+        with:
+          ue5-root: ${{ env.UE5_ROOT }}
+          project-name: ${{ env.PROJECT_NAME }}
+
+  # =============================================================================
+  # Configure Job - Determines which build configurations to run
+  # =============================================================================
+  # Lightweight job (no checkout needed) that outputs a JSON matrix array
+  # based on trigger context. This drives the matrix strategy in the build job.
+  configure:
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    steps:
+      - name: Determine build configuration matrix
+        id: set-matrix
+        shell: powershell
+        run: |
+          $event = "${{ github.event_name }}"
+          $ref = "${{ github.ref }}"
+          $inputConfig = "${{ github.event.inputs.configuration }}"
+
+          Write-Host "Event: $event"
+          Write-Host "Ref: $ref"
+          Write-Host "Input config: $inputConfig"
+
+          # Determine matrix based on trigger context
+          switch ($event) {
+            "workflow_dispatch" {
+              if ($inputConfig -eq "All") {
+                $matrix = '["Development","Test","Shipping"]'
+              } else {
+                $matrix = "[`"$inputConfig`"]"
+              }
+            }
+            "push" {
+              if ($ref -eq "refs/heads/main") {
+                # Push to main = full validation (all three configs)
+                $matrix = '["Development","Test","Shipping"]'
+              } else {
+                # Push to development = fast feedback (Dev only)
+                $matrix = '["Development"]'
+              }
+            }
+            "pull_request" {
+              $baseRef = "${{ github.base_ref }}"
+              Write-Host "Base ref: $baseRef"
+              if ($baseRef -eq "main") {
+                # PR to main = full validation (all three configs)
+                $matrix = '["Development","Test","Shipping"]'
+              } else {
+                # PR to development = fast feedback (Dev only)
+                $matrix = '["Development"]'
+              }
+            }
+            default {
+              # Fallback: Development only
+              $matrix = '["Development"]'
+            }
+          }
+
+          Write-Host "Matrix output: $matrix"
+          echo "matrix=$matrix" >> $env:GITHUB_OUTPUT
+
+  # =============================================================================
+  # Build Job - Compiles C++ code per configuration (requires foundation + configure)
+  # =============================================================================
+  # Runs once per configuration in the matrix. With max-parallel: 1 on a single
+  # runner, configurations execute sequentially: Development -> Test -> Shipping.
+  # fail-fast: true means if any config fails, remaining configs are skipped.
+  build:
+    needs: [foundation, configure]
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        configuration: ${{ fromJson(needs.configure.outputs.matrix) }}
+
+    outputs:
+      status: ${{ steps.collect-results.outputs.status }}
+      duration: ${{ steps.collect-results.outputs.duration }}
+      failed_tests: ${{ steps.collect-results.outputs.failed_tests }}
+      error_excerpt: ${{ steps.collect-results.outputs.error_excerpt }}
+      failed_stage: ${{ steps.collect-results.outputs.failed_stage }}
+      stage_duration: ${{ steps.collect-results.outputs.stage_duration }}
+
+    steps:
+      - name: Log build info
+        shell: powershell
+        run: |
+          Write-Host "Job started by: ${{ github.actor }}"
+          Write-Host "Triggered by: ${{ github.event_name }}"
+          Write-Host "Ref: ${{ github.ref }}"
+          Write-Host "Runner: ${{ runner.name }}"
+          Write-Host "Configuration: ${{ matrix.configuration }}"
+          $cleanBuild = '${{ github.event.inputs.clean_build }}'
+          Write-Host "Clean Build: $cleanBuild"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Clean build (conditional)
+        if: github.event.inputs.clean_build == 'true'
+        shell: powershell
+        run: |
+          Write-Host "Performing clean build - removing cached build artifacts"
+          $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+          $intermediatePath = "${{ github.workspace }}\Intermediate"
+          if (Test-Path $intermediatePath) {
+            Write-Host "Removing Intermediate folder..."
+            Remove-Item -Path $intermediatePath -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "  Intermediate removed"
+          } else {
+            Write-Host "  Intermediate folder not found (already clean)"
+          }
+
+          $binariesPath = "${{ github.workspace }}\Binaries"
+          if (Test-Path $binariesPath) {
+            Write-Host "Removing Binaries folder..."
+            Remove-Item -Path $binariesPath -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "  Binaries removed"
+          } else {
+            Write-Host "  Binaries folder not found (already clean)"
+          }
+
+          $ddcPath = "${{ github.workspace }}\DerivedDataCache"
+          if (Test-Path $ddcPath) {
+            Write-Host "Removing DerivedDataCache folder..."
+            Remove-Item -Path $ddcPath -Recurse -Force -ErrorAction SilentlyContinue
+            Write-Host "  DerivedDataCache removed"
+          } else {
+            Write-Host "  DerivedDataCache folder not found (already clean)"
+          }
+
+          $stopwatch.Stop()
+          $elapsed = $stopwatch.Elapsed
+          Write-Host "Clean completed in $($elapsed.ToString('mm\:ss\.fff'))"
+
+      - name: Register MSVC problem matcher
+        run: echo "::add-matcher::.github/problem-matchers/msvc.json"
+
+      - name: Build project (${{ matrix.configuration }})
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+          # Define paths
+          $ue5Root = if ($env:UE5_ROOT) { $env:UE5_ROOT } else { "${{ env.UE5_ROOT }}" }
+          $runUAT = Join-Path $ue5Root "Engine\Build\BatchFiles\RunUAT.bat"
+          $project = "${{ github.workspace }}\${{ github.event.repository.name }}.uproject"
+          $configuration = "${{ matrix.configuration }}"
+
+          Write-Host "========================================"
+          Write-Host "UE5 Build Configuration"
+          Write-Host "========================================"
+          Write-Host "UE5 Root: $ue5Root"
+          Write-Host "RunUAT: $runUAT"
+          Write-Host "Project: $project"
+          Write-Host "Platform: Win64"
+          Write-Host "Configuration: $configuration"
+          Write-Host "========================================"
+
+          # Verify paths exist
+          if (-not (Test-Path $runUAT)) {
+            Write-Host "::error::RunUAT.bat not found at: $runUAT"
+            exit 1
+          }
+
+          if (-not (Test-Path $project)) {
+            Write-Host "::error::Project file not found at: $project"
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "Starting compilation..."
+          Write-Host ""
+
+          # Build command - compile only, no cook/stage/package
+          # Use hashtable to deduplicate error/warning lines (MSVC outputs each twice)
+          $seenErrors = @{}
+          $errorPattern = ':\s*(error|warning)\s+C\d+:'
+
+          # Config-specific RunUAT flags:
+          #   Development: default flags (debug symbols, editor integration)
+          #   Test:        no special flags (Shipping + console/stats, handled by engine)
+          #   Shipping:    -distribution (strips debug info, disables stats/profiling)
+          $configFlags = @()
+          switch ($configuration) {
+            "Shipping" { $configFlags += "-distribution" }
+            # Test: no special flags needed (Shipping + console/stats, handled by engine)
+          }
+
+          $flagsDisplay = if ($configFlags.Count -gt 0) { $configFlags -join " " } else { "(none)" }
+          Write-Host "Config-specific flags: $flagsDisplay"
+          Write-Host ""
+
+          $uatArgs = @(
+            "BuildCookRun",
+            "-project=`"$project`"",
+            "-noP4",
+            "-NoCompile",
+            "-platform=Win64",
+            "-clientconfig=$configuration",
+            "-build",
+            "-skipcook",
+            "-skipstage",
+            "-skippackage",
+            "-utf8output",
+            "-unattended"
+          ) + $configFlags
+
+          & "$runUAT" @uatArgs 2>&1 | ForEach-Object {
+            $line = $_
+            if ($line -match $errorPattern) {
+              if (-not $seenErrors.ContainsKey($line)) {
+                $seenErrors[$line] = $true
+                Write-Host $line
+              }
+            } else {
+              Write-Host $line
+            }
+          }
+
+          $buildExitCode = $LASTEXITCODE
+          $stopwatch.Stop()
+          $elapsed = $stopwatch.Elapsed
+          $minutes = [math]::Floor($elapsed.TotalMinutes)
+          $seconds = $elapsed.Seconds
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "Build completed in ${minutes}m ${seconds}s"
+          Write-Host "Exit code: $buildExitCode"
+          Write-Host "========================================"
+
+          # Store build results for summary step
+          echo "BUILD_DURATION=${minutes}m ${seconds}s" >> $env:GITHUB_ENV
+          if ($buildExitCode -eq 0) {
+            echo "BUILD_STATUS=success" >> $env:GITHUB_ENV
+          } else {
+            echo "BUILD_STATUS=failed" >> $env:GITHUB_ENV
+            echo "BUILD_EXITCODE=$buildExitCode" >> $env:GITHUB_ENV
+          }
+
+          if ($buildExitCode -ne 0) {
+            Write-Host "::error::Build failed with exit code $buildExitCode (Configuration: $configuration)"
+            exit $buildExitCode
+          }
+
+          Write-Host "Build succeeded!"
+
+      - name: Remove problem matcher
+        if: always()
+        run: |
+          echo "::remove-matcher owner=msvc-compiler::"
+          echo "::remove-matcher owner=msvc-linker::"
+
+      - name: Generate build summary
+        if: always()
+        shell: powershell
+        run: |
+          $configuration = "${{ matrix.configuration }}"
+          $cleanBuild = "${{ github.event.inputs.clean_build }}"
+          if (-not $cleanBuild) { $cleanBuild = "false" }
+          $status = $env:BUILD_STATUS
+          $duration = $env:BUILD_DURATION
+          $exitCode = $env:BUILD_EXITCODE
+          if ($status -eq 'success') {
+            $statusIcon = ':white_check_mark:'
+            $statusText = 'Success'
+          } else {
+            $statusIcon = ':x:'
+            $statusText = "Failed (exit code: $exitCode)"
+          }
+          if (-not $duration) { $duration = "N/A" }
+          $sha = "${{ github.sha }}"
+          $trigger = "${{ github.event_name }}"
+          $branch = "${{ github.ref_name }}"
+
+          # Config-specific flags for display
+          $configFlags = switch ($configuration) {
+            "Shipping" { "-distribution" }
+            "Test"     { "(none -- Test is Shipping + console/stats)" }
+            default    { "(none)" }
+          }
+
+          $codeBlock = '```'
+          $lines = @(
+            "## Build Summary ($configuration) $statusIcon",
+            "",
+            "| Property | Value |",
+            "|----------|-------|",
+            "| **Status** | $statusText |",
+            "| **Duration** | $duration |",
+            "| **Configuration** | $configuration |",
+            "| **Config Flags** | $configFlags |",
+            "| **Platform** | Win64 |",
+            "| **Clean Build** | $cleanBuild |",
+            "| **Trigger** | $trigger |",
+            "| **Branch** | $branch |",
+            "| **Commit** | $sha |",
+            "",
+            "### Build Command",
+            "",
+            $codeBlock,
+            "RunUAT.bat BuildCookRun -project=${{ github.event.repository.name }}.uproject -platform=Win64 -clientconfig=$configuration -build -skipcook -skipstage -skippackage",
+            $codeBlock
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      # =========================================================================
+      # Test Steps - Run UE5 Automation Tests after successful build
+      # =========================================================================
+      - name: Register UE5 test problem matcher
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping'
+        run: echo "::add-matcher::.github/problem-matchers/ue-tests.json"
+
+      - name: Run UE5 Automation Tests (${{ matrix.configuration }})
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping'
+        id: run_tests
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Continue"
+          $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+          # Define paths
+          $ue5Root = if ($env:UE5_ROOT) { $env:UE5_ROOT } else { "${{ env.UE5_ROOT }}" }
+          $editorCmd = Join-Path $ue5Root "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
+          $project = "${{ github.workspace }}\${{ github.event.repository.name }}.uproject"
+          $reportPath = "${{ github.workspace }}\TestResults"
+          $logFile = "${{ github.workspace }}\TestResults\TestRun.log"
+
+          # Create report directory
+          New-Item -ItemType Directory -Force -Path $reportPath | Out-Null
+
+          Write-Host "========================================"
+          Write-Host "UE5 Test Configuration"
+          Write-Host "========================================"
+          Write-Host "Editor: $editorCmd"
+          Write-Host "Project: $project"
+          Write-Host "Report Path: $reportPath"
+          Write-Host "Log File: $logFile"
+          Write-Host "Configuration: ${{ matrix.configuration }}"
+          Write-Host "========================================"
+
+          # Verify editor exists
+          if (-not (Test-Path $editorCmd)) {
+            Write-Host "::error::UnrealEditor-Cmd.exe not found at: $editorCmd"
+            exit 1
+          }
+
+          # List available binaries to debug
+          Write-Host ""
+          Write-Host "Project binaries:"
+          $binPath = "${{ github.workspace }}\Binaries\Win64"
+          if (Test-Path $binPath) {
+            Get-ChildItem $binPath -Filter "*.dll" | Select-Object -First 10 | ForEach-Object { Write-Host "  $_" }
+          } else {
+            Write-Host "  (no Binaries\Win64 folder found)"
+          }
+          Write-Host ""
+          Write-Host "Running automation tests..."
+          Write-Host ""
+
+          # Run tests with explicit log file output
+          # Use -stdout to ensure output goes to console
+          # Use -nosplash -nosound for faster startup
+          $process = Start-Process -FilePath $editorCmd -ArgumentList @(
+            "`"$project`"",
+            "-ExecCmds=`"Automation RunTests ${{ env.PROJECT_NAME }};Quit`"",
+            "-unattended",
+            "-nopause",
+            "-NullRHI",
+            "-nosplash",
+            "-nosound",
+            "-ReportExportPath=`"$reportPath`"",
+            "-log=`"$logFile`"",
+            "-stdout",
+            "-FullStdOutLogOutput"
+          ) -Wait -PassThru -NoNewWindow -RedirectStandardOutput "$reportPath\stdout.txt" -RedirectStandardError "$reportPath\stderr.txt"
+
+          $ueExitCode = $process.ExitCode
+          $stopwatch.Stop()
+
+          Write-Host ""
+          Write-Host "UE5 Exit Code: $ueExitCode"
+          Write-Host ""
+
+          # Output captured stdout
+          if (Test-Path "$reportPath\stdout.txt") {
+            Write-Host "=== STDOUT ==="
+            Get-Content "$reportPath\stdout.txt" | ForEach-Object { Write-Host $_ }
+          }
+
+          # Output captured stderr
+          if (Test-Path "$reportPath\stderr.txt") {
+            $stderr = Get-Content "$reportPath\stderr.txt" -Raw
+            if ($stderr) {
+              Write-Host ""
+              Write-Host "=== STDERR ==="
+              Write-Host $stderr
+            }
+          }
+
+          # Output log file if it exists
+          if (Test-Path $logFile) {
+            Write-Host ""
+            Write-Host "=== LOG FILE (last 100 lines) ==="
+            Get-Content $logFile -Tail 100 | ForEach-Object { Write-Host $_ }
+          }
+
+          # Store testOutput for parsing (use log file)
+          $testOutput = @()
+          if (Test-Path $logFile) {
+            $testOutput = Get-Content $logFile
+          } elseif (Test-Path "$reportPath\stdout.txt") {
+            $testOutput = Get-Content "$reportPath\stdout.txt"
+          }
+
+          # Parse output for test failure indicators
+          $hasFailures = $false
+          $testOutput | ForEach-Object {
+            if ($_ -match "LogAutomationController: Error:" -or
+                $_ -match "Result=\{Failed\}" -or
+                $_ -match "Tests Failed:.*[1-9]") {
+              $hasFailures = $true
+            }
+          }
+
+          # Check JSON report for failures (backup validation)
+          $jsonReport = Join-Path $reportPath "index.json"
+          if (Test-Path $jsonReport) {
+            $jsonContent = Get-Content -Path $jsonReport -Raw -Encoding UTF8
+            $jsonContent = $jsonContent.TrimStart([char]0xFEFF)
+            $report = $jsonContent | ConvertFrom-Json
+            if ($report.failed -gt 0) {
+              $hasFailures = $true
+              Write-Host ""
+              Write-Host "::error::$($report.failed) test(s) failed"
+            }
+          }
+
+          # Store results
+          $elapsed = $stopwatch.Elapsed
+          $minutes = [math]::Floor($elapsed.TotalMinutes)
+          $seconds = $elapsed.Seconds
+
+          echo "TEST_DURATION=${minutes}m ${seconds}s" >> $env:GITHUB_ENV
+
+          if ($hasFailures) {
+            echo "TEST_STATUS=failed" >> $env:GITHUB_ENV
+            echo "TEST_FAILED=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "TEST_STATUS=passed" >> $env:GITHUB_ENV
+            echo "TEST_FAILED=false" >> $env:GITHUB_OUTPUT
+          }
+
+          # List TestResults contents for debugging
+          Write-Host ""
+          Write-Host "TestResults directory contents:"
+          if (Test-Path $reportPath) {
+            Get-ChildItem $reportPath | ForEach-Object { Write-Host "  $($_.Name) ($($_.Length) bytes)" }
+          } else {
+            Write-Host "  (directory not found)"
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "Tests completed in ${minutes}m ${seconds}s"
+          Write-Host "UE Exit Code: $ueExitCode"
+          Write-Host "Has Failures: $hasFailures"
+          Write-Host "Configuration: ${{ matrix.configuration }}"
+          Write-Host "========================================"
+
+          # If UE5 crashed (non-zero exit), mark as failure
+          if ($ueExitCode -ne 0 -and -not $hasFailures) {
+            Write-Host "::warning::UE5 exited with code $ueExitCode - tests may not have run"
+          }
+
+      - name: Convert test results to JUnit XML
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        shell: powershell
+        run: |
+          $jsonReport = "${{ github.workspace }}\TestResults\index.json"
+          $junitOutput = "${{ github.workspace }}\TestResults\junit-results.xml"
+
+          if (Test-Path $jsonReport) {
+            & "${{ github.workspace }}\.github\scripts\Convert-UETestsToJUnit.ps1" `
+              -JsonPath $jsonReport `
+              -OutputPath $junitOutput
+          } else {
+            Write-Host "::warning::No test report found at $jsonReport"
+          }
+
+      - name: Set artifact retention days
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        id: retention
+        shell: powershell
+        run: |
+          # Config-dependent retention:
+          #   Development: 3 days  (ephemeral, quick feedback)
+          #   Test:        3 days  (ephemeral, same as Development)
+          #   Shipping:    14 days (production-quality, worth keeping longer)
+          $retention = switch ("${{ matrix.configuration }}") {
+            "Development" { 3 }
+            "Test"        { 3 }
+            "Shipping"    { 14 }
+            default       { 7 }
+          }
+          Write-Host "Artifact retention for ${{ matrix.configuration }}: $retention days"
+          echo "days=$retention" >> $env:GITHUB_OUTPUT
+
+      - name: Upload test results artifact
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.configuration }}
+          path: TestResults/
+          retention-days: ${{ steps.retention.outputs.days }}
+          if-no-files-found: warn
+
+      - name: Publish test results
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: UE5 Automation Tests (${{ matrix.configuration }})
+          path: TestResults/junit-results.xml
+          reporter: java-junit
+          fail-on-error: false
+        continue-on-error: true
+
+      - name: Remove UE5 test problem matcher
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        run: echo "::remove-matcher owner=ue5-tests::"
+
+      - name: Generate test summary
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        shell: powershell
+        run: |
+          $configuration = "${{ matrix.configuration }}"
+          $status = $env:TEST_STATUS
+          $duration = $env:TEST_DURATION
+
+          if ($status -eq 'passed') {
+            $statusIcon = ':white_check_mark:'
+            $statusText = 'All tests passed'
+          } else {
+            $statusIcon = ':x:'
+            $statusText = 'Tests failed'
+          }
+          if (-not $duration) { $duration = "N/A" }
+
+          # Build summary lines
+          $lines = @(
+            "## Test Summary ($configuration) $statusIcon",
+            "",
+            "| Property | Value |",
+            "|----------|-------|",
+            "| **Status** | $statusText |",
+            "| **Duration** | $duration |",
+            "| **Configuration** | $configuration |"
+          )
+
+          # Read JSON report for details
+          $jsonReport = "${{ github.workspace }}\TestResults\index.json"
+          if (Test-Path $jsonReport) {
+            $jsonContent = Get-Content -Path $jsonReport -Raw -Encoding UTF8
+            $jsonContent = $jsonContent.TrimStart([char]0xFEFF)
+            $report = $jsonContent | ConvertFrom-Json
+
+            $lines += @(
+              "",
+              "### Test Results",
+              "",
+              "| Metric | Count |",
+              "|--------|-------|",
+              "| **Passed** | $($report.succeeded) |",
+              "| **Failed** | $($report.failed) |",
+              "| **Skipped** | $($report.notRun) |",
+              "| **Total** | $($report.succeeded + $report.failed + $report.notRun) |",
+              "",
+              "<details>",
+              "<summary>Test Details</summary>",
+              "",
+              "| Test | Status |",
+              "|------|--------|"
+            )
+
+            foreach ($test in $report.tests) {
+              $testStatus = if ($test.state -eq "Success") { ":white_check_mark:" } elseif ($test.state -eq "Fail") { ":x:" } else { ":grey_question:" }
+              $lines += "| $($test.testDisplayName) | $testStatus |"
+            }
+
+            $lines += @(
+              "",
+              "</details>"
+            )
+          }
+
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      - name: Fail if tests failed
+        if: steps.run_tests.outputs.TEST_FAILED == 'true' && matrix.configuration != 'Shipping'
+        shell: powershell
+        run: |
+          Write-Host "::error::Tests failed - see test results above (Configuration: ${{ matrix.configuration }})"
+          exit 1
+
+      # =========================================================================
+      # Functional Test Steps - Run functional tests in headed mode (GPU rendering)
+      # Separate from unit/smoke tests: different rendering mode, timeout, and filter
+      # =========================================================================
+      - name: Determine functional test filter
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping'
+        id: func_test_filter
+        shell: powershell
+        run: |
+          $ref = "${{ github.ref }}"
+          $baseRef = "${{ github.base_ref }}"
+          $event = "${{ github.event_name }}"
+
+          # Main branch or PR targeting main: run full functional suite
+          # Development branch: run quick checks only
+          $projectName = '${{ env.PROJECT_NAME }}'
+          if ($ref -eq "refs/heads/main" -or $baseRef -eq "main") {
+              $filter = "$projectName.Functional"
+              $tierName = "Full"
+          } else {
+              $filter = "$projectName.Functional.Quick"
+              $tierName = "Quick"
+          }
+
+          Write-Host "Functional test tier: $tierName"
+          Write-Host "Filter: $filter"
+          echo "filter=$filter" >> $env:GITHUB_OUTPUT
+          echo "tier=$tierName" >> $env:GITHUB_OUTPUT
+
+      - name: Run Functional Tests (${{ matrix.configuration }})
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping'
+        id: run_functional_tests
+        timeout-minutes: 10
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Continue"
+          $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+          # Define paths
+          $ue5Root = if ($env:UE5_ROOT) { $env:UE5_ROOT } else { "${{ env.UE5_ROOT }}" }
+          $editorCmd = Join-Path $ue5Root "Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
+          $project = "${{ github.workspace }}\${{ github.event.repository.name }}.uproject"
+          $reportPath = "${{ github.workspace }}\FunctionalTestResults"
+          $logFile = "${{ github.workspace }}\FunctionalTestResults\FunctionalTestRun.log"
+          $filter = "${{ steps.func_test_filter.outputs.filter }}"
+          $tier = "${{ steps.func_test_filter.outputs.tier }}"
+
+          # Create report directory
+          New-Item -ItemType Directory -Force -Path $reportPath | Out-Null
+
+          Write-Host "========================================"
+          Write-Host "Functional Test Configuration"
+          Write-Host "========================================"
+          Write-Host "Editor: $editorCmd"
+          Write-Host "Project: $project"
+          Write-Host "Filter: $filter"
+          Write-Host "Tier: $tier"
+          Write-Host "Mode: Headed (GPU rendering)"
+          Write-Host "Report Path: $reportPath"
+          Write-Host "Log File: $logFile"
+          Write-Host "Configuration: ${{ matrix.configuration }}"
+          Write-Host "========================================"
+
+          # Verify editor exists
+          if (-not (Test-Path $editorCmd)) {
+            Write-Host "::error::UnrealEditor-Cmd.exe not found at: $editorCmd"
+            exit 1
+          }
+
+          Write-Host ""
+          Write-Host "Running functional tests ($tier tier)..."
+          Write-Host ""
+
+          # Run functional tests in headed mode (NO -NullRHI)
+          # Uses -windowed -resx=1280 -resy=720 to prevent fullscreen issues
+          $process = Start-Process -FilePath $editorCmd -ArgumentList @(
+            "`"$project`"",
+            "-ExecCmds=`"Automation RunTests $filter;Quit`"",
+            "-unattended",
+            "-nopause",
+            "-nosplash",
+            "-nosound",
+            "-windowed",
+            "-resx=1280",
+            "-resy=720",
+            "-ReportExportPath=`"$reportPath`"",
+            "-log=`"$logFile`"",
+            "-stdout",
+            "-FullStdOutLogOutput"
+          ) -Wait -PassThru -NoNewWindow -RedirectStandardOutput "$reportPath\stdout.txt" -RedirectStandardError "$reportPath\stderr.txt"
+
+          $ueExitCode = $process.ExitCode
+          $stopwatch.Stop()
+
+          Write-Host ""
+          Write-Host "UE5 Exit Code: $ueExitCode"
+          Write-Host ""
+
+          # Output captured stdout
+          if (Test-Path "$reportPath\stdout.txt") {
+            Write-Host "=== FUNCTIONAL TEST STDOUT ==="
+            Get-Content "$reportPath\stdout.txt" | ForEach-Object { Write-Host $_ }
+          }
+
+          # Output captured stderr
+          if (Test-Path "$reportPath\stderr.txt") {
+            $stderr = Get-Content "$reportPath\stderr.txt" -Raw
+            if ($stderr) {
+              Write-Host ""
+              Write-Host "=== FUNCTIONAL TEST STDERR ==="
+              Write-Host $stderr
+            }
+          }
+
+          # Output log file if it exists
+          if (Test-Path $logFile) {
+            Write-Host ""
+            Write-Host "=== FUNCTIONAL TEST LOG (last 100 lines) ==="
+            Get-Content $logFile -Tail 100 | ForEach-Object { Write-Host $_ }
+          }
+
+          # Store testOutput for parsing (use log file)
+          $testOutput = @()
+          if (Test-Path $logFile) {
+            $testOutput = Get-Content $logFile
+          } elseif (Test-Path "$reportPath\stdout.txt") {
+            $testOutput = Get-Content "$reportPath\stdout.txt"
+          }
+
+          # Parse output for test failure indicators
+          $hasFailures = $false
+          $testOutput | ForEach-Object {
+            if ($_ -match "LogAutomationController: Error:" -or
+                $_ -match "Result=\{Failed\}" -or
+                $_ -match "Tests Failed:.*[1-9]") {
+              $hasFailures = $true
+            }
+          }
+
+          # Check JSON report for failures (backup validation)
+          $jsonReport = Join-Path $reportPath "index.json"
+          if (Test-Path $jsonReport) {
+            $jsonContent = Get-Content -Path $jsonReport -Raw -Encoding UTF8
+            $jsonContent = $jsonContent.TrimStart([char]0xFEFF)
+            $report = $jsonContent | ConvertFrom-Json
+            if ($report.failed -gt 0) {
+              $hasFailures = $true
+              Write-Host ""
+              Write-Host "::error::$($report.failed) functional test(s) failed"
+            }
+          }
+
+          # Store results
+          $elapsed = $stopwatch.Elapsed
+          $minutes = [math]::Floor($elapsed.TotalMinutes)
+          $seconds = $elapsed.Seconds
+
+          echo "FUNC_TEST_DURATION=${minutes}m ${seconds}s" >> $env:GITHUB_ENV
+
+          if ($hasFailures) {
+            echo "FUNC_TEST_STATUS=failed" >> $env:GITHUB_ENV
+            echo "FUNC_TEST_FAILED=true" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "FUNC_TEST_STATUS=passed" >> $env:GITHUB_ENV
+            echo "FUNC_TEST_FAILED=false" >> $env:GITHUB_OUTPUT
+          }
+
+          # List FunctionalTestResults contents for debugging
+          Write-Host ""
+          Write-Host "FunctionalTestResults directory contents:"
+          if (Test-Path $reportPath) {
+            Get-ChildItem $reportPath | ForEach-Object { Write-Host "  $($_.Name) ($($_.Length) bytes)" }
+          } else {
+            Write-Host "  (directory not found)"
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "Functional tests completed in ${minutes}m ${seconds}s"
+          Write-Host "UE Exit Code: $ueExitCode"
+          Write-Host "Has Failures: $hasFailures"
+          Write-Host "Tier: $tier"
+          Write-Host "Configuration: ${{ matrix.configuration }}"
+          Write-Host "========================================"
+
+          # If UE5 crashed (non-zero exit), mark as failure
+          if ($ueExitCode -ne 0 -and -not $hasFailures) {
+            Write-Host "::warning::UE5 exited with code $ueExitCode - functional tests may not have run"
+          }
+
+      - name: Convert functional test results to JUnit XML
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        shell: powershell
+        run: |
+          $jsonReport = "${{ github.workspace }}\FunctionalTestResults\index.json"
+          $junitOutput = "${{ github.workspace }}\FunctionalTestResults\junit-functional-results.xml"
+
+          if (Test-Path $jsonReport) {
+            & "${{ github.workspace }}\.github\scripts\Convert-UETestsToJUnit.ps1" `
+              -JsonPath $jsonReport `
+              -OutputPath $junitOutput
+          } else {
+            Write-Host "::warning::No functional test report found at $jsonReport"
+          }
+
+      - name: Upload functional test results artifact
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functional-test-results-${{ matrix.configuration }}
+          path: FunctionalTestResults/
+          retention-days: ${{ steps.retention.outputs.days }}
+          if-no-files-found: warn
+
+      - name: Publish functional test results
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Functional Tests (${{ steps.func_test_filter.outputs.tier }}) (${{ matrix.configuration }})
+          path: FunctionalTestResults/junit-functional-results.xml
+          reporter: java-junit
+          fail-on-error: false
+        continue-on-error: true
+
+      - name: Generate functional test summary
+        if: env.BUILD_STATUS == 'success' && matrix.configuration != 'Shipping' && always()
+        shell: powershell
+        run: |
+          $configuration = "${{ matrix.configuration }}"
+          $status = $env:FUNC_TEST_STATUS
+          $duration = $env:FUNC_TEST_DURATION
+          $tier = "${{ steps.func_test_filter.outputs.tier }}"
+
+          if ($status -eq 'passed') {
+            $statusIcon = ':white_check_mark:'
+            $statusText = 'All functional tests passed'
+          } else {
+            $statusIcon = ':x:'
+            $statusText = 'Functional tests failed'
+          }
+          if (-not $duration) { $duration = "N/A" }
+
+          # Build summary lines
+          $lines = @(
+            "## Functional Test Summary ($tier) ($configuration) $statusIcon",
+            "",
+            "| Property | Value |",
+            "|----------|-------|",
+            "| **Status** | $statusText |",
+            "| **Duration** | $duration |",
+            "| **Tier** | $tier |",
+            "| **Mode** | Headed (GPU rendering) |",
+            "| **Configuration** | $configuration |"
+          )
+
+          # Read JSON report for details
+          $jsonReport = "${{ github.workspace }}\FunctionalTestResults\index.json"
+          if (Test-Path $jsonReport) {
+            $jsonContent = Get-Content -Path $jsonReport -Raw -Encoding UTF8
+            $jsonContent = $jsonContent.TrimStart([char]0xFEFF)
+            $report = $jsonContent | ConvertFrom-Json
+
+            $lines += @(
+              "",
+              "### Functional Test Results",
+              "",
+              "| Metric | Count |",
+              "|--------|-------|",
+              "| **Passed** | $($report.succeeded) |",
+              "| **Failed** | $($report.failed) |",
+              "| **Skipped** | $($report.notRun) |",
+              "| **Total** | $($report.succeeded + $report.failed + $report.notRun) |",
+              "",
+              "<details>",
+              "<summary>Functional Test Details</summary>",
+              "",
+              "| Test | Status |",
+              "|------|--------|"
+            )
+
+            foreach ($test in $report.tests) {
+              $testStatus = if ($test.state -eq "Success") { ":white_check_mark:" } elseif ($test.state -eq "Fail") { ":x:" } else { ":grey_question:" }
+              $lines += "| $($test.testDisplayName) | $testStatus |"
+            }
+
+            $lines += @(
+              "",
+              "</details>"
+            )
+          }
+
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      - name: Fail if functional tests failed
+        if: steps.run_functional_tests.outputs.FUNC_TEST_FAILED == 'true' && matrix.configuration != 'Shipping'
+        shell: powershell
+        run: |
+          Write-Host "::error::Functional tests failed - see results above (Configuration: ${{ matrix.configuration }}, Tier: ${{ steps.func_test_filter.outputs.tier }})"
+          exit 1
+
+      # =========================================================================
+      # Collect Results - Gathers build/test data for notification job
+      # =========================================================================
+      - name: Collect results for notifications
+        id: collect-results
+        if: always()
+        shell: powershell
+        run: |
+          # Determine overall status
+          $buildStatus = if ($env:BUILD_STATUS) { $env:BUILD_STATUS } else { "unknown" }
+          $testStatus = if ($env:TEST_STATUS) { $env:TEST_STATUS } else { "skipped" }
+
+          $funcTestStatus = if ($env:FUNC_TEST_STATUS) { $env:FUNC_TEST_STATUS } else { "skipped" }
+
+          $status = "success"
+          $failedStage = ""
+          $stageDuration = ""
+          $errorExcerpt = ""
+
+          if ($buildStatus -eq "failed") {
+              $status = "failed"
+              $failedStage = "build"
+              $stageDuration = $env:BUILD_DURATION
+              $errorExcerpt = "[${{ matrix.configuration }}] Build failed with exit code $env:BUILD_EXITCODE"
+          } elseif ($testStatus -eq "failed") {
+              $status = "failed"
+              $failedStage = "test"
+              $stageDuration = $env:TEST_DURATION
+              $errorExcerpt = "[${{ matrix.configuration }}] Tests failed"
+          } elseif ($funcTestStatus -eq "failed") {
+              $status = "failed"
+              $failedStage = "functional-test"
+              $stageDuration = $env:FUNC_TEST_DURATION
+              $errorExcerpt = "[${{ matrix.configuration }}] Functional tests failed"
+          }
+
+          # Extract failed test names from JUnit XML (unit/smoke tests)
+          $failedTests = ""
+          $junitPath = "${{ github.workspace }}\TestResults\junit-results.xml"
+          if (Test-Path $junitPath) {
+              try {
+                  [xml]$junit = Get-Content $junitPath -Encoding UTF8
+                  # JUnit XML structure: <testsuite><testcase><failure>
+                  $failures = $junit.testsuite.testcase | Where-Object { $_.failure }
+                  if ($failures) {
+                      $failedNames = @($failures | ForEach-Object { $_.name })
+                      $failedTests = $failedNames -join ","
+                  }
+              } catch {
+                  Write-Host "::warning::Could not parse JUnit XML: $_"
+              }
+          }
+
+          # Extract failed test names from functional test JUnit XML
+          $funcJunitPath = "${{ github.workspace }}\FunctionalTestResults\junit-functional-results.xml"
+          if (Test-Path $funcJunitPath) {
+              try {
+                  [xml]$funcJunit = Get-Content $funcJunitPath -Encoding UTF8
+                  $funcFailures = $funcJunit.testsuite.testcase | Where-Object { $_.failure }
+                  if ($funcFailures) {
+                      $funcFailedNames = @($funcFailures | ForEach-Object { $_.name })
+                      $funcFailedStr = $funcFailedNames -join ","
+                      if ($failedTests) {
+                          $failedTests = "$failedTests,$funcFailedStr"
+                      } else {
+                          $failedTests = $funcFailedStr
+                      }
+                  }
+              } catch {
+                  Write-Host "::warning::Could not parse functional test JUnit XML: $_"
+              }
+          }
+
+          # Determine overall duration (use latest stage duration: functional > unit > build)
+          $duration = if ($env:FUNC_TEST_DURATION) { $env:FUNC_TEST_DURATION } elseif ($env:TEST_DURATION) { $env:TEST_DURATION } else { $env:BUILD_DURATION }
+          if (-not $duration) { $duration = "N/A" }
+
+          # Write to GITHUB_OUTPUT
+          echo "status=$status" >> $env:GITHUB_OUTPUT
+          echo "duration=$duration" >> $env:GITHUB_OUTPUT
+          echo "failed_stage=$failedStage" >> $env:GITHUB_OUTPUT
+          echo "stage_duration=$stageDuration" >> $env:GITHUB_OUTPUT
+          echo "failed_tests=$failedTests" >> $env:GITHUB_OUTPUT
+
+          # Use delimiter syntax for error_excerpt (may contain special chars)
+          echo "error_excerpt<<EOF" >> $env:GITHUB_OUTPUT
+          echo "$errorExcerpt" >> $env:GITHUB_OUTPUT
+          echo "EOF" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Collected results: status=$status, duration=$duration, failed_stage=$failedStage"
+          if ($failedTests) { Write-Host "Failed tests: $failedTests" }
+
+  # =============================================================================
+  # Notify Job - Sends failure notifications (requires build)
+  # =============================================================================
+  notify:
+    needs: [build]
+    if: failure()
+    uses: ./.github/workflows/notify.yml
+    with:
+      status: 'failed'
+      workflow_name: 'UE5 Build'
+      branch: ${{ github.ref_name }}
+      commit_sha: ${{ github.sha }}
+      duration: ${{ needs.build.outputs.duration || 'N/A' }}
+      failed_tests: ${{ needs.build.outputs.failed_tests || '' }}
+      error_excerpt: ${{ needs.build.outputs.error_excerpt || '' }}
+      failed_stage: ${{ needs.build.outputs.failed_stage || '' }}
+      stage_duration: ${{ needs.build.outputs.stage_duration || '' }}
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    secrets: inherit

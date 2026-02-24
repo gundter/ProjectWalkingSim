@@ -1,0 +1,12 @@
+{
+  "threshold": 70,
+  "changed_lines_threshold": 70,
+  "skip_labels": ["skip-coverage"],
+  "module_name": "ClaudeCodeTesting",
+  "comment": {
+    "header": "coverage-gate",
+    "show_diff_cover": true,
+    "show_actionable_hints": true,
+    "max_hint_files": 5
+  }
+}

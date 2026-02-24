@@ -1,0 +1,587 @@
+# Steam Deploy — Standalone workflow_dispatch for deploying Shipping builds to Steam beta branch
+#
+# Secrets required:
+#   STEAM_USERNAME        — Dedicated CI Steam account username
+#   STEAM_PASSWORD        — Dedicated CI Steam account password
+#   STEAM_SHARED_SECRET   — TOTP shared_secret from CI account's .maFile
+#   DISCORD_WEBHOOK_URL   — (optional) Discord webhook for failure notifications
+#
+# Variables required (repository vars, not secrets):
+#   STEAM_APP_ID          — Steam App ID from Steamworks
+#   STEAM_DEPOT_ID        — Steam Depot ID from Steamworks
+#
+# Prerequisites:
+#   - Beta branch named 'beta' created with a password in Steamworks App Admin
+#   - CI Steam account has SteamPipe upload permissions for the app
+#   - At least one GitHub Release with a Shipping ZIP attached (from release.yml)
+
+name: Steam Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to deploy (e.g. v1.2.0). Leave blank to auto-detect latest.'
+        required: false
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry run - log actions without uploading to Steam'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# Never cancel an in-progress Steam upload — queue the next run instead.
+concurrency:
+  group: steam-deploy
+  cancel-in-progress: false
+
+jobs:
+  steam-deploy:
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 60
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Resolve tag
+      # If tag input is blank, auto-detect the latest non-pre-release tag via
+      # GitHub CLI. Outputs: resolved_tag.
+      # -------------------------------------------------------------------------
+      - name: Resolve tag
+        id: resolve-tag
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tagInput = "${{ inputs.tag }}".Trim()
+          if (-not $tagInput) {
+            Write-Host "No tag specified — auto-detecting latest release..."
+            $latestTag = gh release list --limit 1 --exclude-pre-releases --json tagName --jq ".[0].tagName"
+            if (-not $latestTag) {
+              Write-Host "::error::Could not auto-detect latest release tag. No non-pre-release releases found."
+              Write-Host "::error::Either push a release tag first, or specify a tag input explicitly."
+              exit 1
+            }
+            $resolvedTag = $latestTag.Trim()
+            Write-Host "Auto-detected latest release tag: $resolvedTag"
+          } else {
+            $resolvedTag = $tagInput
+            Write-Host "Using specified tag: $resolvedTag"
+          }
+          echo "resolved_tag=$resolvedTag" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 2: Extract version from tag
+      # Parses semver and sha7 from the resolved tag and current commit.
+      # Determines is_prerelease from tag suffix (-beta, -rc, -alpha).
+      # Branch is always 'beta' per user decision — this workflow always deploys
+      # to the Steam beta branch regardless of pre-release status.
+      # Outputs: semver, sha7, is_prerelease, branch.
+      # -------------------------------------------------------------------------
+      - name: Extract version from tag
+        id: extract-version
+        shell: powershell
+        run: |
+          $resolvedTag = "${{ steps.resolve-tag.outputs.resolved_tag }}"
+          $semver      = $resolvedTag.TrimStart('v')
+          $sha7        = "${{ github.sha }}".Substring(0, 7)
+
+          # Detect pre-release from tag suffix (-beta, -rc, -alpha, etc.)
+          $isPrerelease = ($semver -match '-[a-zA-Z]').ToString().ToLower()
+
+          # Branch is ALWAYS 'beta' — per user decision.
+          # SetLive "default" is explicitly blocked by Valve.
+          $branch = "beta"
+
+          Write-Host "Resolved tag:   $resolvedTag"
+          Write-Host "Semver:         $semver"
+          Write-Host "SHA7:           $sha7"
+          Write-Host "Is pre-release: $isPrerelease"
+          Write-Host "Target branch:  $branch"
+
+          echo "semver=$semver"           >> $env:GITHUB_OUTPUT
+          echo "sha7=$sha7"               >> $env:GITHUB_OUTPUT
+          echo "is_prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
+          echo "branch=$branch"           >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 3: Checkout repository at resolved tag
+      # Required to access PATCH_NOTES.md at the tagged version.
+      # -------------------------------------------------------------------------
+      - name: Checkout repository at tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve-tag.outputs.resolved_tag }}
+
+      # -------------------------------------------------------------------------
+      # Step 4: Generate Steam TOTP code
+      # CyberAndrii/steam-totp@v1 generates a time-valid TOTP code from the
+      # shared_secret extracted from the CI account's Steam mobile authenticator
+      # .maFile. TOTP never expires — preferred over config.vdf base64 approach.
+      # Guard: skipped in dry-run mode (no SteamCMD login needed).
+      # Outputs: code.
+      # -------------------------------------------------------------------------
+      - name: Generate Steam TOTP code
+        id: totp
+        if: inputs.dry_run != true
+        uses: CyberAndrii/steam-totp@v1
+        with:
+          shared_secret: ${{ secrets.STEAM_SHARED_SECRET }}
+
+      # -------------------------------------------------------------------------
+      # Step 5: Setup SteamCMD
+      # CyberAndrii/setup-steamcmd@v1 installs SteamCMD on Windows, adds it to
+      # PATH, and exposes 'directory' and 'executable' outputs.
+      # Guard: skipped in dry-run mode.
+      # -------------------------------------------------------------------------
+      - name: Setup SteamCMD
+        id: steamcmd
+        if: inputs.dry_run != true
+        uses: CyberAndrii/setup-steamcmd@v1
+
+      # -------------------------------------------------------------------------
+      # Step 6: Download Shipping ZIP from GitHub Release
+      # Uses gh release download to fetch the Shipping ZIP attached to the
+      # GitHub Release for the resolved tag. GitHub Release assets are permanently
+      # stored (not subject to 30-day Actions artifact expiry).
+      # Validates that exactly one ZIP was downloaded.
+      # Guard: skipped in dry-run mode.
+      # Outputs: zip_path.
+      # -------------------------------------------------------------------------
+      - name: Download Shipping ZIP from GitHub Release
+        id: download-zip
+        if: inputs.dry_run != true
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag    = "${{ steps.resolve-tag.outputs.resolved_tag }}"
+          $outDir = "${{ runner.temp }}\shipping-steam-download"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          Write-Host "Downloading Shipping ZIP for tag: $tag"
+          gh release download $tag --pattern "*.zip" --dir $outDir
+
+          $zips = Get-ChildItem $outDir -Filter "*.zip"
+          if (-not $zips -or $zips.Count -eq 0) {
+            Write-Host "::error::No ZIP file found in GitHub Release '$tag'."
+            Write-Host "::error::Ensure the release has a Shipping ZIP asset attached (created by the release.yml github-deploy job)."
+            exit 1
+          }
+          if ($zips.Count -gt 1) {
+            Write-Host "::error::Multiple ZIP files found in release '$tag'. Expected exactly one."
+            $zips | ForEach-Object { Write-Host "  $($_.Name)" }
+            exit 1
+          }
+
+          $zipPath = $zips[0].FullName
+          $zipSizeMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
+          Write-Host "Downloaded: $zipPath ($zipSizeMB MB)"
+          echo "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 7: Extract Shipping ZIP for Steam
+      # Extracts to a Steam-specific directory (shipping-steam) to avoid
+      # interference with itch.io extraction (shipping-butler). (Pitfall 5)
+      # Validates that extraction produced files (catches corrupt ZIP).
+      # Guard: skipped in dry-run mode.
+      # -------------------------------------------------------------------------
+      - name: Extract Shipping ZIP for Steam
+        if: inputs.dry_run != true
+        shell: powershell
+        run: |
+          $zipPath   = "${{ steps.download-zip.outputs.zip_path }}"
+          $extractDir = "${{ runner.temp }}\shipping-steam"
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+
+          Write-Host "Extracting: $zipPath"
+          Write-Host "  -> To: $extractDir"
+          Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+
+          $fileCount = (Get-ChildItem $extractDir -Recurse -File -ErrorAction SilentlyContinue).Count
+          Write-Host "Extracted $fileCount files to: $extractDir"
+
+          if ($fileCount -eq 0) {
+            Write-Host "::error::Extraction produced no files. The Shipping ZIP may be corrupt or empty."
+            exit 1
+          }
+
+          Write-Host "Extraction validated: $fileCount files found"
+
+      # -------------------------------------------------------------------------
+      # Step 8: Build description from PATCH_NOTES.md
+      # Reads PATCH_NOTES.md from the checked-out tagged commit, strips HTML
+      # comments (template artifacts), composes header "v{semver} ({sha7})",
+      # and truncates to 1000 characters total (keeping header + first section).
+      # Silent truncation per user decision — no CI warning on trim.
+      # Plain text only — Steam Desc field does not support markdown or rich text.
+      # This step ALWAYS runs (needed for both dry-run logging and real upload).
+      # Outputs: build_desc.
+      # -------------------------------------------------------------------------
+      - name: Build description from PATCH_NOTES.md
+        id: build-desc
+        shell: powershell
+        run: |
+          $semver = "${{ steps.extract-version.outputs.semver }}"
+          $sha7   = "${{ steps.extract-version.outputs.sha7 }}"
+          $notesPath = "${{ github.workspace }}\PATCH_NOTES.md"
+
+          if (-not (Test-Path $notesPath)) {
+            Write-Host "::warning::PATCH_NOTES.md not found at workspace root. Build description will use version header only."
+            $notes = ""
+          } else {
+            $notes = Get-Content $notesPath -Raw
+
+            # Strip HTML comments (template artifacts like <!-- ... -->)
+            $notes = $notes -replace '(?s)<!--.*?-->', ''
+
+            # Collapse multiple blank lines into single blank lines
+            $notes = $notes -replace '(?m)^\s*$(\r?\n)', "`n"
+            $notes = $notes.Trim()
+          }
+
+          $header    = "v${semver} (${sha7})"
+          $maxDesc   = 1000
+          $headerLen = $header.Length + 1  # +1 for newline separator
+
+          if ($notes.Length -gt 0) {
+            $available = $maxDesc - $headerLen
+            if ($notes.Length -gt $available) {
+              # Truncate: find last line break before cut point to avoid mid-line cuts
+              $cutPoint = $notes.LastIndexOf("`n", ($available - 4))
+              if ($cutPoint -lt 0) { $cutPoint = [Math]::Max(0, $available - 4) }
+              $notes = $notes.Substring(0, $cutPoint) + " ..."
+            }
+            $buildDesc = "${header}`n${notes}"
+          } else {
+            $buildDesc = $header
+          }
+
+          Write-Host "Build description ($($buildDesc.Length) chars):"
+          Write-Host "  $($buildDesc.Substring(0, [Math]::Min(200, $buildDesc.Length)))..."
+
+          # Write to multi-line output safely via file
+          $descPath = "${{ runner.temp }}\build-desc.txt"
+          $buildDesc | Out-File -FilePath $descPath -Encoding utf8 -NoNewline
+          echo "build_desc_path=$descPath" >> $env:GITHUB_OUTPUT
+          echo "build_desc_preview=$($buildDesc.Substring(0, [Math]::Min(200, $buildDesc.Length)))" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 9: Write VDF files
+      # Generates app_build.vdf and depot_build.vdf dynamically in PowerShell
+      # (never commit VDF files — they contain paths and would need secrets).
+      # Uses PowerShell here-strings (@"..."@) for clean multi-line output.
+      # VDF key points:
+      #   - SetLive "beta" (NEVER "default" — Valve blocks default via automation)
+      #   - Preview "0" (NEVER "1" — would silently skip upload)
+      #   - Depots value: absolute path to depot_build.vdf
+      #   - ContentRoot: absolute path using runner.temp (Pitfall 5)
+      # Guard: skipped in dry-run mode.
+      # Outputs: app_vdf_path, build_output_dir.
+      # -------------------------------------------------------------------------
+      - name: Write VDF files
+        id: write-vdf
+        if: inputs.dry_run != true
+        shell: powershell
+        run: |
+          $appId       = "${{ vars.STEAM_APP_ID }}"
+          $depotId     = "${{ vars.STEAM_DEPOT_ID }}"
+          $semver      = "${{ steps.extract-version.outputs.semver }}"
+          $sha7        = "${{ steps.extract-version.outputs.sha7 }}"
+          $branch      = "${{ steps.extract-version.outputs.branch }}"
+          $contentRoot = "${{ runner.temp }}\shipping-steam"
+          $buildOutput = "${{ runner.temp }}\steamcmd-output"
+          $appVdfPath  = "${{ runner.temp }}\app_build.vdf"
+          $depotVdfPath = "${{ runner.temp }}\depot_build.vdf"
+
+          New-Item -ItemType Directory -Force -Path $buildOutput | Out-Null
+
+          # Read build description from file (avoids GITHUB_OUTPUT multiline issues)
+          $descPath  = "${{ steps.build-desc.outputs.build_desc_path }}"
+          $buildDesc = Get-Content $descPath -Raw
+
+          # Sanitize build description for VDF:
+          # Replace internal double-quotes with single quotes to avoid VDF parse errors.
+          # VDF values are quoted strings; embedded quotes break the format.
+          $buildDesc = $buildDesc -replace '"', "'"
+
+          Write-Host "Writing app_build.vdf..."
+          Write-Host "  AppID:       $appId"
+          Write-Host "  DepotID:     $depotId"
+          Write-Host "  ContentRoot: $contentRoot"
+          Write-Host "  BuildOutput: $buildOutput"
+          Write-Host "  SetLive:     $branch"
+          Write-Host "  Preview:     0"
+
+          $appVdfLines = @(
+            '"AppBuild"'
+            '{'
+            "  `"AppID`"       `"$appId`""
+            "  `"Desc`"        `"$buildDesc`""
+            "  `"ContentRoot`" `"$contentRoot`""
+            "  `"BuildOutput`" `"$buildOutput`""
+            "  `"SetLive`"     `"$branch`""
+            '  "Preview"     "0"'
+            '  "Depots"'
+            '  {'
+            "    `"$depotId`"  `"$depotVdfPath`""
+            '  }'
+            '}'
+          ) -join "`n"
+          $appVdfLines | Out-File -FilePath $appVdfPath -Encoding utf8
+
+          Write-Host "Writing depot_build.vdf..."
+          $depotVdfLines = @(
+            '"DepotBuildConfig"'
+            '{'
+            "  `"DepotID`"     `"$depotId`""
+            "  `"ContentRoot`" `"$contentRoot`""
+            '  "FileMapping"'
+            '  {'
+            '    "LocalPath" "*"'
+            '    "DepotPath" "."'
+            '    "recursive" "1"'
+            '  }'
+            '  "FileExclusion" "*.pdb"'
+            '}'
+          ) -join "`n"
+          $depotVdfLines | Out-File -FilePath $depotVdfPath -Encoding utf8
+
+          Write-Host "VDF files written:"
+          Write-Host "  app_build.vdf:   $appVdfPath"
+          Write-Host "  depot_build.vdf: $depotVdfPath"
+
+          echo "app_vdf_path=$appVdfPath"     >> $env:GITHUB_OUTPUT
+          echo "build_output_dir=$buildOutput" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 10: Validate Preview mode — MANDATORY CI safeguard
+      # Reads the generated app_build.vdf and fails if Preview "1" is found.
+      # Preview "1" causes SteamCMD to silently skip the upload (exits 0 but
+      # uploads nothing — "build preview" instead of "build complete"). (Pitfall 2)
+      # This check runs BEFORE SteamCMD is invoked.
+      # Guard: skipped in dry-run mode (no VDF file generated in dry-run).
+      # -------------------------------------------------------------------------
+      - name: Validate Preview mode
+        if: inputs.dry_run != true
+        shell: powershell
+        run: |
+          $appVdfPath = "${{ steps.write-vdf.outputs.app_vdf_path }}"
+          $vdfContent = Get-Content $appVdfPath -Raw
+
+          if ($vdfContent -match '"Preview"\s+"1"') {
+            Write-Host "::error::app_build.vdf contains Preview `"1`" — this is a preview build and will NOT upload to Steam."
+            Write-Host "::error::SteamCMD would exit 0 with 'Successfully finished build preview' but upload nothing."
+            Write-Host "::error::Fix: Ensure the Preview field is set to `"0`" in the workflow VDF generation step."
+            exit 1
+          }
+
+          Write-Host "Preview validation passed: Preview field is not '1'"
+
+      # -------------------------------------------------------------------------
+      # Step 11: Upload to Steam via SteamCMD
+      # Runs SteamCMD with +login (TOTP auth) and +run_app_build (absolute VDF path).
+      # Secrets passed via env block — NEVER interpolated directly in shell. (Pitfall 8)
+      # Absolute paths used for VDF — relative paths fail SteamCMD. (Pitfall 7)
+      # Guard: skipped in dry-run mode.
+      # Outputs: exit_code.
+      # -------------------------------------------------------------------------
+      - name: Upload to Steam via SteamCMD
+        id: steam-upload
+        if: inputs.dry_run != true
+        shell: powershell
+        env:
+          STEAM_USERNAME: ${{ secrets.STEAM_USERNAME }}
+          STEAM_PASSWORD: ${{ secrets.STEAM_PASSWORD }}
+          STEAM_TOTP:     ${{ steps.totp.outputs.code }}
+        run: |
+          $appVdfPath = "${{ steps.write-vdf.outputs.app_vdf_path }}"
+
+          Write-Host "========================================"
+          Write-Host "SteamCMD Upload"
+          Write-Host "========================================"
+          Write-Host "  VDF:      $appVdfPath"
+          Write-Host "  Tag:      ${{ steps.resolve-tag.outputs.resolved_tag }}"
+          Write-Host "  Branch:   ${{ steps.extract-version.outputs.branch }}"
+          Write-Host "========================================"
+          Write-Host "Running: steamcmd +login [USERNAME] [PASSWORD] [TOTP] +run_app_build $appVdfPath +quit"
+
+          steamcmd `
+            +login $env:STEAM_USERNAME $env:STEAM_PASSWORD $env:STEAM_TOTP `
+            +run_app_build $appVdfPath `
+            +quit
+
+          $exitCode = $LASTEXITCODE
+          echo "exit_code=$exitCode" >> $env:GITHUB_OUTPUT
+
+          if ($exitCode -ne 0) {
+            Write-Host "::error::SteamCMD +run_app_build failed with exit code $exitCode"
+            Write-Host "::error::Check the SteamCMD logs artifact for details (uploaded on failure)."
+            exit $exitCode
+          }
+
+          Write-Host "SteamCMD upload completed successfully."
+          Write-Host "Check Steamworks App Admin > Builds to verify the new build appears on the '${{ steps.extract-version.outputs.branch }}' branch."
+
+      # -------------------------------------------------------------------------
+      # Step 12: Dry-run summary
+      # When dry_run is true, outputs a GITHUB_STEP_SUMMARY table showing the
+      # resolved tag, version, branch target, and configuration status.
+      # Uses ::warning:: for any missing required configuration.
+      # Guard: only runs in dry-run mode.
+      # -------------------------------------------------------------------------
+      - name: Dry-run summary
+        if: inputs.dry_run == true
+        shell: powershell
+        env:
+          STEAM_SHARED_SECRET: ${{ secrets.STEAM_SHARED_SECRET }}
+          STEAM_USERNAME:      ${{ secrets.STEAM_USERNAME }}
+          STEAM_PASSWORD:      ${{ secrets.STEAM_PASSWORD }}
+        run: |
+          $resolvedTag  = "${{ steps.resolve-tag.outputs.resolved_tag }}"
+          $semver       = "${{ steps.extract-version.outputs.semver }}"
+          $sha7         = "${{ steps.extract-version.outputs.sha7 }}"
+          $branch       = "${{ steps.extract-version.outputs.branch }}"
+          $appId        = "${{ vars.STEAM_APP_ID }}"
+          $depotId      = "${{ vars.STEAM_DEPOT_ID }}"
+          $hasAppId     = if ($appId)   { 'yes' } else { 'NO - not configured' }
+          $hasDepotId   = if ($depotId) { 'yes' } else { 'NO - not configured' }
+
+          # Check for secret presence via env vars (never interpolated in shell)
+          $hasSharedSecret = if ($env:STEAM_SHARED_SECRET) { 'yes' } else { 'NO - not configured' }
+          $hasUsername     = if ($env:STEAM_USERNAME)      { 'yes' } else { 'NO - not configured' }
+          $hasPassword     = if ($env:STEAM_PASSWORD)      { 'yes' } else { 'NO - not configured' }
+
+          $descPreview = "${{ steps.build-desc.outputs.build_desc_preview }}"
+          if (-not $descPreview) { $descPreview = "(not generated)" }
+
+          # Emit warnings for missing config
+          if (-not $appId)                  { Write-Host "::warning::vars.STEAM_APP_ID is not set. Required for VDF generation." }
+          if (-not $depotId)                { Write-Host "::warning::vars.STEAM_DEPOT_ID is not set. Required for VDF generation." }
+          if (-not $env:STEAM_SHARED_SECRET) {
+            Write-Host "::warning::secrets.STEAM_SHARED_SECRET is not set. Required for TOTP authentication."
+          }
+          if (-not $env:STEAM_USERNAME) {
+            Write-Host "::warning::secrets.STEAM_USERNAME is not set. Required for SteamCMD login."
+          }
+          if (-not $env:STEAM_PASSWORD) {
+            Write-Host "::warning::secrets.STEAM_PASSWORD is not set. Required for SteamCMD login."
+          }
+
+          $lines = @(
+            "## Steam Deploy (DRY RUN)",
+            "",
+            "> **No files were uploaded.** This is a preview of what would happen.",
+            "> Re-trigger with ``dry_run=false`` to perform a real Steam upload.",
+            "",
+            "### Resolved Deployment Parameters",
+            "",
+            "| Parameter | Value |",
+            "|-----------|-------|",
+            "| Tag | $resolvedTag |",
+            "| Version | $semver |",
+            "| Commit SHA | $sha7 |",
+            "| Target branch | $branch |",
+            "",
+            "### Configuration Status",
+            "",
+            "| Secret / Variable | Configured |",
+            "|-------------------|-----------|",
+            "| STEAM_USERNAME (secret) | $hasUsername |",
+            "| STEAM_PASSWORD (secret) | $hasPassword |",
+            "| STEAM_SHARED_SECRET (secret) | $hasSharedSecret |",
+            "| STEAM_APP_ID (variable) | $hasAppId |",
+            "| STEAM_DEPOT_ID (variable) | $hasDepotId |",
+            "",
+            "### Build Description Preview",
+            "",
+            "``````",
+            "$descPreview",
+            "``````",
+            "",
+            "> Re-run with ``dry_run=false`` to upload to Steam beta branch."
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+          Write-Host "Dry-run summary written to GITHUB_STEP_SUMMARY."
+
+      # -------------------------------------------------------------------------
+      # Step 13: Upload SteamCMD logs on failure
+      # The BuildOutput directory accumulates SteamCMD logs during the run.
+      # Upload as artifact for post-mortem diagnosis when deployment fails.
+      # retention-days: 7 — logs are short-lived, no need for 30-day retention.
+      # -------------------------------------------------------------------------
+      - name: Upload SteamCMD logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: steamcmd-logs-${{ github.run_id }}
+          path: ${{ runner.temp }}\steamcmd-output\
+          retention-days: 7
+          if-no-files-found: warn
+
+      # -------------------------------------------------------------------------
+      # Step 14: Send Discord failure notification
+      # Sends a Discord embed with failure details and a link to the failed run.
+      # Reuses the Invoke-RestMethod pattern from notify.yml.
+      # Skipped gracefully if DISCORD_WEBHOOK_URL is not configured.
+      # -------------------------------------------------------------------------
+      - name: Send Discord failure notification
+        if: failure()
+        shell: powershell
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          if (-not $env:DISCORD_WEBHOOK_URL) {
+            Write-Host "No Discord webhook configured — skipping failure notification."
+            exit 0
+          }
+
+          $tag     = "${{ steps.resolve-tag.outputs.resolved_tag }}"
+          $runUrl  = "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          $exitCode = "${{ steps.steam-upload.outputs.exit_code }}"
+          if (-not $exitCode) { $exitCode = "N/A (failed before upload step)" }
+
+          $payload = @{
+            embeds = @(
+              @{
+                title       = "Steam Deploy FAILED"
+                description = "[View Run]($runUrl)"
+                color       = 15158332  # Red — matches notify.yml
+                fields      = @(
+                  @{ name = "Tag";       value = $tag;      inline = $true }
+                  @{ name = "Exit Code"; value = $exitCode; inline = $true }
+                  @{ name = "Branch";    value = "${{ steps.extract-version.outputs.branch }}"; inline = $true }
+                )
+                footer    = @{ text = "GitHub Actions" }
+                timestamp = (Get-Date -Format "o")
+              }
+            )
+          } | ConvertTo-Json -Depth 10 -Compress
+
+          try {
+            Invoke-RestMethod -Uri $env:DISCORD_WEBHOOK_URL -Method Post -Body $payload -ContentType "application/json; charset=utf-8"
+            Write-Host "Discord failure notification sent."
+          } catch {
+            Write-Host "::warning::Failed to send Discord notification: $($_.Exception.Message)"
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 15: Cleanup temp files
+      # Removes all temporary files created by this workflow from runner.temp.
+      # Runs with if: always() to clean up even when prior steps fail.
+      # -------------------------------------------------------------------------
+      - name: Cleanup temp files
+        if: always()
+        shell: powershell
+        run: |
+          Remove-Item "${{ runner.temp }}\shipping-steam-download" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\shipping-steam"          -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\steamcmd-output"         -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\app_build.vdf"                   -Force  -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\depot_build.vdf"                 -Force  -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\build-desc.txt"                  -Force  -ErrorAction SilentlyContinue
+          Write-Host "Cleanup complete."

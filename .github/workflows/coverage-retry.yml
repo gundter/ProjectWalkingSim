@@ -1,0 +1,77 @@
+# .github/workflows/coverage-retry.yml
+# Coverage Retry - Responds to /retry-coverage comments on PRs.
+#
+# LIMITATION (Pitfall 5 from research): issue_comment-triggered workflows cannot
+# update the required status check for branch protection. That check is bound to the
+# original pull_request-triggered run. This workflow posts an acknowledgement comment
+# with a direct link to re-run the failed coverage job. The user must use
+# "Re-run failed jobs" in the GitHub UI to update the actual required check status.
+#
+# Note on issue_comment context (Pitfall 4): GITHUB_SHA and GITHUB_REF are set to
+# the default branch, not the PR branch. Since this workflow only posts a comment
+# (no checkout or coverage measurement), this is not a problem.
+name: Coverage Retry
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  retry:
+    # Only run for PR comments (not issue comments) containing /retry-coverage
+    if: >-
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, '/retry-coverage')
+    runs-on: [self-hosted, windows, ue5]
+    steps:
+      - name: Get PR workflow run URL
+        id: get-run-url
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $repo = '${{ github.repository }}'
+
+          # Find the most recent coverage workflow run (failed, cancelled, or timed out)
+          $runs = gh run list `
+            --repo $repo `
+            --workflow coverage.yml `
+            --json databaseId,status,url `
+            --limit 10 | ConvertFrom-Json
+
+          $failedRun = $runs |
+            Where-Object { $_.status -in @('failure', 'cancelled', 'timed_out') } |
+            Select-Object -First 1
+
+          if ($failedRun) {
+            echo "run_url=$($failedRun.url)" >> $env:GITHUB_OUTPUT
+            echo "run_id=$($failedRun.databaseId)" >> $env:GITHUB_OUTPUT
+          } else {
+            $fallbackUrl = "https://github.com/$repo/actions/workflows/coverage.yml"
+            echo "run_url=$fallbackUrl" >> $env:GITHUB_OUTPUT
+            echo "run_id=" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Post acknowledgement comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-retry-ack
+          number: ${{ github.event.issue.number }}
+          message: |
+            ## Coverage Retry Requested
+
+            :arrows_counterclockwise: Retry request received.
+
+            **Important:** The `/retry-coverage` comment cannot directly re-trigger the
+            required status check. To update the PR check status, use **Re-run failed jobs**
+            on the coverage workflow run:
+
+            ${{ steps.get-run-url.outputs.run_url }}
+
+            The Re-run failed jobs button will re-run the coverage measurement and update
+            the required check result in this PR.

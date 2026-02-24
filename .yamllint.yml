@@ -1,0 +1,19 @@
+extends: default
+
+rules:
+  line-length:
+    max: 120
+    level: error
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+  truthy:
+    allowed-values: ['true', 'false']
+    check-keys: false
+  document-start: disable
+  new-lines:
+    type: unix
+
+ignore: |
+  .github/workflows/

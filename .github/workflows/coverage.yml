@@ -1,0 +1,380 @@
+# .github/workflows/coverage.yml
+# Coverage Gate - Measures C++ code coverage on PRs to development and enforces a 70% threshold.
+# Triggers on PRs that change C++ source files (Source/) or CI workflow files (.github/).
+# Posts a sticky PR comment with percentage, delta from main, and actionable hints.
+#
+# Skip conditions (handled inside the job so the check is always visible):
+#   - 'skip-coverage' label on PR (emergency bypass, maintainer-only)
+#   - No C++ source changes AND no .github/ changes (docs/assets-only PR)
+#   - Shipping configuration (coverage not meaningful for stripped builds)
+#
+# Concurrency group: ue5-coverage-* (isolated from ue5-pipeline-* and ue5-audit-*)
+name: Coverage Gate
+
+on:
+  pull_request:
+    branches: [development]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ue5-coverage-${{ github.ref }}
+  cancel-in-progress: true
+
+# === FORK CONFIGURATION ===
+# Edit these values to match your environment.
+# Search for "FORK CONFIGURATION" to find all config points across workflows.
+# Full setup instructions: docs/quick-start.md
+env:
+  UE5_ROOT: 'E:\Epic Games\UE_5.7'  # Path to your UE5 installation
+  PROJECT_NAME: 'ProjectWalkingSim'                 # Must match your .uproject filename
+  RUNNER_LABEL: 'ue5'                               # Documentation only — runs-on labels must stay literal
+# === END FORK CONFIGURATION ===
+
+jobs:
+  check-changes:
+    runs-on: [self-hosted, windows, ue5]
+    outputs:
+      run_coverage: ${{ steps.filter.outputs.cpp }}
+      skip_reason: ${{ steps.skip-reason.outputs.reason }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          clean: false
+
+      - name: Detect C++ and CI workflow changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            cpp:
+              - 'Source/**/*.cpp'
+              - 'Source/**/*.h'
+              - 'Source/**/*.Build.cs'
+              - '.github/**'
+
+      - name: Set skip reason
+        id: skip-reason
+        shell: pwsh
+        run: |
+          if ('${{ steps.filter.outputs.cpp }}' -eq 'true') {
+            echo "reason=" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "reason=No C++ source or CI workflow changes detected" >> $env:GITHUB_OUTPUT
+          }
+
+  coverage:
+    needs: check-changes
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 90
+    steps:
+      - name: Skip - no C++ or CI changes
+        if: needs.check-changes.outputs.run_coverage != 'true'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-gate
+          message: |
+            ## Coverage Gate :white_check_mark: Skipped
+
+            **Reason:** ${{ needs.check-changes.outputs.skip_reason }}
+
+            Coverage measurement is skipped for PRs that only touch documentation,
+            assets, or other non-code files.
+
+            <sub>To force coverage measurement, add a C++ source change or modify a file
+            under `.github/`</sub>
+
+      - name: Exit after skip comment (no C++ changes)
+        if: needs.check-changes.outputs.run_coverage != 'true'
+        shell: pwsh
+        run: exit 0
+
+      - name: Skip - skip-coverage label present
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          contains(github.event.pull_request.labels.*.name, 'skip-coverage')
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-gate
+          message: |
+            ## Coverage Gate :white_check_mark: Bypassed
+
+            **Reason:** `skip-coverage` label applied by a maintainer.
+
+            Coverage measurement was bypassed for this PR. Remove the label
+            to restore the coverage gate on future pushes.
+
+      - name: Exit after skip comment (skip-coverage label)
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          contains(github.event.pull_request.labels.*.name, 'skip-coverage')
+        shell: pwsh
+        run: exit 0
+
+      - name: Skip - Shipping configuration
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG == 'Shipping'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-gate
+          message: |
+            ## Coverage Gate :white_check_mark: Skipped
+
+            **Reason:** Shipping configuration — coverage is not measured for stripped builds.
+
+      - name: Exit after skip comment (Shipping config)
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG == 'Shipping'
+        shell: pwsh
+        run: exit 0
+
+      - name: Checkout repository
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          clean: false
+
+      - name: Compile Development Editor (incremental)
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          $runUAT = Join-Path $env:UE5_ROOT 'Engine\Build\BatchFiles\RunUAT.bat'
+          $project = Join-Path '${{ github.workspace }}' '${{ github.event.repository.name }}.uproject'
+          Write-Host "Compiling Development Editor (incremental)..."
+          Write-Host "  RunUAT: $runUAT"
+          Write-Host "  Project: $project"
+          & $runUAT BuildCookRun `
+            "-project=$project" `
+            -noP4 -NoCompile -platform=Win64 `
+            -clientconfig=Development `
+            -build -skipcook -skipstage -skippackage `
+            -utf8output -unattended
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::Compilation failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+          Write-Host "Compilation complete."
+
+      - name: Install diff-cover
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: python -m pip install --quiet diff-cover
+
+      - name: Fetch base branch for diff-cover
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: git fetch origin development --depth=1
+
+      - name: Add OpenCppCoverage to PATH
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          $installDir = 'C:\Program Files\OpenCppCoverage'
+          $exe = Join-Path $installDir 'OpenCppCoverage.exe'
+          if (-not (Test-Path $exe)) {
+            Write-Host "::error::OpenCppCoverage.exe not found at $exe — ensure it is installed on the runner"
+            exit 1
+          }
+          Write-Host "OpenCppCoverage found at $exe"
+          "$installDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # --version flag exits non-zero; existence check above is sufficient
+
+      - name: Run coverage measurement
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}\.github\scripts\Invoke-Coverage.ps1"
+
+      - name: Read threshold from config
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          $config = Get-Content '.github\coverage-config.json' | ConvertFrom-Json
+          $threshold = $config.threshold
+          echo "COVERAGE_THRESHOLD=$threshold" >> $env:GITHUB_ENV
+
+      - name: Check overall coverage threshold
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          $pct = [double]$env:COVERAGE_PCT
+          $threshold = [double]$env:COVERAGE_THRESHOLD
+          if ($pct -ge $threshold) {
+            echo "COVERAGE_PASS=true" >> $env:GITHUB_ENV
+          } else {
+            echo "COVERAGE_PASS=false" >> $env:GITHUB_ENV
+          }
+
+      - name: Run diff-cover for changed-lines analysis
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          $threshold = $env:COVERAGE_THRESHOLD
+          $xmlPath = "CoverageReports\coverage.xml"
+          $diffMdPath = "CoverageReports\diff-coverage.md"
+
+          # Normalize backslashes to forward slashes in coverage.xml for diff-cover
+          # (diff-cover parses file paths and may fail on Windows backslashes)
+          $xmlContent = Get-Content $xmlPath -Raw -Encoding UTF8
+          $xmlContent = $xmlContent -replace '\\\\', '/' -replace '\\', '/'
+          $xmlContent | Out-File -FilePath $xmlPath -Encoding UTF8 -NoNewline
+
+          # diff-cover >=9.x uses --format type:path syntax (not separate --output)
+          python -m diff_cover.diff_cover_tool `
+            $xmlPath `
+            --compare-branch "origin/main" `
+            --fail-under $threshold `
+            --format "markdown:$diffMdPath"
+          $diffExit = $LASTEXITCODE
+          echo "DIFF_COVER_EXIT=$diffExit" >> $env:GITHUB_ENV
+
+          if ($diffExit -eq 0) {
+            echo "DIFF_PASS=true" >> $env:GITHUB_ENV
+          } else {
+            echo "DIFF_PASS=false" >> $env:GITHUB_ENV
+          }
+
+          # Parse diff-cover percentage from markdown output
+          if (Test-Path $diffMdPath) {
+            $mdContent = Get-Content $diffMdPath -Raw
+            if ($mdContent -match 'Total:\s*([\d.]+)%') {
+              echo "DIFF_COVER_PCT=$($Matches[1])" >> $env:GITHUB_ENV
+            } else {
+              echo "DIFF_COVER_PCT=N/A" >> $env:GITHUB_ENV
+            }
+          } else {
+            echo "DIFF_COVER_PCT=N/A" >> $env:GITHUB_ENV
+          }
+
+      - name: Generate actionable hints
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}\.github\scripts\Get-CoverageHints.ps1"
+
+      - name: Check coverage baseline cache
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        id: baseline-cache
+        uses: actions/cache@v4
+        with:
+          path: CoverageReports/coverage-baseline.txt
+          key: >-
+            coverage-baseline-${{ github.base_ref }}-${{ github.event.pull_request.base.sha }}
+          restore-keys: coverage-baseline-${{ github.base_ref }}-
+
+      - name: Compute coverage delta from main
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          $baselinePath = "CoverageReports\coverage-baseline.txt"
+          if (Test-Path $baselinePath) {
+            $baseline = [double](Get-Content $baselinePath -Raw).Trim()
+            $current = [double]$env:COVERAGE_PCT
+            $delta = [math]::Round($current - $baseline, 2)
+            if ($delta -ge 0) {
+              echo "COVERAGE_DELTA=+${delta}% from main" >> $env:GITHUB_ENV
+            } else {
+              echo "COVERAGE_DELTA=${delta}% from main" >> $env:GITHUB_ENV
+            }
+          } else {
+            echo "COVERAGE_DELTA=N/A (first run)" >> $env:GITHUB_ENV
+          }
+
+      - name: Post PR comment with coverage results
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: coverage-gate
+          message: |
+            ## Coverage Gate ${{ env.COVERAGE_PASS == 'true' && ':white_check_mark: Pass' || ':x: Fail' }}
+
+            **${{ env.COVERAGE_PCT }}%** line coverage (${{ env.LINES_COVERED }} / ${{ env.LINES_VALID }} lines)
+            Delta from main: ${{ env.COVERAGE_DELTA }}
+
+            | Check | Result |
+            |-------|--------|
+            | Overall threshold (${{ env.COVERAGE_THRESHOLD }}%) | ${{ env.COVERAGE_PASS == 'true' && ':white_check_mark: Pass' || ':x: Fail' }} |
+            | Changed lines (${{ env.COVERAGE_THRESHOLD }}%) | ${{ env.DIFF_PASS == 'true' && ':white_check_mark: Pass' || ':x: Fail' }} |
+
+            ${{ env.HINT_TEXT }}
+
+            <sub>Emergency bypass: add `skip-coverage` label (maintainer only) | Retry: comment `/retry-coverage` or use Re-run failed jobs</sub>
+
+      - name: Save coverage as baseline for future PRs
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          $env:COVERAGE_PCT | Out-File -FilePath "CoverageReports\coverage-baseline.txt" -Encoding utf8 -NoNewline
+
+      - name: Cache coverage baseline
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        uses: actions/cache@v4
+        with:
+          path: CoverageReports/coverage-baseline.txt
+          key: coverage-baseline-${{ github.base_ref }}-${{ github.sha }}
+
+      - name: Fail job if coverage threshold not met
+        if: >-
+          needs.check-changes.outputs.run_coverage == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'skip-coverage') &&
+          env.BUILD_CONFIG != 'Shipping'
+        shell: pwsh
+        run: |
+          if ($env:COVERAGE_PASS -eq 'false' -or $env:DIFF_COVER_EXIT -ne '0') {
+            Write-Host "::error::Coverage gate failed. See PR comment for details."
+            exit 1
+          }
+          Write-Host "Coverage gate passed: $($env:COVERAGE_PCT)% overall, changed-lines check passed."

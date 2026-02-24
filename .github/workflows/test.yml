@@ -1,0 +1,647 @@
+# .github/workflows/test.yml
+# Gauntlet E2E Test Pipeline - Runs E2E tests against packaged build on main branch
+#
+# Triggers: workflow_run on "UE5 Package" completion (main branch only)
+#
+# This workflow is the quality gate between packaging and deployment. It proves
+# the packaged game actually works end-to-end: boots, passes automation tests,
+# and completes the full gameplay loop. Packaging success alone does not guarantee
+# this — a build can package successfully but fail to boot or crash during gameplay.
+#
+# Flow:
+#   1. Download packaged Test build artifact from triggering workflow_run (required; no fallback)
+#   2. Extract build to PackagedBuilds/Test/
+#   3. Run RunUAT RunUnreal with combined test chain (boot -> automation -> gameplay)
+#      - Uses -configuration=Test so CSV_PROFILER macro is active (PERF-01)
+#      - Uses -ResumeOnCriticalFailure for crash recovery (PERF-04)
+#   4. Collect crash artifacts (minidumps, crash logs) to GauntletResults/CrashArtifacts/
+#   5. Upload crash artifacts as a separate named CI artifact (crash-artifacts-{sha})
+#   6. Generate performance reports (CSV collection, PerfreportTool, master HTML) (PERF-02, PERF-03)
+#   7. Upload performance-report artifact (30-day retention for trend analysis)
+#   8. Convert Gauntlet JSON results to JUnit XML
+#   9. Upload all diagnostics (screenshots, game logs, results, perf data) as artifacts
+#  10. Publish "Gauntlet E2E Tests" check run via dorny/test-reporter
+#
+# DECISION (locked): Combined -test=A+B+C invocation runs all three tests in a single
+# Gauntlet session. A game crash causes RunUAT to exit non-zero immediately — no further
+# tests run. Do NOT split into separate RunUAT invocations (violates abort-on-crash requirement).
+#
+# DECISION (locked): Test configuration required for CSV_PROFILER macro (PERF-01).
+# CSV_PROFILER=0 in Shipping builds — all CSV profiling instrumentation has no effect.
+# Phase 17: Test artifact is now required (no Shipping fallback). package.yml push-to-main
+# matrix produces both Test and Shipping artifacts.
+name: Gauntlet E2E Tests
+
+on:
+  workflow_run:
+    workflows: ["UE5 Package"]
+    types: [completed]
+    branches: [main]
+
+# Permissions required for artifact download and check run creation
+permissions:
+  contents: read
+  checks: write    # For dorny/test-reporter check run
+  actions: read    # For downloading artifacts from triggering workflow_run
+
+# Share concurrency group with build.yml and package.yml — prevents simultaneous
+# execution on the single self-hosted runner. E2E tests are expensive to restart
+# so they are NOT cancelled when a newer run starts.
+concurrency:
+  group: ue5-pipeline-${{ github.event.workflow_run.head_branch || github.ref }}
+  cancel-in-progress: false
+
+# === FORK CONFIGURATION ===
+# Edit these values to match your environment.
+# Search for "FORK CONFIGURATION" to find all config points across workflows.
+# Full setup instructions: docs/quick-start.md
+env:
+  UE5_ROOT: 'E:\Epic Games\UE_5.7'  # Path to your UE5 installation
+  PROJECT_NAME: 'ProjectWalkingSim'                 # Must match your .uproject filename
+  RUNNER_LABEL: 'ue5'                               # Documentation only — runs-on labels must stay literal
+  UE5_ENGINE_VERSION: '5.7'
+# === END FORK CONFIGURATION ===
+
+jobs:
+  # =============================================================================
+  # Gauntlet Job - Downloads packaged build, runs E2E tests, reports results
+  # =============================================================================
+  gauntlet:
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 30
+    # Only run if packaging succeeded — don't test a broken build
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Checkout repository (needed for project file + conversion script)
+      # -------------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      # -------------------------------------------------------------------------
+      # Step 2: Download packaged Test build artifact from triggering workflow_run
+      # Test artifact is required — no Shipping fallback (Phase 17 locked decision).
+      # package.yml push-to-main matrix produces both Test and Shipping artifacts.
+      # Test config required for WITH_DEV_AUTOMATION_TESTS=1 and CSV_PROFILER=1.
+      # -------------------------------------------------------------------------
+      - name: Download packaged build artifact
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const allArtifacts = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: context.payload.workflow_run.id,
+            });
+
+            // Test artifact is required (Phase 17). No Shipping fallback.
+            // package.yml push-to-main matrix produces both Test and Shipping artifacts.
+            const testArtifact = allArtifacts.data.artifacts.find(a => a.name.includes('-Test-'));
+
+            if (!testArtifact) {
+              core.setFailed(
+                'Test artifact not found from packaging workflow. ' +
+                'Expected an artifact with "-Test-" in the name. ' +
+                'Verify that package.yml push-to-main matrix includes "Test" configuration (see Phase 17).'
+              );
+              return;
+            }
+
+            core.info(`Using Test artifact: ${testArtifact.name} (${testArtifact.size_in_bytes} bytes)`);
+            core.exportVariable('ARTIFACT_CONFIG', 'Test');
+
+            const download = await github.rest.actions.downloadArtifact({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              artifact_id: testArtifact.id,
+              archive_format: 'zip',
+            });
+
+            const fs = require('fs');
+            fs.writeFileSync('${{ github.workspace }}/packaged-build.zip', Buffer.from(download.data));
+            core.info(`Downloaded artifact: ${testArtifact.name} (${testArtifact.size_in_bytes} bytes)`);
+
+      # -------------------------------------------------------------------------
+      # Step 3: Extract packaged build
+      # GitHub artifact download wraps our zip in another zip (double-wrapped).
+      # Extract outer zip -> find inner zip -> extract inner zip to build dir.
+      # Build directory path reflects which config was downloaded (Test or Shipping).
+      # -------------------------------------------------------------------------
+      - name: Extract packaged build
+        shell: powershell
+        run: |
+          $outerZip = "${{ github.workspace }}\packaged-build.zip"
+          $tempDir = "${{ github.workspace }}\temp-extract"
+          $artifactConfig = if ($env:ARTIFACT_CONFIG) { $env:ARTIFACT_CONFIG } else { "Shipping" }
+          $buildDir = "${{ github.workspace }}\PackagedBuilds\$artifactConfig"
+
+          New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
+
+          Write-Host "Artifact config: $artifactConfig"
+          Write-Host "Extracting outer zip (GitHub artifact wrapper)..."
+          Expand-Archive -Path $outerZip -DestinationPath $tempDir -Force
+
+          # Find inner zip (our actual packaged build)
+          $innerZip = Get-ChildItem $tempDir -Filter "*.zip" | Select-Object -First 1
+          if (-not $innerZip) {
+            Write-Error "No inner zip found in downloaded artifact"
+            exit 1
+          }
+
+          Write-Host "Extracting inner zip (packaged build): $($innerZip.Name)"
+          Expand-Archive -Path $innerZip.FullName -DestinationPath $buildDir -Force
+          Write-Host "Extracted packaged build to: $buildDir"
+
+          # Export build dir for subsequent steps
+          echo "BUILD_DIR=$buildDir" >> $env:GITHUB_ENV
+
+          # Verify executable exists (excludes CrashReporter which is in subdirectory)
+          $exe = Get-ChildItem $buildDir -Recurse -Filter "*.exe" |
+            Where-Object { $_.Name -notlike "CrashReport*" } |
+            Select-Object -First 1
+          if ($exe) {
+            Write-Host "Found game executable: $($exe.FullName)"
+          } else {
+            Write-Error "No game executable found in extracted build"
+            exit 1
+          }
+
+          # Clean up temp directory
+          Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+
+      # -------------------------------------------------------------------------
+      # Step 4: Create results directory
+      # -------------------------------------------------------------------------
+      - name: Create results directory
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "${{ github.workspace }}\GauntletResults" | Out-Null
+          Write-Host "Created GauntletResults directory"
+
+      # -------------------------------------------------------------------------
+      # Step 5: Run Gauntlet E2E tests
+      # Combined session: boot -> automation -> gameplay (single RunUAT invocation).
+      # Crash causes RunUAT to exit non-zero immediately; no further tests run.
+      # Exit code analysis distinguishes crash vs assertion failure for notifications.
+      #
+      # PERF-01: -configuration=Test ensures CSV_PROFILER macro is active.
+      #          CSV_PROFILER=0 in Shipping builds — all FCsvProfiler calls are no-ops.
+      # PERF-04: -ResumeOnCriticalFailure enables crash recovery (resumes up to 3 times).
+      #          If recovery triggered and run eventually succeeds, GAUNTLET_STATUS=unstable.
+      # -------------------------------------------------------------------------
+      - name: Run Gauntlet E2E tests
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Continue"  # Don't abort on first error — capture all output
+
+          $ue5Root = if ($env:UE5_ROOT) { $env:UE5_ROOT } else { "${{ env.UE5_ROOT }}" }
+          $runUAT = "$ue5Root\Engine\Build\BatchFiles\RunUAT.bat"
+          $project = "${{ github.workspace }}\${{ github.event.repository.name }}.uproject"
+          $buildDir = if ($env:BUILD_DIR) { $env:BUILD_DIR } else { "${{ github.workspace }}\PackagedBuilds\Test" }
+          $reportDir = "${{ github.workspace }}\GauntletResults"
+          $artifactConfig = if ($env:ARTIFACT_CONFIG) { $env:ARTIFACT_CONFIG } else { "Test" }
+
+          Write-Host "========================================"
+          Write-Host "Gauntlet E2E Test Configuration"
+          Write-Host "========================================"
+          Write-Host "UE5 Root:       $ue5Root"
+          Write-Host "RunUAT:         $runUAT"
+          Write-Host "Project:        $project"
+          Write-Host "Build Dir:      $buildDir"
+          Write-Host "Report Dir:     $reportDir"
+          Write-Host "Artifact Config: $artifactConfig"
+          Write-Host "Head SHA:       ${{ github.event.workflow_run.head_sha }}"
+          Write-Host "========================================"
+
+          # Verify RunUAT exists
+          if (-not (Test-Path $runUAT)) {
+            Write-Host "::error::RunUAT.bat not found at: $runUAT"
+            exit 1
+          }
+
+          # Combined session: boot -> automation -> gameplay
+          # IMPORTANT: Combined -test=A+B+C runs all three tests in a single Gauntlet session.
+          # A game crash causes RunUAT to exit non-zero immediately — no further tests run.
+          # Test class names match C# class names in {ProjectName}.Automation namespace.
+          #
+          # -configuration=Test: required for CSV_PROFILER macro (PERF-01). CSV_PROFILER=0 in Shipping.
+          # -ResumeOnCriticalFailure: crash recovery — resumes up to 3 times after crash (PERF-04).
+          $projectName = '${{ env.PROJECT_NAME }}'
+          & "$runUAT" RunUnreal `
+              -NoCompile `
+              -project="$project" `
+              -platform=Win64 `
+              -configuration=Test `
+              -build="$buildDir" `
+              -test="$projectName.BootTest+$projectName.TargetAutomationTest+$projectName.GameplayTest" `
+              -runtest="$projectName" `
+              -ReportExportPath="$reportDir" `
+              -ResumeOnCriticalFailure `
+              -log `
+              -unattended `
+              -windowed -resx=1280 -resy=720 `
+              -nosound `
+              "-gauntlet.screenshotperiod=10"
+
+          $gauntletExitCode = $LASTEXITCODE
+          Write-Host ""
+          Write-Host "RunUAT exit code: $gauntletExitCode"
+
+          # Store exit code for subsequent steps
+          echo "GAUNTLET_EXIT_CODE=$gauntletExitCode" >> $env:GITHUB_ENV
+
+          # Determine failure type for distinct notification messages (user decision)
+          if ($gauntletExitCode -eq 0) {
+            # Check if crash recovery was triggered (PERF-04: partial success / unstable)
+            $logFiles = Get-ChildItem $reportDir -Recurse -Filter "*.log" -ErrorAction SilentlyContinue
+            $hasCrashRecovery = $false
+
+            foreach ($log in $logFiles) {
+              $content = Get-Content $log.FullName -ErrorAction SilentlyContinue
+              if ($content -match 'ResumeOnCriticalFailure|Resuming after critical failure|Resume attempt') {
+                $hasCrashRecovery = $true
+              }
+            }
+
+            if ($hasCrashRecovery) {
+              echo "GAUNTLET_STATUS=unstable" >> $env:GITHUB_ENV
+              Write-Host "::warning::Gauntlet E2E tests: UNSTABLE (completed after crash recovery)"
+            } else {
+              echo "GAUNTLET_STATUS=success" >> $env:GITHUB_ENV
+              Write-Host "Gauntlet E2E tests: PASSED"
+            }
+          } else {
+            # Analyze logs to distinguish crash vs assertion failure
+            $logFiles = Get-ChildItem $reportDir -Recurse -Filter "*.log" -ErrorAction SilentlyContinue
+            $hasCrash = $false
+            $hasAssertFail = $false
+
+            foreach ($log in $logFiles) {
+              $content = Get-Content $log.FullName -ErrorAction SilentlyContinue
+              if ($content -match 'Fatal Error|Unhandled Exception|appError called|Critical error') {
+                $hasCrash = $true
+              }
+              if ($content -match 'LogGauntlet.*Error|Test Failed|EndTest\(-1\)') {
+                $hasAssertFail = $true
+              }
+            }
+
+            if ($hasCrash) {
+              echo "GAUNTLET_STATUS=crashed" >> $env:GITHUB_ENV
+              Write-Host "::error::Gauntlet E2E: GAME CRASHED -- build is broken, aborting remaining tests"
+            } else {
+              echo "GAUNTLET_STATUS=test_failed" >> $env:GITHUB_ENV
+              Write-Host "::error::Gauntlet E2E: TEST ASSERTION FAILED -- game ran but a test check failed"
+            }
+
+            # Copy screenshots to results directory on failure
+            # (periodic screenshots already captured via -gauntlet.screenshotperiod=10)
+            $screenshotDir = "${{ github.workspace }}\Saved\Screenshots"
+            if (Test-Path $screenshotDir) {
+              $destDir = "$reportDir\FailureScreenshots"
+              New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+              Copy-Item "$screenshotDir\*" -Destination $destDir -Recurse -ErrorAction SilentlyContinue
+              Write-Host "Copied failure screenshots to $destDir"
+            }
+          }
+
+          # Always copy full game logs to results directory (user decision: always capture)
+          $savedLogsDir = "${{ github.workspace }}\Saved\Logs"
+          if (Test-Path $savedLogsDir) {
+            $destLogs = "$reportDir\GameLogs"
+            New-Item -ItemType Directory -Force -Path $destLogs | Out-Null
+            Copy-Item "$savedLogsDir\*.log" -Destination $destLogs -ErrorAction SilentlyContinue
+            Write-Host "Copied game logs to $destLogs"
+          }
+
+          # Fail the step if Gauntlet failed (triggers if: always() steps below)
+          if ($gauntletExitCode -ne 0) {
+            exit 1
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 6: Collect crash artifacts
+      # Searches all likely crash dump locations for .dmp, .log, .runtime-xml files.
+      # Sets CRASH_RECOVERY_TRIGGERED env var if crash files are found.
+      # Runs if: always() — clean runs produce no files (if-no-files-found: ignore).
+      # -------------------------------------------------------------------------
+      - name: Collect crash artifacts
+        if: always()
+        shell: powershell
+        run: |
+          $crashArtifactDir = "${{ github.workspace }}\GauntletResults\CrashArtifacts"
+          New-Item -ItemType Directory -Force -Path $crashArtifactDir | Out-Null
+
+          # Search all likely crash dump locations
+          $buildDir = if ($env:BUILD_DIR) { $env:BUILD_DIR } else { "${{ github.workspace }}\PackagedBuilds\Test" }
+          $projectName = '${{ env.PROJECT_NAME }}'
+          $crashDirs = @(
+            "$buildDir\$projectName\Saved\Crashes",
+            "${{ github.workspace }}\PackagedBuilds\Shipping\$projectName\Saved\Crashes",
+            "${{ github.workspace }}\Saved\Crashes",
+            "$env:LOCALAPPDATA\$projectName\Saved\Crashes"
+          )
+
+          $foundCrashFiles = 0
+          foreach ($dir in $crashDirs) {
+            if (Test-Path $dir) {
+              $files = Get-ChildItem $dir -Recurse -Include "*.dmp", "*.log", "*.runtime-xml" -ErrorAction SilentlyContinue
+              foreach ($f in $files) {
+                Copy-Item $f.FullName -Destination $crashArtifactDir -ErrorAction SilentlyContinue
+                $foundCrashFiles++
+              }
+              Write-Host "Collected crash artifacts from: $dir"
+            }
+          }
+          Write-Host "Total crash artifacts collected: $foundCrashFiles"
+
+          # Set env var for job summary and notification steps
+          if ($foundCrashFiles -gt 0) {
+            echo "CRASH_RECOVERY_TRIGGERED=true" >> $env:GITHUB_ENV
+            Write-Host "Crash artifacts found — CRASH_RECOVERY_TRIGGERED=true"
+          } else {
+            echo "CRASH_RECOVERY_TRIGGERED=false" >> $env:GITHUB_ENV
+            Write-Host "No crash artifacts found — clean run"
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 7: Upload crash artifacts as a separate named CI artifact
+      # Separate from gauntlet-results so crash data is always retrievable for
+      # post-mortem correlation with performance CSV data (locked decision).
+      # if-no-files-found: ignore — clean runs with no crashes should not emit warnings.
+      # Retention 30 days matches performance data retention for correlation.
+      # -------------------------------------------------------------------------
+      - name: Upload crash artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: crash-artifacts-${{ github.event.workflow_run.head_sha || github.sha }}
+          path: GauntletResults/CrashArtifacts/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      # -------------------------------------------------------------------------
+      # Step 8: Generate performance reports
+      # Collects CSVs from packaged build's Saved/Profiling/CSV/, runs PerfreportTool
+      # per node, checks configurable thresholds, and generates master dashboard HTML.
+      # Runs if: always() — partial performance data from partially-completed runs is valuable.
+      # PERF_FAIL_ON_THRESHOLD: set to "true" to promote threshold violations to CI errors.
+      # -------------------------------------------------------------------------
+      - name: Generate performance reports
+        if: always()
+        shell: powershell
+        run: |
+          $ue5Root = if ($env:UE5_ROOT) { $env:UE5_ROOT } else { "${{ env.UE5_ROOT }}" }
+          $failOnThreshold = if ($env:PERF_FAIL_ON_THRESHOLD -eq "true") { "-FailOnThreshold" } else { "" }
+          $headSha = "${{ github.event.workflow_run.head_sha }}"
+          $shortSha = if ($headSha.Length -ge 7) { $headSha.Substring(0, 7) } else { $headSha }
+
+          & "${{ github.workspace }}\.github\scripts\Generate-PerfReport.ps1" `
+              -WorkspaceDir "${{ github.workspace }}" `
+              -UE5Root "$ue5Root" `
+              -ReportDir "${{ github.workspace }}\GauntletResults" `
+              -CommitSha $shortSha `
+              -RunNumber "${{ github.run_number }}" `
+              $failOnThreshold
+
+          # Don't fail the workflow on perf report generation errors
+          # (Gauntlet test results are more important)
+          if ($LASTEXITCODE -ne 0 -and $env:PERF_FAIL_ON_THRESHOLD -ne "true") {
+              Write-Host "::warning::Performance report generation had issues (exit code: $LASTEXITCODE)"
+          } elseif ($LASTEXITCODE -ne 0) {
+              Write-Host "::error::Performance threshold violations detected (PERF_FAIL_ON_THRESHOLD=true)"
+              exit 1
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 9: Upload performance reports as a separate named artifact
+      # Separate from the full gauntlet-results artifact for easy discovery.
+      # 30-day retention (longer than 14-day gauntlet-results) for trend analysis.
+      # if-no-files-found: warn — report directory should always exist after step 8.
+      # -------------------------------------------------------------------------
+      - name: Upload performance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report-${{ github.event.workflow_run.head_sha || github.sha }}
+          path: |
+            GauntletResults/PerfReports/
+            GauntletResults/PerfData/
+          retention-days: 30
+          if-no-files-found: warn
+
+      # -------------------------------------------------------------------------
+      # Step 10: Convert Gauntlet results to JUnit XML
+      # Runs if: always() so results are reported even on failure or crash.
+      # -------------------------------------------------------------------------
+      - name: Convert Gauntlet results to JUnit XML
+        if: always()
+        shell: powershell
+        run: |
+          $reportDir = "${{ github.workspace }}\GauntletResults"
+          $junitPath = "$reportDir\junit-gauntlet-results.xml"
+
+          # Run conversion script (handles both normal and crash scenarios)
+          & "${{ github.workspace }}\.github\scripts\Convert-GauntletToJUnit.ps1" `
+              -ReportDir $reportDir `
+              -OutputPath $junitPath
+
+          if (Test-Path $junitPath) {
+            Write-Host "JUnit XML created: $junitPath"
+            $size = (Get-Item $junitPath).Length
+            Write-Host "File size: $size bytes"
+          } else {
+            Write-Host "::warning::JUnit conversion produced no output file"
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 11: Upload all artifacts (on every run, not just failure — user decision)
+      # Includes: Gauntlet JSON results, JUnit XML, game logs, screenshots, perf data
+      # -------------------------------------------------------------------------
+      - name: Upload Gauntlet results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gauntlet-results-${{ github.event.workflow_run.head_sha || github.sha }}
+          path: GauntletResults/
+          retention-days: 14
+          if-no-files-found: warn
+
+      # -------------------------------------------------------------------------
+      # Step 12: Publish test results as "Gauntlet E2E Tests" check run
+      # Creates a separate check run distinct from unit/functional test results.
+      # -------------------------------------------------------------------------
+      - name: Publish Gauntlet E2E results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Gauntlet E2E Tests
+          path: GauntletResults/junit-gauntlet-results.xml
+          reporter: java-junit
+          fail-on-error: true
+
+      # -------------------------------------------------------------------------
+      # Step 13: Generate job summary
+      # Shows pass/fail/crash/unstable status, test count, performance data section.
+      # -------------------------------------------------------------------------
+      - name: Generate job summary
+        if: always()
+        shell: powershell
+        run: |
+          $status = $env:GAUNTLET_STATUS
+          $exitCode = $env:GAUNTLET_EXIT_CODE
+          $headSha = "${{ github.event.workflow_run.head_sha }}"
+          $shortSha = if ($headSha.Length -ge 7) { $headSha.Substring(0, 7) } else { $headSha }
+          $runNumber = "${{ github.run_number }}"
+          $triggeredBy = "${{ github.event.workflow_run.name }}"
+          $triggeredRunId = "${{ github.event.workflow_run.id }}"
+          $repoUrl = "${{ github.server_url }}/${{ github.repository }}"
+          $artifactConfig = if ($env:ARTIFACT_CONFIG) { $env:ARTIFACT_CONFIG } else { "Test" }
+
+          # Determine status icon and message
+          switch ($status) {
+            "success" {
+              $statusIcon = ":white_check_mark:"
+              $statusText = "PASSED"
+              $statusDetail = "All three Gauntlet tests completed successfully."
+            }
+            "unstable" {
+              $statusIcon = ":warning:"
+              $statusText = "UNSTABLE (recovered from crash)"
+              $statusDetail = "Tests completed after crash recovery. Check crash artifacts for details."
+            }
+            "crashed" {
+              $statusIcon = ":boom:"
+              $statusText = "GAME CRASHED"
+              $statusDetail = "The game crashed during testing. Build is broken -- remaining tests aborted."
+            }
+            "test_failed" {
+              $statusIcon = ":x:"
+              $statusText = "TEST ASSERTION FAILED"
+              $statusDetail = "The game ran but a test check failed. See test results for details."
+            }
+            default {
+              $statusIcon = ":warning:"
+              $statusText = "UNKNOWN"
+              $statusDetail = "Gauntlet status could not be determined. Check workflow logs."
+            }
+          }
+
+          # Parse JUnit XML for test count summary
+          $junitPath = "${{ github.workspace }}\GauntletResults\junit-gauntlet-results.xml"
+          $testCount = "N/A"
+          $passCount = "N/A"
+          $failCount = "N/A"
+          if (Test-Path $junitPath) {
+            try {
+              [xml]$junit = Get-Content $junitPath -Raw
+              $suite = $junit.testsuite
+              if ($suite) {
+                $testCount = $suite.GetAttribute("tests")
+                $failCount = $suite.GetAttribute("failures")
+                $errCount  = $suite.GetAttribute("errors")
+                $skipCount = $suite.GetAttribute("skipped")
+                $passInt = [int]$testCount - [int]$failCount - [int]$errCount - [int]$skipCount
+                $passCount = [string]$passInt
+              }
+            } catch {
+              Write-Host "Could not parse JUnit XML for summary: $_"
+            }
+          }
+
+          $lines = @(
+            "## Gauntlet E2E Tests $statusIcon",
+            "",
+            "**Status:** $statusText",
+            "",
+            "$statusDetail",
+            "",
+            "| Property | Value |",
+            "|----------|-------|",
+            "| **Triggered By** | [$triggeredBy run]($repoUrl/actions/runs/$triggeredRunId) |",
+            "| **Commit** | $shortSha |",
+            "| **Run** | #$runNumber |",
+            "| **Build Config** | $artifactConfig |",
+            "| **Tests** | $testCount |",
+            "| **Passed** | $passCount |",
+            "| **Failed** | $failCount |",
+            "",
+            "### Tests Executed",
+            "",
+            "| Test Node | Purpose |",
+            "|-----------|---------|",
+            "| BootTest | Verifies game boots and reaches GameState |",
+            "| TargetAutomationTest | Runs unit/smoke/functional/CQTest suite in packaged binary |",
+            "| GameplayTest | Full gameplay loop: spawn -> coins -> enemy -> level transition |"
+          )
+
+          if ($status -eq "unstable") {
+            $lines += @(
+              "",
+              "> **Recovered from crash** -- Tests completed successfully after crash recovery.",
+              "> -ResumeOnCriticalFailure triggered at least once during the run.",
+              "> Check the crash-artifacts upload for minidumps and crash logs.",
+              "> This is a warning: investigate to prevent recurring crashes."
+            )
+          } elseif ($status -eq "crashed") {
+            $lines += @(
+              "",
+              "> **Game crashed** -- The packaged build failed to run correctly.",
+              "> This indicates a critical regression in the packaged binary.",
+              "> Remaining tests in the chain were aborted.",
+              "> Check the uploaded game logs and Gauntlet results artifacts for crash details."
+            )
+          } elseif ($status -eq "test_failed") {
+            $lines += @(
+              "",
+              "> **Test assertion failed** -- The game ran but a test expectation was not met.",
+              "> This indicates a logic regression in game behavior.",
+              "> Check the test reporter check run and uploaded results for specific failures."
+            )
+          }
+
+          # Add performance report section to summary
+          $perfReportExists = Test-Path "${{ github.workspace }}\GauntletResults\PerfReports\performance-report.html"
+          if ($perfReportExists) {
+            $lines += @(
+              "",
+              "### Performance Data",
+              "",
+              "Performance reports generated. Download the ``performance-report`` artifact for detailed analysis.",
+              ""
+            )
+
+            # Check for threshold violations from Generate-PerfReport.ps1 output
+            $violations = $env:PERF_VIOLATIONS_COUNT
+            if ($violations -and [int]$violations -gt 0) {
+              $lines += "**Threshold violations: $violations** (see performance-report.html for details)"
+            } else {
+              $lines += "All performance thresholds passed."
+            }
+          } else {
+            $lines += @(
+              "",
+              "### Performance Data",
+              "",
+              "> No performance reports generated. CSV profiling may not have produced data.",
+              "> Verify the build uses Test/Development configuration (not Shipping)."
+            )
+          }
+
+          # Add crash artifact information if crash files were collected
+          if ($env:CRASH_RECOVERY_TRIGGERED -eq "true") {
+            $lines += @(
+              "",
+              "### Crash Artifacts",
+              "",
+              "Crash files collected during this run. Download the ``crash-artifacts`` artifact for post-mortem analysis.",
+              "> Correlate crash timestamps with performance CSV data for root cause investigation."
+            )
+          }
+
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          Write-Host "Job summary generated."

@@ -1,0 +1,108 @@
+# .github/workflows/validate.yml
+# UE5 Asset Validation - Standalone on-demand validation workflow
+# Triggers: manual dispatch only (workflow_dispatch)
+#
+# Runs all 7 asset validation checks via Invoke-AssetValidation.ps1:
+#   1. Missing asset references (DataValidation commandlet)
+#   2. Blueprint compilation (CompileAllBlueprints commandlet)
+#   3. Circular dependencies (log parsing)
+#   4. Asset naming conventions (PowerShell)
+#   5. Unused/orphaned assets (PowerShell heuristic)
+#   6. Large asset sizes (PowerShell)
+#   7. Map validation (log parsing + file verification)
+#
+# Severity gating:
+#   Development: warnings only (workflow succeeds)
+#   Shipping:    errors block (workflow fails)
+#
+# REUSE NOTE: This workflow assumes the repository name matches the .uproject
+# filename (e.g., repo "MyGame" expects "MyGame.uproject" in the root).
+name: UE5 Validate
+
+on:
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Validation strictness (Shipping = errors block, Development = warnings only)'
+        required: false
+        type: choice
+        options:
+          - Development
+          - Shipping
+        default: 'Development'
+
+permissions:
+  contents: read
+
+# Shared concurrency group with build.yml and package.yml prevents simultaneous
+# runs on the single self-hosted runner. Validation is cheap to restart.
+concurrency:
+  group: ue5-pipeline-${{ github.ref }}
+  cancel-in-progress: true
+
+# === FORK CONFIGURATION ===
+# Edit these values to match your environment.
+# Search for "FORK CONFIGURATION" to find all config points across workflows.
+# Full setup instructions: docs/quick-start.md
+env:
+  PROJECT_NAME: 'ProjectWalkingSim'  # Must match your .uproject filename
+  RUNNER_LABEL: 'ue5'                # Documentation only — runs-on labels must stay literal
+# === END FORK CONFIGURATION ===
+
+jobs:
+  # =============================================================================
+  # Validate Job - Runs all 7 asset validation checks
+  # =============================================================================
+  validate:
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 30
+
+    steps:
+      - name: Log validation info
+        shell: powershell
+        run: |
+          Write-Host "Job started by: ${{ github.actor }}"
+          Write-Host "Triggered by: ${{ github.event_name }}"
+          Write-Host "Ref: ${{ github.ref }}"
+          Write-Host "Runner: ${{ runner.name }}"
+          Write-Host "Configuration: ${{ github.event.inputs.configuration }}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Run asset validation
+        shell: powershell
+        run: |
+          & "${{ github.workspace }}\.github\scripts\Invoke-AssetValidation.ps1" `
+            -ProjectPath "${{ github.workspace }}\${{ github.event.repository.name }}.uproject" `
+            -Configuration "${{ github.event.inputs.configuration }}" `
+            -OutputDir "${{ github.workspace }}\ValidationOutput"
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report-${{ github.event.inputs.configuration }}-${{ github.sha }}
+          path: ValidationOutput/validation-report.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  # =============================================================================
+  # Notify Job - Sends failure notifications (requires validate)
+  # =============================================================================
+  notify:
+    needs: [validate]
+    if: failure()
+    uses: ./.github/workflows/notify.yml
+    with:
+      status: 'failed'
+      workflow_name: 'UE5 Validate'
+      branch: ${{ github.ref_name }}
+      commit_sha: ${{ github.sha }}
+      duration: 'N/A'
+      error_excerpt: 'Asset validation failed. Check the validation report artifact for details.'
+      failed_stage: 'validate'
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    secrets: inherit

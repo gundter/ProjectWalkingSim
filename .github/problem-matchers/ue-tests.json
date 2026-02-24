@@ -1,0 +1,14 @@
+{
+  "problemMatcher": [
+    {
+      "owner": "ue5-tests",
+      "pattern": [
+        {
+          "regexp": "^\\[(\\d{4}\\.\\d{2}\\.\\d{2}-\\d{2}\\.\\d{2}\\.\\d{2}:\\d{3})\\].*LogAutomationController:\\s*(Error|Warning):\\s*(.+)$",
+          "severity": 2,
+          "message": 3
+        }
+      ]
+    }
+  ]
+}

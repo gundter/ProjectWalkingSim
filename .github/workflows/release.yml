@@ -1,0 +1,1294 @@
+# .github/workflows/release.yml
+# UE5 Release Pipeline - Tag-triggered release orchestrator
+# Triggers: push of v*.*.* tag (production releases), manual dispatch (dry-run by default)
+#
+# This workflow is the single entry point for all platform deployments. It reads the
+# VERSION file as the authoritative version source, validates that the pushed tag
+# matches it, then distributes version outputs to all downstream jobs. Manual dispatch
+# defaults to dry-run mode so accidental deploys are not possible without explicit intent.
+#
+# Job graph (release.yml jobs):
+#   version-extract
+#         |
+#         +-- prepare
+#         |     |
+#         |     +-- github-deploy
+#         |     +-- itchio-deploy
+#         |           |
+#         |           +-- changelog-update
+#         |           +-- notify (if: always())
+#         |
+#         +-- prepare-dry-run
+#               |
+#               +-- itchio-deploy-dry-run
+#                     |
+#                     +-- notify-dry-run (if: always())
+#
+# Standalone workflows (separate files, workflow_dispatch):
+#   steam-deploy.yml  — Steam beta branch deployment (triggers manually after release.yml)
+#   epic-deploy.yml   — Epic Games Store Dev sandbox deployment (triggers manually after release.yml)
+#
+# VERSION file format: MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-CHANNEL
+#   Stable:     1.2.0          -> full version: 1.2.0+143
+#   Pre-release: 1.2.0-beta   -> full version: 1.2.0-beta+143
+#
+name: UE5 Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version_override:
+        description: 'Version override (leave blank to read VERSION file)'
+        required: false
+        type: string
+        default: ''
+      channel:
+        description: 'Channel override (ignored if version_override is blank)'
+        required: false
+        type: choice
+        options: [stable, beta, alpha, rc]
+        default: 'stable'
+      dry_run:
+        description: 'Dry run - log intended actions without uploading'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  actions: read    # Required for dawidd6/action-download-artifact to read workflow runs
+
+# Shared concurrency group with build.yml and package.yml prevents simultaneous runs
+# on the single self-hosted runner. Release jobs should NOT be cancelled mid-flight
+# (fail-safe: queue the next run rather than cancel the current one).
+concurrency:
+  group: ue5-pipeline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # =============================================================================
+  # Version Extract Job - Single source of version truth for all downstream jobs
+  # =============================================================================
+  # Reads the VERSION file, parses semver components, validates the pushed tag
+  # matches the file content, normalizes the dry_run flag (tag pushes always get
+  # false; manual dispatch respects the input), and emits all version outputs
+  # for downstream consumption via needs.version-extract.outputs.*.
+  version-extract:
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 10
+    outputs:
+      semver:        ${{ steps.parse.outputs.semver }}
+      channel:       ${{ steps.parse.outputs.channel }}
+      full_version:  ${{ steps.parse.outputs.full_version }}
+      is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
+      build_number:  ${{ steps.parse.outputs.build_number }}
+      dry_run:       ${{ steps.parse.outputs.dry_run }}
+
+    steps:
+      - name: Log trigger info
+        shell: powershell
+        run: |
+          Write-Host "Job started by: ${{ github.actor }}"
+          Write-Host "Triggered by: ${{ github.event_name }}"
+          Write-Host "Ref: ${{ github.ref }}"
+          Write-Host "Runner: ${{ runner.name }}"
+          if ("${{ github.event_name }}" -eq 'push') {
+            Write-Host "Tag: ${{ github.ref_name }}"
+          } else {
+            Write-Host "version_override: '${{ inputs.version_override }}'"
+            Write-Host "channel: '${{ inputs.channel }}'"
+            Write-Host "dry_run: '${{ inputs.dry_run }}'"
+          }
+
+      # Always checkout — PATCH_NOTES.md must be available to downstream jobs regardless
+      # of whether version_override is set (Plan 03 reads it from workspace).
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Parse VERSION and validate tag
+        id: parse
+        shell: powershell
+        run: |
+          # -----------------------------------------------------------------------
+          # Determine version source: version_override input or VERSION file
+          # -----------------------------------------------------------------------
+          $versionOverride = "${{ inputs.version_override }}".Trim()
+          $useOverride = ($versionOverride -ne '')
+
+          if ($useOverride) {
+            Write-Host "Using version_override: '$versionOverride'"
+            $versionRaw = $versionOverride
+          } else {
+            $versionFilePath = "${{ github.workspace }}\VERSION"
+            if (-not (Test-Path $versionFilePath)) {
+              Write-Host "::error::VERSION file not found at: $versionFilePath"
+              Write-Host "::error::Create a VERSION file at the repository root with content like '1.2.0' or '1.2.0-beta'."
+              exit 1
+            }
+            $versionRaw = (Get-Content $versionFilePath -Raw).Trim()
+            Write-Host "VERSION file content: '$versionRaw'"
+          }
+
+          # -----------------------------------------------------------------------
+          # Parse semver + optional channel
+          # Expected formats: MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-CHANNEL
+          # Channel must start with a letter (e.g., alpha, beta, rc) — not a number
+          # -----------------------------------------------------------------------
+          if ($versionRaw -match '^(\d+)\.(\d+)\.(\d+)(?:-([a-zA-Z][a-zA-Z0-9]*))?$') {
+            $semver  = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
+            $channel = if ($Matches[4]) { $Matches[4] } else { 'stable' }
+          } else {
+            Write-Host "::error::Invalid VERSION format: '$versionRaw'. Expected MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-CHANNEL (e.g., '1.2.0' or '1.2.0-beta')."
+            exit 1
+          }
+
+          # -----------------------------------------------------------------------
+          # Apply channel input override (workflow_dispatch with version_override only)
+          # If version_override is set and doesn't include a channel suffix, apply
+          # the 'channel' input. If version already has a suffix, that takes precedence.
+          # -----------------------------------------------------------------------
+          if ($useOverride -and (-not $Matches[4])) {
+            $channelInput = "${{ inputs.channel }}".Trim()
+            if ($channelInput -ne '' -and $channelInput -ne 'stable') {
+              $channel = $channelInput
+              Write-Host "Applying channel input override: '$channel'"
+            }
+          }
+
+          $build = "${{ github.run_number }}"
+
+          # -----------------------------------------------------------------------
+          # Construct full version string
+          # Stable:      MAJOR.MINOR.PATCH+BUILD         (e.g., 1.2.0+143)
+          # Pre-release: MAJOR.MINOR.PATCH-CHANNEL+BUILD (e.g., 1.2.0-beta+143)
+          # -----------------------------------------------------------------------
+          $full = if ($channel -eq 'stable') {
+            "${semver}+${build}"
+          } else {
+            "${semver}-${channel}+${build}"
+          }
+
+          # -----------------------------------------------------------------------
+          # Tag/VERSION validation (push event only)
+          # Strip the 'v' prefix from the tag and compare to VERSION file content.
+          # Fails immediately on mismatch to prevent mismatched release artifacts.
+          # -----------------------------------------------------------------------
+          if ("${{ github.event_name }}" -eq 'push') {
+            $tag = "${{ github.ref_name }}"
+            $tagVersion = $tag.TrimStart('v')
+            if ($tagVersion -ne $versionRaw) {
+              Write-Host "::error::Tag '$tag' does not match VERSION file '$versionRaw'."
+              Write-Host "::error::Update the VERSION file to '$tagVersion' and commit it before pushing the tag."
+              exit 1
+            }
+            Write-Host "Tag validation passed: '$tag' matches VERSION file '$versionRaw'"
+          }
+
+          # -----------------------------------------------------------------------
+          # Pre-release detection
+          # Anything other than 'stable' is a pre-release (beta, alpha, rc, etc.)
+          # -----------------------------------------------------------------------
+          $isPrerelease = ($channel -ne 'stable').ToString().ToLower()
+
+          # -----------------------------------------------------------------------
+          # Normalize dry_run flag
+          # On tag push, inputs.dry_run is null — default to 'false' (real deploy).
+          # On workflow_dispatch with dry_run=true, set 'true'.
+          # This normalization ensures all downstream jobs can safely check
+          # needs.version-extract.outputs.dry_run without null-check logic.
+          # See: Pitfall 3 in 18-RESEARCH.md
+          # -----------------------------------------------------------------------
+          $dryRun = if ("${{ inputs.dry_run }}" -eq 'true') { 'true' } else { 'false' }
+
+          # -----------------------------------------------------------------------
+          # Emit outputs via GITHUB_OUTPUT
+          # -----------------------------------------------------------------------
+          echo "semver=$semver"               >> $env:GITHUB_OUTPUT
+          echo "channel=$channel"             >> $env:GITHUB_OUTPUT
+          echo "full_version=$full"           >> $env:GITHUB_OUTPUT
+          echo "is_prerelease=$isPrerelease"  >> $env:GITHUB_OUTPUT
+          echo "build_number=$build"          >> $env:GITHUB_OUTPUT
+          echo "dry_run=$dryRun"              >> $env:GITHUB_OUTPUT
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "Version extraction complete"
+          Write-Host "========================================"
+          Write-Host "  semver:        $semver"
+          Write-Host "  channel:       $channel"
+          Write-Host "  full_version:  $full"
+          Write-Host "  is_prerelease: $isPrerelease"
+          Write-Host "  build_number:  $build"
+          Write-Host "  dry_run:       $dryRun"
+          Write-Host "========================================"
+
+      - name: Generate workflow summary
+        if: always()
+        shell: powershell
+        run: |
+          $dryRun      = "${{ steps.parse.outputs.dry_run }}"
+          $fullVersion = "${{ steps.parse.outputs.full_version }}"
+          $channel     = "${{ steps.parse.outputs.channel }}"
+          $isPrerelease = "${{ steps.parse.outputs.is_prerelease }}"
+          $trigger     = "${{ github.event_name }}"
+
+          if ($dryRun -eq 'true') {
+            # -----------------------------------------------------------------------
+            # Dry-run summary: show what would happen without uploading anything
+            # -----------------------------------------------------------------------
+            Write-Host "::warning::DRY RUN: No uploads will occur. Re-run with dry_run=false to deploy."
+
+            $lines = @(
+              "## DRY RUN - UE5 Release Pipeline",
+              "",
+              "> **No files were uploaded. This is a preview of what would happen.**",
+              "> Re-trigger with `dry_run=false` to perform a real deployment.",
+              "",
+              "| Action | Status |",
+              "|--------|--------|",
+              "| Parse version | Completed: $fullVersion |",
+              "| Download Shipping artifact | Would download from package.yml (commit: ${{ github.sha }}) |",
+              "| Extract and repackage ZIP | Would create versioned artifact |",
+              "| Platform deploys (Phases 19-22) | Would execute: GitHub Releases, itch.io, Steam, Epic |",
+              "",
+              "### Version Details",
+              "",
+              "| Field | Value |",
+              "|-------|-------|",
+              "| Full version | $fullVersion |",
+              "| Channel | $channel |",
+              "| Pre-release | $isPrerelease |",
+              "| Build number | ${{ github.run_number }} |",
+              "| Trigger | $trigger |",
+              "| Commit | ${{ github.sha }} |"
+            )
+            $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+          } else {
+            # -----------------------------------------------------------------------
+            # Normal (non-dry-run) summary: show version and release context
+            # -----------------------------------------------------------------------
+            $preReleaseLabel = if ($isPrerelease -eq 'true') { 'Yes' } else { 'No' }
+            $channelLabel    = if ($channel -eq 'stable') { 'stable (production)' } else { $channel }
+
+            $lines = @(
+              "## UE5 Release Pipeline",
+              "",
+              "| Field | Value |",
+              "|-------|-------|",
+              "| Full version | $fullVersion |",
+              "| Channel | $channelLabel |",
+              "| Pre-release | $preReleaseLabel |",
+              "| Build number | ${{ github.run_number }} |",
+              "| Trigger | $trigger |",
+              "| Commit | ${{ github.sha }} |",
+              "| Run ID | ${{ github.run_id }} |"
+            )
+            $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          }
+
+
+  # =============================================================================
+  # Prepare Job - Downloads Shipping artifact from package.yml, updates
+  # build-info.json with version fields, re-archives with versioned filename,
+  # and uploads for downstream platform deploy jobs (Phases 19-22).
+  # =============================================================================
+  # Cross-workflow artifact download uses dawidd6/action-download-artifact@v3
+  # to find the package.yml run matching the current commit SHA. The artifact
+  # name from package.yml follows the pattern {repo}-Shipping-{branch}-{sha};
+  # name_is_regexp: true matches it without hardcoding the branch name.
+  # VER-04: Versioned artifact name: {repo}-Shipping-v{semver}-{build} (stable)
+  #         or {repo}-Shipping-v{semver}-{channel}-{build} (pre-release)
+  # VER-05: build-info.json updated with version, fullVersion, channel fields
+  # REL-03: Cross-workflow artifact download from package.yml by commit SHA
+  prepare:
+    needs: [version-extract]
+    if: needs.version-extract.outputs.dry_run != 'true'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 30
+    outputs:
+      artifact_name: ${{ steps.set-artifact-name.outputs.artifact_name }}
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Construct the versioned artifact name
+      # Stable:      {repo}-Shipping-v{semver}-{build}
+      # Pre-release: {repo}-Shipping-v{semver}-{channel}-{build}
+      # -------------------------------------------------------------------------
+      - name: Set versioned artifact name
+        id: set-artifact-name
+        shell: powershell
+        run: |
+          $repo    = "${{ github.event.repository.name }}"
+          $ver     = "${{ needs.version-extract.outputs.semver }}"
+          $channel = "${{ needs.version-extract.outputs.channel }}"
+          $build   = "${{ needs.version-extract.outputs.build_number }}"
+
+          if ($channel -eq 'stable') {
+            $name = "${repo}-Shipping-v${ver}-${build}"
+          } else {
+            $name = "${repo}-Shipping-v${ver}-${channel}-${build}"
+          }
+
+          echo "artifact_name=$name" >> $env:GITHUB_OUTPUT
+
+          Write-Host "========================================"
+          Write-Host "Prepare Job - Version: ${{ needs.version-extract.outputs.full_version }}"
+          Write-Host "Versioned artifact name: $name"
+          Write-Host "Commit SHA: ${{ github.sha }}"
+          Write-Host "========================================"
+
+      # -------------------------------------------------------------------------
+      # Step 2: Download Shipping artifact from package.yml by commit SHA
+      # name_is_regexp: true matches {repo}-Shipping-{branch}-{sha7} pattern
+      # if_no_artifact_found: fail — fail fast with clear error if missing
+      # -------------------------------------------------------------------------
+      - name: Download Shipping artifact from package.yml
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: package.yml
+          commit: ${{ github.sha }}
+          name: '${{ github.event.repository.name }}-Shipping-.*'
+          name_is_regexp: true
+          path: ${{ runner.temp }}\shipping-download
+          workflow_conclusion: success
+          if_no_artifact_found: fail
+
+      # -------------------------------------------------------------------------
+      # Step 3: Validate the download — ensure a ZIP file is present
+      # Handles the case where dawidd6 exits 0 but finds no artifact (Pitfall 2)
+      # -------------------------------------------------------------------------
+      - name: Validate download and locate ZIP
+        id: locate-zip
+        shell: powershell
+        run: |
+          $downloadDir = "${{ runner.temp }}\shipping-download"
+          Write-Host "Searching for ZIP in: $downloadDir"
+
+          $zips = Get-ChildItem -Path $downloadDir -Filter "*.zip" -Recurse -ErrorAction SilentlyContinue
+          if (-not $zips -or $zips.Count -eq 0) {
+            Write-Host "::error::No Shipping artifact found for commit ${{ github.sha }}. Run package.yml first."
+            Write-Host "::error::Download directory contents:"
+            Get-ChildItem -Path $downloadDir -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "  $($_.FullName)"
+            }
+            exit 1
+          }
+
+          $zipPath = $zips[0].FullName
+          $zipSizeMB = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
+          Write-Host "Found ZIP: $zipPath ($zipSizeMB MB)"
+
+          echo "zip_path=$zipPath" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 4: Extract the Shipping ZIP
+      # Uses Expand-Archive -Force; validates extraction produced files
+      # -------------------------------------------------------------------------
+      - name: Extract Shipping ZIP
+        shell: powershell
+        run: |
+          $zipPath    = "${{ steps.locate-zip.outputs.zip_path }}"
+          $extractDir = "${{ runner.temp }}\shipping-extracted"
+
+          Write-Host "Extracting: $zipPath"
+          Write-Host "  -> To: $extractDir"
+
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+          Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+
+          # Validate extraction produced files
+          $fileCount = (Get-ChildItem $extractDir -Recurse -File -ErrorAction SilentlyContinue).Count
+          Write-Host "Extracted file count: $fileCount"
+
+          if ($fileCount -eq 0) {
+            Write-Host "::error::Extraction produced no files. The ZIP may be corrupt or empty."
+            exit 1
+          }
+
+          Write-Host "Extraction validated: $fileCount files found"
+
+      # -------------------------------------------------------------------------
+      # Step 5: Update build-info.json with version fields (VER-05)
+      # Adds version, fullVersion, channel to the existing build-info.json.
+      # Emits ::warning:: if not found — absence does not block the release.
+      # -------------------------------------------------------------------------
+      - name: Update build-info.json with version fields
+        shell: powershell
+        run: |
+          $extractDir  = "${{ runner.temp }}\shipping-extracted"
+          $semver      = "${{ needs.version-extract.outputs.semver }}"
+          $fullVersion = "${{ needs.version-extract.outputs.full_version }}"
+          $channel     = "${{ needs.version-extract.outputs.channel }}"
+
+          $buildInfoFiles = Get-ChildItem -Path $extractDir -Filter "build-info.json" -Recurse -ErrorAction SilentlyContinue
+
+          if (-not $buildInfoFiles -or $buildInfoFiles.Count -eq 0) {
+            Write-Host "::warning::build-info.json not found in extracted artifact. Version fields (version, fullVersion, channel) will not be added."
+            Write-Host "::warning::This is unexpected — package.yml should generate build-info.json. Check the Shipping build output."
+          } else {
+            foreach ($infoFile in $buildInfoFiles) {
+              Write-Host "Updating build-info.json: $($infoFile.FullName)"
+
+              $json = Get-Content $infoFile.FullName -Raw | ConvertFrom-Json
+
+              # Add version fields (Add-Member -Force overwrites if already present)
+              $json | Add-Member -NotePropertyName 'version'     -NotePropertyValue $semver      -Force
+              $json | Add-Member -NotePropertyName 'fullVersion' -NotePropertyValue $fullVersion  -Force
+              $json | Add-Member -NotePropertyName 'channel'     -NotePropertyValue $channel      -Force
+
+              $json | ConvertTo-Json -Depth 5 | Out-File -FilePath $infoFile.FullName -Encoding utf8
+
+              Write-Host "  Added: version=$semver, fullVersion=$fullVersion, channel=$channel"
+            }
+
+            Write-Host "build-info.json update complete ($($buildInfoFiles.Count) file(s))"
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 6: Re-archive with versioned filename (VER-04)
+      # Uses -Path "$extractDir\*" (not $extractDir) to avoid directory nesting
+      # See: Pitfall 7 in 18-RESEARCH.md
+      # -------------------------------------------------------------------------
+      - name: Re-archive with versioned filename
+        shell: powershell
+        run: |
+          $extractDir   = "${{ runner.temp }}\shipping-extracted"
+          $artifactName = "${{ steps.set-artifact-name.outputs.artifact_name }}"
+          $outputDir    = "${{ runner.temp }}\shipping-versioned"
+          $zipDest      = Join-Path $outputDir "${artifactName}.zip"
+
+          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+
+          Write-Host "Re-archiving: $extractDir\* -> $zipDest"
+
+          # CRITICAL: use "$extractDir\*" not "$extractDir" to avoid nesting the
+          # directory name inside the ZIP (Pitfall 7). This matches package.yml's
+          # ZipFile::CreateFromDirectory with includeBaseDirectory: false.
+          Compress-Archive -Path "$extractDir\*" -DestinationPath $zipDest -CompressionLevel Optimal
+
+          $zipSizeMB = [math]::Round((Get-Item $zipDest).Length / 1MB, 2)
+          Write-Host "Created versioned ZIP: $zipDest ($zipSizeMB MB)"
+          Write-Host "Artifact: $artifactName"
+
+      # -------------------------------------------------------------------------
+      # Step 7: Upload versioned Shipping artifact for downstream platform jobs
+      # compression-level: 0 — already compressed, no re-compression benefit
+      # retention-days: 30 — matches Shipping retention policy from package.yml
+      # -------------------------------------------------------------------------
+      - name: Upload versioned Shipping artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.set-artifact-name.outputs.artifact_name }}
+          path: ${{ runner.temp }}\shipping-versioned\*.zip
+          retention-days: 30
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Generate prepare job summary
+        if: always()
+        shell: powershell
+        run: |
+          $artifactName = "${{ steps.set-artifact-name.outputs.artifact_name }}"
+          $fullVersion  = "${{ needs.version-extract.outputs.full_version }}"
+          $channel      = "${{ needs.version-extract.outputs.channel }}"
+
+          $lines = @(
+            "## Prepare Job",
+            "",
+            "| Action | Status |",
+            "|--------|--------|",
+            "| Download Shipping artifact | From package.yml for commit ``${{ github.sha }}`` |",
+            "| Update build-info.json | Added version=${{ needs.version-extract.outputs.semver }}, fullVersion=$fullVersion, channel=$channel |",
+            "| Re-archive | As ``${artifactName}.zip`` |",
+            "| Upload | 30-day retention |",
+            "",
+            "**Versioned artifact:** $artifactName",
+            "**Full version:** $fullVersion",
+            "**Channel:** $channel"
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # =============================================================================
+  # Prepare Dry-Run Job - Reports intended prepare actions without downloading
+  # or uploading anything. Runs when dry_run == 'true' (workflow_dispatch).
+  # Both prepare and prepare-dry-run output artifact_name so downstream jobs
+  # can reference it regardless of dry-run state.
+  # =============================================================================
+  prepare-dry-run:
+    needs: [version-extract]
+    if: needs.version-extract.outputs.dry_run == 'true'
+    runs-on: [self-hosted, windows, ue5]
+    outputs:
+      artifact_name: ${{ steps.set-artifact-name.outputs.artifact_name }}
+
+    steps:
+      - name: Set versioned artifact name
+        id: set-artifact-name
+        shell: powershell
+        run: |
+          $repo    = "${{ github.event.repository.name }}"
+          $ver     = "${{ needs.version-extract.outputs.semver }}"
+          $channel = "${{ needs.version-extract.outputs.channel }}"
+          $build   = "${{ needs.version-extract.outputs.build_number }}"
+
+          if ($channel -eq 'stable') {
+            $name = "${repo}-Shipping-v${ver}-${build}"
+          } else {
+            $name = "${repo}-Shipping-v${ver}-${channel}-${build}"
+          }
+
+          echo "artifact_name=$name" >> $env:GITHUB_OUTPUT
+          Write-Host "Versioned artifact name (dry-run): $name"
+
+      - name: Report dry-run prepare actions
+        shell: powershell
+        run: |
+          $artifactName = "${{ steps.set-artifact-name.outputs.artifact_name }}"
+          $fullVersion  = "${{ needs.version-extract.outputs.full_version }}"
+          $semver       = "${{ needs.version-extract.outputs.semver }}"
+          $channel      = "${{ needs.version-extract.outputs.channel }}"
+
+          Write-Host "::warning::DRY RUN: Would download Shipping artifact from package.yml for commit ${{ github.sha }}"
+          Write-Host "::warning::DRY RUN: Would update build-info.json with version=$semver, fullVersion=$fullVersion, channel=$channel"
+          Write-Host "::warning::DRY RUN: Would re-archive as ${artifactName}.zip"
+          Write-Host "::warning::DRY RUN: Would upload with 30-day retention"
+
+          $lines = @(
+            "## Prepare Job (DRY RUN)",
+            "",
+            "| Action | Would Do |",
+            "|--------|----------|",
+            "| Download artifact | From package.yml for commit ``${{ github.sha }}`` |",
+            "| Validate ZIP | Locate *.zip in shipping-download directory |",
+            "| Extract | To ``runner.temp\shipping-extracted`` |",
+            "| Update build-info.json | Add version=$semver, fullVersion=$fullVersion, channel=$channel |",
+            "| Re-archive | As ``${artifactName}.zip`` |",
+            "| Upload | 30-day retention, compression-level 0 |",
+            "",
+            "> Re-run with ``dry_run=false`` to execute."
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # --- Platform deploy jobs (Phases 19-22) ---
+
+  # =============================================================================
+  # GitHub Deploy Job - Creates GitHub Release with Shipping ZIP and build-info.json
+  # Requirements: GHR-01, GHR-02, GHR-03, GHR-04, GHR-05, NOTES-03, NOTES-06
+  # =============================================================================
+  github-deploy:
+    needs: [version-extract, prepare]
+    if: needs.version-extract.outputs.dry_run != 'true'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 30
+    permissions:
+      contents: write
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Checkout repository (shallow clone for PATCH_NOTES.md access)
+      # Do NOT use ref: main or fetch-depth: 0 — this is file access only.
+      # -------------------------------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # -------------------------------------------------------------------------
+      # Step 2: Download versioned Shipping artifact from prepare job
+      # -------------------------------------------------------------------------
+      - name: Download versioned Shipping artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prepare.outputs.artifact_name }}
+          path: ${{ runner.temp }}\shipping-versioned
+
+      # -------------------------------------------------------------------------
+      # Step 3: Extract Shipping ZIP to locate build-info.json (GHR-05)
+      # build-info.json lives inside the ZIP — extract to attach it separately.
+      # -------------------------------------------------------------------------
+      - name: Extract Shipping ZIP to locate build-info.json
+        shell: powershell
+        run: |
+          $zip = Get-ChildItem "${{ runner.temp }}\shipping-versioned" -Filter "*.zip" | Select-Object -First 1
+          if (-not $zip) {
+            Write-Host "::error::No ZIP found in shipping-versioned directory."
+            exit 1
+          }
+          Write-Host "Extracting: $($zip.FullName)"
+          Expand-Archive -Path $zip.FullName -DestinationPath "${{ runner.temp }}\shipping-extracted-gh" -Force
+          Write-Host "Extraction complete."
+
+      # -------------------------------------------------------------------------
+      # Step 4: Validate PATCH_NOTES.md (NOTES-03, NOTES-06)
+      # Checks existence, character limit (125k), and template heuristic (<!--)
+      # -------------------------------------------------------------------------
+      - name: Validate PATCH_NOTES.md
+        shell: powershell
+        run: |
+          $notesPath = "${{ github.workspace }}\PATCH_NOTES.md"
+
+          if (-not (Test-Path $notesPath)) {
+            Write-Host "::error::PATCH_NOTES.md not found at workspace root. The checkout step must succeed first."
+            exit 1
+          }
+
+          $notes = Get-Content $notesPath -Raw
+          $charCount = $notes.Length
+          $limit = 125000
+          $warnThreshold = 100000
+
+          Write-Host "PATCH_NOTES.md: $charCount characters"
+
+          if ($charCount -gt $limit) {
+            Write-Host "::error::PATCH_NOTES.md ($charCount chars) exceeds GitHub Release body limit ($limit chars). Truncate the file before tagging."
+            exit 1
+          } elseif ($charCount -gt $warnThreshold) {
+            Write-Host "::warning::PATCH_NOTES.md ($charCount chars) is approaching the GitHub Release body limit ($limit chars)."
+          }
+
+          if ($notes -match '<!--') {
+            Write-Host "::warning::PATCH_NOTES.md appears to contain HTML comments — possible unmodified template content. Update it before tagging for release."
+          }
+
+          Write-Host "PATCH_NOTES.md validation passed."
+
+      # -------------------------------------------------------------------------
+      # Step 5: Compose framed release body
+      # Format: **v{semver}** ({yyyy-MM-dd})\n\n{PATCH_NOTES content}\n---\n{compare link}
+      # Previous tag discovered via git describe; footer omitted if no prior tag.
+      # -------------------------------------------------------------------------
+      - name: Compose release body
+        id: compose-body
+        shell: powershell
+        run: |
+          $semver   = "${{ needs.version-extract.outputs.semver }}"
+          $today    = (Get-Date).ToString("yyyy-MM-dd")
+          $bodyPath = "${{ runner.temp }}\release-body.md"
+
+          $header = "**v${semver}** (${today})"
+          $notes  = Get-Content "${{ github.workspace }}\PATCH_NOTES.md" -Raw
+
+          # Attempt to find the previous tag for the compare link footer
+          $prevTag = git describe --tags --abbrev=0 HEAD^ 2>$null
+          if ($prevTag) {
+            $footer = "`n---`n[Full Changelog](https://github.com/${{ github.repository }}/compare/${prevTag}...v${semver})"
+            Write-Host "Previous tag for compare link: $prevTag"
+          } else {
+            $footer = ""
+            Write-Host "No previous tag found — compare link omitted."
+          }
+
+          "${header}`n`n${notes}${footer}" | Out-File -FilePath $bodyPath -Encoding utf8
+
+          Write-Host "Release body written to: $bodyPath"
+          echo "body_path=$bodyPath" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 6: Determine draft vs publish
+      # All releases are created as drafts — manual publish step required.
+      # -------------------------------------------------------------------------
+      - name: Determine draft vs publish
+        id: draft-check
+        shell: powershell
+        run: |
+          $isDraft = 'true'
+          Write-Host "Creating draft release — manual publish required."
+          echo "is_draft=$isDraft" >> $env:GITHUB_OUTPUT
+
+      # -------------------------------------------------------------------------
+      # Step 7: Create GitHub Release with ZIP and build-info.json assets
+      # GHR-01: Release created on tag push
+      # GHR-02: Shipping ZIP attached
+      # GHR-03: Pre-release flag set for beta/rc tags
+      # GHR-04: Atomic upload (softprops uploads all files before release is visible)
+      # GHR-05: build-info.json attached as separate asset
+      # NOTES-03: PATCH_NOTES.md content used as release body (framed)
+      # -------------------------------------------------------------------------
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ needs.version-extract.outputs.semver }}
+          tag_name: v${{ needs.version-extract.outputs.semver }}
+          body_path: ${{ steps.compose-body.outputs.body_path }}
+          draft: ${{ steps.draft-check.outputs.is_draft == 'true' }}
+          prerelease: ${{ needs.version-extract.outputs.is_prerelease == 'true' }}
+          make_latest: ${{ needs.version-extract.outputs.is_prerelease != 'true' }}
+          fail_on_unmatched_files: true
+          files: |
+            ${{ runner.temp }}/shipping-versioned/*.zip
+            ${{ runner.temp }}/shipping-extracted-gh/**/build-info.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # -------------------------------------------------------------------------
+      # Step 8: Generate job summary (runs even on failure for diagnostics)
+      # -------------------------------------------------------------------------
+      - name: Generate github-deploy job summary
+        if: always()
+        shell: powershell
+        run: |
+          $semver      = "${{ needs.version-extract.outputs.semver }}"
+          $fullVersion = "${{ needs.version-extract.outputs.full_version }}"
+          $channel     = "${{ needs.version-extract.outputs.channel }}"
+          $isPrerelease = "${{ needs.version-extract.outputs.is_prerelease }}"
+          $isDraft     = "${{ steps.draft-check.outputs.is_draft }}"
+          $trigger     = "${{ github.event_name }}"
+          $artifactName = "${{ needs.prepare.outputs.artifact_name }}"
+
+          $releaseTypeLabel = if ($isPrerelease -eq 'true') { 'Pre-release' } else { 'Full release' }
+          $draftLabel       = if ($isDraft -eq 'true') { 'Yes (draft)' } else { 'No (published)' }
+
+          $lines = @(
+            "## GitHub Deploy Job",
+            "",
+            "| Field | Value |",
+            "|-------|-------|",
+            "| Version | v${semver} |",
+            "| Full version | ${fullVersion} |",
+            "| Channel | ${channel} |",
+            "| Release type | ${releaseTypeLabel} |",
+            "| Draft | ${draftLabel} |",
+            "| Trigger | ${trigger} |",
+            "",
+            "### Assets",
+            "",
+            "| Asset | Source |",
+            "|-------|--------|",
+            "| ``${artifactName}.zip`` | Versioned Shipping ZIP from prepare job |",
+            "| ``build-info.json`` | Extracted from inside Shipping ZIP |"
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # =============================================================================
+  # itch.io Deploy Job - Pushes Shipping build to itch.io via butler CLI
+  # Requirements: ITCH-01, ITCH-02, ITCH-03, ITCH-04, ITCH-05, ITCH-06, BETA-01, BETA-02
+  # =============================================================================
+  itchio-deploy:
+    needs: [version-extract, prepare]
+    if: needs.version-extract.outputs.dry_run != 'true'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 30
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Set up butler CLI
+      # remarkablegames/setup-butler@v2 downloads butler and adds it to PATH
+      # automatically. No configuration needed on Windows runners.
+      # -------------------------------------------------------------------------
+      - name: Set up butler
+        uses: remarkablegames/setup-butler@v2
+
+      # -------------------------------------------------------------------------
+      # Step 2: Validate configuration
+      # Checks that vars.ITCHIO_GAME and secrets.BUTLER_API_KEY are both set.
+      # Per user decision: if vars.ITCHIO_GAME is not set, fail immediately.
+      # -------------------------------------------------------------------------
+      - name: Validate configuration
+        shell: powershell
+        run: |
+          $game   = "${{ vars.ITCHIO_GAME }}"
+          $apiKey = "${{ secrets.BUTLER_API_KEY }}"
+
+          if (-not $game) {
+            Write-Host "::error::vars.ITCHIO_GAME is not set. Set it to 'user/game-slug' in repository variables (Settings > Secrets and variables > Actions > Variables)."
+            exit 1
+          }
+          if (-not $apiKey) {
+            Write-Host "::error::secrets.BUTLER_API_KEY is not set. Add your itch.io API key to repository secrets (Settings > Secrets and variables > Actions > Secrets). Generate a key at https://itch.io/user/settings/api-keys"
+            exit 1
+          }
+
+          Write-Host "Configuration valid: ITCHIO_GAME=$game, BUTLER_API_KEY is set"
+
+      # -------------------------------------------------------------------------
+      # Step 3: Verify butler authentication
+      # Calls /wharf/status with the API key before any file transfer begins.
+      # Fails with a clear error if the key is invalid or expired.
+      # -------------------------------------------------------------------------
+      - name: Verify butler authentication
+        shell: powershell
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          try {
+            $response = Invoke-WebRequest `
+              -Uri "https://api.itch.io/wharf/status" `
+              -Headers @{ Authorization = "Bearer $env:BUTLER_API_KEY" } `
+              -UseBasicParsing `
+              -ErrorAction Stop
+            Write-Host "Butler authentication verified (HTTP $($response.StatusCode))"
+          } catch {
+            Write-Host "::error::Butler authentication failed. The BUTLER_API_KEY secret may be invalid or expired."
+            Write-Host "::error::Generate a new API key at https://itch.io/user/settings/api-keys and update the repository secret."
+            Write-Host "::error::Details: $($_.Exception.Message)"
+            exit 1
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 4: Download versioned Shipping artifact from prepare job
+      # Same pattern as github-deploy: download the versioned ZIP to a local dir.
+      # -------------------------------------------------------------------------
+      - name: Download versioned Shipping artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prepare.outputs.artifact_name }}
+          path: ${{ runner.temp }}\shipping-versioned
+
+      # -------------------------------------------------------------------------
+      # Step 5: Extract Shipping ZIP for butler
+      # Butler expects a directory, NOT an archive (Pitfall 2 — zip-inside-a-zip).
+      # Extracts to shipping-butler; validates extraction produced files.
+      # ZIP structure: Windows\ at root (Pitfall 3 — push extraction root, not Windows\)
+      # -------------------------------------------------------------------------
+      - name: Extract Shipping ZIP for butler
+        shell: powershell
+        run: |
+          $zip = Get-ChildItem "${{ runner.temp }}\shipping-versioned" -Filter "*.zip" | Select-Object -First 1
+          if (-not $zip) {
+            Write-Host "::error::No ZIP found in shipping-versioned directory. The prepare job artifact may be missing."
+            exit 1
+          }
+
+          $extractDir = "${{ runner.temp }}\shipping-butler"
+          New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+
+          Write-Host "Extracting: $($zip.FullName)"
+          Write-Host "  -> To: $extractDir"
+          Expand-Archive -Path $zip.FullName -DestinationPath $extractDir -Force
+
+          $fileCount = (Get-ChildItem $extractDir -Recurse -File -ErrorAction SilentlyContinue).Count
+          Write-Host "Extracted $fileCount files to: $extractDir"
+
+          if ($fileCount -eq 0) {
+            Write-Host "::error::Extraction produced no files. The versioned ZIP may be corrupt or empty."
+            exit 1
+          }
+
+          Write-Host "Extraction validated: $fileCount files found"
+          Write-Host "Extraction root contents:"
+          Get-ChildItem $extractDir | ForEach-Object { Write-Host "  $($_.Name)" }
+
+      # -------------------------------------------------------------------------
+      # Step 6: Write version file for butler
+      # --userversion-file reads a single-line UTF-8 file.
+      # Stable:      "1.2.0"       (semver as-is from VERSION file)
+      # Pre-release: "1.2.0-beta"  (semver + channel suffix)
+      # Per user decision: use VERSION file content as-is for display.
+      # -------------------------------------------------------------------------
+      - name: Write version file for butler
+        shell: powershell
+        run: |
+          $semver  = "${{ needs.version-extract.outputs.semver }}"
+          $channel = "${{ needs.version-extract.outputs.channel }}"
+          $version = if ($channel -eq 'stable') { $semver } else { "${semver}-${channel}" }
+
+          $versionFile = "${{ runner.temp }}\butler-version.txt"
+          $version | Out-File -FilePath $versionFile -Encoding utf8 -NoNewline
+
+          Write-Host "Version file: $versionFile"
+          Write-Host "Version string: $version"
+
+      # -------------------------------------------------------------------------
+      # Step 7: Push to itch.io
+      # Channel routing: is_prerelease == 'true' -> windows-beta, else -> windows
+      # ITCH-01: stable -> windows channel
+      # ITCH-02: pre-release -> windows-beta channel
+      # BETA-01/BETA-02: routing confirmed by is_prerelease output
+      # Flags: --userversion-file only (no --fix-permissions per user decision)
+      # -------------------------------------------------------------------------
+      - name: Push to itch.io
+        shell: powershell
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+        run: |
+          $game        = "${{ vars.ITCHIO_GAME }}"
+          $isPrerelease = "${{ needs.version-extract.outputs.is_prerelease }}"
+          $itchChannel = if ($isPrerelease -eq 'true') { 'windows-beta' } else { 'windows' }
+          $extractDir  = "${{ runner.temp }}\shipping-butler"
+          $versionFile = "${{ runner.temp }}\butler-version.txt"
+          $target      = "${game}:${itchChannel}"
+
+          Write-Host "========================================"
+          Write-Host "itch.io Push"
+          Write-Host "========================================"
+          Write-Host "  Target:       $target"
+          Write-Host "  Directory:    $extractDir"
+          Write-Host "  Version file: $versionFile"
+          Write-Host "  Version:      $(Get-Content $versionFile)"
+          Write-Host "========================================"
+
+          butler push $extractDir $target --userversion-file $versionFile
+
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::butler push failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+          Write-Host "butler push completed successfully -> $target"
+
+      # -------------------------------------------------------------------------
+      # Step 8: Cleanup temp files
+      # Removes shipping-versioned, shipping-butler, and butler-version.txt from
+      # runner.temp to prevent disk pressure on the self-hosted runner.
+      # Runs with if: always() to clean up even when prior steps fail.
+      # -------------------------------------------------------------------------
+      - name: Cleanup temp files
+        if: always()
+        shell: powershell
+        run: |
+          Remove-Item "${{ runner.temp }}\shipping-versioned" -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\shipping-butler"    -Recurse -Force -ErrorAction SilentlyContinue
+          Remove-Item "${{ runner.temp }}\butler-version.txt" -Force          -ErrorAction SilentlyContinue
+          Write-Host "Temp file cleanup complete"
+
+      # -------------------------------------------------------------------------
+      # Step 9: Generate itchio-deploy job summary (runs even on failure)
+      # -------------------------------------------------------------------------
+      - name: Generate itchio-deploy job summary
+        if: always()
+        shell: powershell
+        run: |
+          $semver      = "${{ needs.version-extract.outputs.semver }}"
+          $channel     = "${{ needs.version-extract.outputs.channel }}"
+          $isPrerelease = "${{ needs.version-extract.outputs.is_prerelease }}"
+          $itchChannel = if ($isPrerelease -eq 'true') { 'windows-beta' } else { 'windows' }
+          $version     = if ($channel -eq 'stable') { $semver } else { "${semver}-${channel}" }
+          $game        = "${{ vars.ITCHIO_GAME }}"
+          $artifactName = "${{ needs.prepare.outputs.artifact_name }}"
+
+          $lines = @(
+            "## itch.io Deploy Job",
+            "",
+            "| Field | Value |",
+            "|-------|-------|",
+            "| Version | $version |",
+            "| Channel | $itchChannel |",
+            "| Target | ${game}:${itchChannel} |",
+            "| Artifact | $artifactName |",
+            "| Full version | ${{ needs.version-extract.outputs.full_version }} |"
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # =============================================================================
+  # itch.io Deploy Dry-Run Job - Validates config and logs intended actions
+  # without installing butler or pushing any files.
+  # =============================================================================
+  itchio-deploy-dry-run:
+    needs: [version-extract, prepare-dry-run]
+    if: needs.version-extract.outputs.dry_run == 'true'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 10
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Validate configuration (dry run)
+      # Uses ::warning:: (not ::error::) — informational in dry-run mode.
+      # Validates both vars.ITCHIO_GAME and secrets.BUTLER_API_KEY.
+      # -------------------------------------------------------------------------
+      - name: Validate configuration (dry run)
+        shell: powershell
+        run: |
+          $game    = "${{ vars.ITCHIO_GAME }}"
+          $apiKey  = "${{ secrets.BUTLER_API_KEY }}"
+          $configOk = $true
+
+          if (-not $game) {
+            Write-Host "::warning::DRY RUN: vars.ITCHIO_GAME is NOT set — real run would fail immediately. Set it to 'user/game-slug' in repository variables."
+            $configOk = $false
+          }
+          if (-not $apiKey) {
+            Write-Host "::warning::DRY RUN: secrets.BUTLER_API_KEY is NOT set — real run would fail immediately. Add your itch.io API key to repository secrets."
+            $configOk = $false
+          }
+
+          if ($configOk) {
+            Write-Host "DRY RUN: Configuration valid (ITCHIO_GAME=$game, BUTLER_API_KEY is set)"
+          } else {
+            Write-Host "DRY RUN: Configuration incomplete — see warnings above"
+          }
+
+      # -------------------------------------------------------------------------
+      # Step 2: Report dry-run itch.io actions
+      # Computes channel/version/target and writes GITHUB_STEP_SUMMARY table.
+      # Matches prepare-dry-run style.
+      # -------------------------------------------------------------------------
+      - name: Report dry-run itch.io actions
+        shell: powershell
+        run: |
+          $game        = "${{ vars.ITCHIO_GAME }}"
+          $semver      = "${{ needs.version-extract.outputs.semver }}"
+          $channel     = "${{ needs.version-extract.outputs.channel }}"
+          $isPrerelease = "${{ needs.version-extract.outputs.is_prerelease }}"
+          $itchChannel = if ($isPrerelease -eq 'true') { 'windows-beta' } else { 'windows' }
+          $version     = if ($channel -eq 'stable') { $semver } else { "${semver}-${channel}" }
+
+          $gameDisplay = if ($game) { $game } else { '(not configured)' }
+          $configStatus = if ($game -and "${{ secrets.BUTLER_API_KEY }}") { 'Valid' } else { 'Missing: see warnings above' }
+
+          Write-Host "::warning::DRY RUN: Would push ${gameDisplay}:${itchChannel} with butler"
+
+          $lines = @(
+            "## itch.io Deploy (DRY RUN)",
+            "",
+            "| Field | Value |",
+            "|-------|-------|",
+            "| Target | ${gameDisplay}:${itchChannel} |",
+            "| Channel | $itchChannel |",
+            "| Version | $version |",
+            "| Configuration | $configStatus |",
+            "",
+            "> Re-run with ``dry_run=false`` to push to itch.io."
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # =============================================================================
+  # Changelog Update Job - Generates CHANGELOG.md entry from git history and
+  # commits it back to main using orhun/git-cliff-action@v4.
+  # Requirements: NOTES-01, NOTES-04
+  # =============================================================================
+  # Runs AFTER github-deploy and itchio-deploy succeed — changelog commit
+  # happens only once all platform deploys are complete. Uses full git history
+  # (fetch-depth: 0) and explicit ref: main checkout to avoid detached HEAD
+  # from the tag push event.
+  # GITHUB_TOKEN push to main does NOT trigger downstream workflows (safe).
+  changelog-update:
+    needs: [version-extract, github-deploy, itchio-deploy]
+    if: needs.version-extract.outputs.dry_run != 'true'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Add 7-Zip to PATH
+      # CRITICAL: git-cliff-action's install.sh uses `7z x -aoa` on Windows to
+      # extract the git-cliff binary. 7z.exe is installed at
+      # C:\Program Files\7-Zip\7z.exe but is NOT in PATH by default on this
+      # runner. Must be added before orhun/git-cliff-action runs. (Pitfall 1)
+      # -------------------------------------------------------------------------
+      - name: Add 7-Zip to PATH
+        shell: powershell
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\Program Files\7-Zip"
+          Write-Host "Added C:\Program Files\7-Zip to GITHUB_PATH"
+
+      # -------------------------------------------------------------------------
+      # Step 2: Checkout main branch with full history
+      # CRITICAL: Tag push events leave the runner in a detached HEAD state.
+      # Must explicitly checkout main (ref: main) to be able to push back.
+      # fetch-depth: 0 gives git-cliff the full tag history it needs to
+      # determine the unreleased commit range. (Pitfall 2)
+      # -------------------------------------------------------------------------
+      - name: Checkout main branch with full history
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      # -------------------------------------------------------------------------
+      # Step 3: Generate CHANGELOG entry with git-cliff
+      # --unreleased: generates only commits not yet in a tag
+      # --tag: labels this section with the current version
+      # --prepend: prepends new entry to top of CHANGELOG.md without overwriting
+      # config: cliff.toml — uses project Keep a Changelog format
+      # -------------------------------------------------------------------------
+      - name: Generate CHANGELOG entry
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --verbose --unreleased --tag v${{ needs.version-extract.outputs.semver }} --prepend CHANGELOG.md
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # -------------------------------------------------------------------------
+      # Step 4: Commit and push CHANGELOG.md back to main
+      # Uses github-actions[bot] identity for the commit.
+      # git diff --cached --quiet check prevents empty commits on re-runs of
+      # the same tag (edge case: changelog already up to date).
+      # GITHUB_TOKEN push to main does NOT trigger build.yml/package.yml
+      # workflows — this is documented GitHub behavior, no loop risk. (Pitfall 3)
+      # -------------------------------------------------------------------------
+      - name: Commit and push CHANGELOG.md
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          if git diff --cached --quiet; then
+            echo "No changes to CHANGELOG.md — already up to date"
+            exit 0
+          fi
+          git commit -m "docs: update CHANGELOG.md for v${{ needs.version-extract.outputs.semver }}"
+          git push origin main
+
+      # -------------------------------------------------------------------------
+      # Step 5: Generate job summary (runs even on failure for diagnostics)
+      # -------------------------------------------------------------------------
+      - name: Generate changelog-update job summary
+        if: always()
+        shell: powershell
+        run: |
+          $semver      = "${{ needs.version-extract.outputs.semver }}"
+          $fullVersion = "${{ needs.version-extract.outputs.full_version }}"
+
+          $changelogPath = "${{ github.workspace }}\CHANGELOG.md"
+          $changelogExists = Test-Path $changelogPath
+          $entryCount = 0
+          if ($changelogExists) {
+            $content = Get-Content $changelogPath -Raw
+            $entryCount = ([regex]::Matches($content, '^## \[', [System.Text.RegularExpressions.RegexOptions]::Multiline)).Count
+          }
+
+          $lines = @(
+            "## Changelog Update Job",
+            "",
+            "| Action | Result |",
+            "|--------|--------|",
+            "| CHANGELOG.md updated | $(if ($changelogExists) { 'Yes' } else { 'Not found' }) |",
+            "| Version labeled | v${semver} |",
+            "| Total version entries | ${entryCount} |",
+            "| Full version | ${fullVersion} |",
+            "",
+            "> CHANGELOG.md was generated using ``orhun/git-cliff-action@v4`` with ``cliff.toml`` and committed back to main.",
+            "> Push authenticated with GITHUB_TOKEN — does **not** trigger downstream workflows."
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+  # =============================================================================
+  # Notify Job - Cross-platform deploy status rollup (informational only)
+  # Runs after ALL platform deploy jobs regardless of their success/failure.
+  # Always exits 0 — individual job failures are visible in their own statuses.
+  # =============================================================================
+  notify:
+    needs: [version-extract, github-deploy, itchio-deploy]
+    if: always() && needs.version-extract.outputs.dry_run != 'true'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 10
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Report platform deploy status
+      # Reads needs.*.result for each platform deploy job (github-deploy, itchio-deploy)
+      # and writes a summary table to GITHUB_STEP_SUMMARY.
+      # Steam and Epic run as standalone workflow_dispatch workflows — not tracked here.
+      # Possible values: success, failure, skipped, cancelled
+      # Always exits 0 — this job is informational only.
+      # -------------------------------------------------------------------------
+      - name: Report platform deploy status
+        shell: powershell
+        run: |
+          $semver      = "${{ needs.version-extract.outputs.semver }}"
+          $fullVersion = "${{ needs.version-extract.outputs.full_version }}"
+
+          $ghResult    = "${{ needs.github-deploy.result }}"
+          $itchResult  = "${{ needs.itchio-deploy.result }}"
+
+          # Map job result to display label
+          function Get-StatusLabel($result) {
+            switch ($result) {
+              'success'   { return 'success' }
+              'failure'   { return 'FAILED' }
+              'skipped'   { return 'skipped' }
+              'cancelled' { return 'cancelled' }
+              default     { return $result }
+            }
+          }
+
+          $ghStatus   = Get-StatusLabel $ghResult
+          $itchStatus = Get-StatusLabel $itchResult
+
+          Write-Host "========================================"
+          Write-Host "Release Deploy Summary"
+          Write-Host "========================================"
+          Write-Host "  Version:         v$semver ($fullVersion)"
+          Write-Host "  GitHub Releases: $ghStatus"
+          Write-Host "  itch.io:         $itchStatus"
+          Write-Host "========================================"
+
+          $lines = @(
+            "## Release Deploy Summary",
+            "",
+            "**Version:** v${semver} (${fullVersion})",
+            "",
+            "| Platform | Status |",
+            "|----------|--------|",
+            "| GitHub Releases | $ghStatus |",
+            "| itch.io | $itchStatus |",
+            "",
+            "> Steam and Epic deployments run as standalone workflows (``steam-deploy.yml``, ``epic-deploy.yml``) and are not tracked here."
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+          exit 0
+
+  # =============================================================================
+  # Notify Dry-Run Job - Cross-platform dry-run status rollup (informational only)
+  # Runs after all dry-run variant jobs regardless of their success/failure.
+  # Always exits 0 — informational only.
+  # =============================================================================
+  notify-dry-run:
+    needs: [version-extract, itchio-deploy-dry-run]
+    if: always() && needs.version-extract.outputs.dry_run == 'true'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 10
+
+    steps:
+      # -------------------------------------------------------------------------
+      # Step 1: Report dry-run deploy summary
+      # Reads dry-run job results and writes a summary table to GITHUB_STEP_SUMMARY.
+      # Note: github-deploy has no dry-run variant (Phase 19 did not create one).
+      # Steam and Epic run as standalone workflow_dispatch workflows — not tracked here.
+      # Always exits 0 — informational only.
+      # -------------------------------------------------------------------------
+      - name: Report dry-run deploy summary
+        shell: powershell
+        run: |
+          $semver      = "${{ needs.version-extract.outputs.semver }}"
+          $fullVersion = "${{ needs.version-extract.outputs.full_version }}"
+
+          $itchDryResult = "${{ needs.itchio-deploy-dry-run.result }}"
+
+          # Map job result to display label
+          function Get-StatusLabel($result) {
+            switch ($result) {
+              'success'   { return 'success' }
+              'failure'   { return 'FAILED' }
+              'skipped'   { return 'skipped' }
+              'cancelled' { return 'cancelled' }
+              default     { return $result }
+            }
+          }
+
+          $itchDryStatus = Get-StatusLabel $itchDryResult
+
+          Write-Host "========================================"
+          Write-Host "Release Deploy Summary (DRY RUN)"
+          Write-Host "========================================"
+          Write-Host "  Version:         v$semver ($fullVersion)"
+          Write-Host "  itch.io dry-run: $itchDryStatus"
+          Write-Host "  No files were uploaded."
+          Write-Host "========================================"
+
+          $lines = @(
+            "## Release Deploy Summary (DRY RUN)",
+            "",
+            "**Version:** v${semver} (${fullVersion})",
+            "",
+            "> No files were uploaded. Re-run with ``dry_run=false`` to deploy.",
+            "",
+            "| Platform | Dry-Run Status |",
+            "|----------|----------------|",
+            "| GitHub Releases | (no dry-run variant) |",
+            "| itch.io | $itchDryStatus |",
+            "",
+            "> Steam and Epic deployments run as standalone workflows (``steam-deploy.yml``, ``epic-deploy.yml``) and are not tracked here."
+          )
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+          exit 0

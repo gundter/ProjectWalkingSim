@@ -1,0 +1,197 @@
+# .github/actions/ue5-setup/action.yml
+# Composite action: UE5 runner prerequisite validation
+# Validates disk space, UE5 installation, and Visual Studio before UE5 jobs.
+# Used by build.yml and package.yml foundation jobs.
+#
+# FORK SETUP: Set UE5_ROOT in your workflow env block to point to your UE5 install.
+# Full setup instructions: docs/quick-start.md
+name: UE5 Setup
+description: Validates runner prerequisites for UE5 CI jobs (disk space, UE5, Visual Studio)
+
+inputs:
+  ue5-root:
+    description: 'Path to UE5 installation root'
+    required: false
+    default: 'H:/UE5-Source/UnrealEngine'
+  project-name:
+    description: 'Project name matching .uproject filename'
+    required: false
+    default: ''
+
+outputs:
+  ue5-root-resolved:
+    description: 'Resolved UE5 root path used for this run'
+    value: ${{ steps.resolve-paths.outputs.ue5-root-resolved }}
+  project-root:
+    description: 'Absolute path to the workspace root'
+    value: ${{ steps.resolve-paths.outputs.project-root }}
+
+runs:
+  using: 'composite'
+  steps:
+
+    - name: Resolve paths
+      id: resolve-paths
+      shell: powershell
+      run: |
+        # Prefer UE5_ROOT env var if set, fall back to input value
+        $ue5Root = if ($env:UE5_ROOT) { $env:UE5_ROOT } else { "${{ inputs.ue5-root }}" }
+        $projectRoot = "${{ github.workspace }}"
+
+        Write-Host "UE5 root resolved: $ue5Root"
+        Write-Host "Project root: $projectRoot"
+
+        echo "ue5-root-resolved=$ue5Root" >> $env:GITHUB_OUTPUT
+        echo "project-root=$projectRoot" >> $env:GITHUB_OUTPUT
+
+    - name: Log job info
+      shell: powershell
+      run: |
+        Write-Host "Job started by: ${{ github.actor }}"
+        Write-Host "Triggered by: ${{ github.event_name }}"
+        Write-Host "Ref: ${{ github.ref }}"
+        Write-Host "Runner: ${{ runner.name }}"
+
+    - name: Check disk space
+      shell: powershell
+      run: |
+        # Detect workspace drive dynamically (supports runner on any drive)
+        $workspacePath = "${{ github.workspace }}"
+        $driveLetter = (Split-Path -Qualifier $workspacePath).TrimEnd(':')
+        $drive = Get-PSDrive -Name $driveLetter
+        $freeGB = [math]::Round($drive.Free / 1GB, 2)
+        $usedGB = [math]::Round($drive.Used / 1GB, 2)
+        $totalGB = [math]::Round(($drive.Free + $drive.Used) / 1GB, 2)
+        Write-Host "Disk ${driveLetter}: - Free: ${freeGB}GB, Used: ${usedGB}GB, Total: ${totalGB}GB"
+        Write-Host "Workspace: $workspacePath"
+
+        if ($freeGB -lt 50) {
+          Write-Host "::warning::Low disk space detected (${freeGB}GB free). Attempting cleanup..."
+
+          # Priority 1: Old GitHub Actions artifacts (safe to re-download)
+          $runnerRoot = Split-Path (Split-Path (Split-Path "${{ github.workspace }}"))
+          $actionsPath = Join-Path $runnerRoot "_work\*\_actions"
+          if (Test-Path $actionsPath) {
+            $oldActions = Get-ChildItem $actionsPath -Directory -ErrorAction SilentlyContinue |
+              Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) }
+            if ($oldActions) {
+              Write-Host "Cleaning old actions cache..."
+              $oldActions | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          # Priority 2: Old staged builds (> 7 days, takes ~30min to rebuild)
+          $stagedPath = "${{ github.workspace }}\Saved\StagedBuilds"
+          if (Test-Path $stagedPath) {
+            $oldStaged = Get-ChildItem $stagedPath -Directory -ErrorAction SilentlyContinue |
+              Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) }
+            if ($oldStaged) {
+              Write-Host "Cleaning old staged builds..."
+              $oldStaged | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          # Priority 3: Intermediate files (takes ~20min to rebuild)
+          $intermediatePath = "${{ github.workspace }}\Intermediate"
+          if (Test-Path $intermediatePath) {
+            Write-Host "Cleaning intermediate files..."
+            Remove-Item -Path $intermediatePath -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+          # Priority 4: Old runner update folders
+          $runnerBins = Get-ChildItem (Join-Path (Split-Path $runnerRoot) "bin.*") -Directory -ErrorAction SilentlyContinue
+          if ($runnerBins) {
+            Write-Host "Cleaning old runner update folders..."
+            $runnerBins | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+          }
+
+          # Re-check after cleanup
+          $drive = Get-PSDrive -Name $driveLetter
+          $freeGB = [math]::Round($drive.Free / 1GB, 2)
+          Write-Host "After cleanup - Free: ${freeGB}GB"
+
+          # Note: DDC cache is NOT automatically deleted (hours to rebuild)
+          # If still low after cleanup, warn about DDC
+          if ($freeGB -lt 50) {
+            $ddcPath = "${{ github.workspace }}\DerivedDataCache"
+            if (Test-Path $ddcPath) {
+              $ddcSize = [math]::Round((Get-ChildItem $ddcPath -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum / 1GB, 2)
+              Write-Host "::warning::DDC cache is ${ddcSize}GB. Manual cleanup may be needed if disk space remains critical."
+            }
+            Write-Error "Insufficient disk space after cleanup: ${freeGB}GB free. Minimum required: 50GB"
+            exit 1
+          }
+        }
+
+        Write-Host "Disk space check passed: ${freeGB}GB free"
+
+    - name: Validate UE5 installation
+      shell: powershell
+      run: |
+        $ue5Root = "${{ steps.resolve-paths.outputs.ue5-root-resolved }}"
+
+        $runUATPath = Join-Path $ue5Root "Engine\Build\BatchFiles\RunUAT.bat"
+        if (Test-Path $runUATPath) {
+          Write-Host "UE5 found at: $ue5Root"
+          Write-Host "  RunUAT.bat: $runUATPath"
+        } else {
+          Write-Error "UE5 not found at [$ue5Root]. Set UE5_ROOT in the workflow env block. See docs/quick-start.md."
+          Write-Host "  Expected RunUAT.bat at: $runUATPath"
+          exit 1
+        }
+
+    - name: Validate Visual Studio
+      shell: powershell
+      run: |
+        $vsWherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (Test-Path $vsWherePath) {
+          $vsPath = & $vsWherePath -latest -property installationPath
+          if ($vsPath) {
+            Write-Host "Visual Studio found at: $vsPath"
+
+            # Check for C++ workload
+            $vcToolsPath = Join-Path $vsPath "VC\Tools\MSVC"
+            if (Test-Path $vcToolsPath) {
+              Write-Host "  C++ tools found"
+            } else {
+              Write-Host "::warning::C++ tools not found at expected location. See docs/quick-start.md for VS workload requirements."
+            }
+          } else {
+            Write-Error "vswhere found but no Visual Studio installation detected. See docs/quick-start.md for setup requirements."
+            exit 1
+          }
+        } else {
+          Write-Host "::warning::vswhere not found - Visual Studio validation skipped"
+          Write-Host "  Expected at: $vsWherePath"
+        }
+
+    - name: Generate foundation summary
+      if: always()
+      shell: powershell
+      run: |
+        $ue5Root = "${{ steps.resolve-paths.outputs.ue5-root-resolved }}"
+        $projectRoot = "${{ steps.resolve-paths.outputs.project-root }}"
+
+        $driveLetter = (Split-Path -Qualifier "${{ github.workspace }}").TrimEnd(':')
+        $drive = Get-PSDrive -Name $driveLetter
+        $freeGB = [math]::Round($drive.Free / 1GB, 2)
+
+        $vsWherePath = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $vsVersion = "Not found"
+        if (Test-Path $vsWherePath) {
+          $vsVer = & $vsWherePath -latest -property installationVersion 2>$null
+          if ($vsVer) { $vsVersion = $vsVer }
+        }
+
+        $lines = @(
+          "## Foundation Check :white_check_mark:",
+          "",
+          "| Check | Value |",
+          "|-------|-------|",
+          "| UE5 Root | $ue5Root |",
+          "| Project Root | $projectRoot |",
+          "| Disk Space | ${freeGB}GB free |",
+          "| Visual Studio | $vsVersion |",
+          ""
+        )
+        $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8

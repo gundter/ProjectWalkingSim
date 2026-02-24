@@ -1,0 +1,822 @@
+# .github/workflows/package.yml
+# UE5 Package Pipeline - Full cook + package + archive for distributable builds
+# Triggers: push to main (auto-packages Shipping), manual dispatch (config selection)
+#
+# This workflow produces distributable Windows builds, separate from build.yml
+# which only handles compilation + testing. Packaging takes significantly longer
+# (cook + stage + pak + package + archive) so it only runs when targeting production.
+#
+# Configuration matrix:
+#   push to main:             ["Test","Shipping"] (Phase 17: both for Gauntlet E2E + perf coverage)
+#   workflow_dispatch single:  [selected config]
+#   workflow_dispatch "All":   [Development, Test, Shipping]
+#   schedule:                  cleanup-report only (no packaging)
+#
+# REUSE NOTE: This workflow assumes the repository name matches the .uproject
+# filename (e.g., repo "MyGame" expects "MyGame.uproject" in the root).
+name: UE5 Package
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      configuration:
+        description: 'Package configuration'
+        required: false
+        type: choice
+        options:
+          - Shipping
+          - Test
+          - Development
+          - All
+        default: 'Shipping'
+  schedule:
+    - cron: '0 9 * * 1'  # Weekly Monday 9am UTC - cleanup report only
+
+permissions:
+  contents: read
+
+# Shared concurrency group with build.yml prevents both workflows from running
+# simultaneously on the single self-hosted runner. Package jobs should NOT be
+# cancelled (they take longer and are more expensive to restart).
+concurrency:
+  group: ue5-pipeline-${{ github.ref }}
+  cancel-in-progress: false
+
+# === FORK CONFIGURATION ===
+# Edit these values to match your environment.
+# Search for "FORK CONFIGURATION" to find all config points across workflows.
+# Full setup instructions: docs/quick-start.md
+env:
+  UE5_ROOT: 'E:\Epic Games\UE_5.7'  # Path to your UE5 installation
+  PROJECT_NAME: 'ProjectWalkingSim'                 # Must match your .uproject filename
+  RUNNER_LABEL: 'ue5'                               # Documentation only — runs-on labels must stay literal
+  UE5_ENGINE_VERSION: '5.7'
+# === END FORK CONFIGURATION ===
+
+jobs:
+  # =============================================================================
+  # Foundation Job - Validates runner infrastructure before packaging
+  # =============================================================================
+  foundation:
+    if: github.event_name != 'schedule'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: UE5 Setup
+        id: ue5-setup
+        uses: ./.github/actions/ue5-setup
+        with:
+          ue5-root: ${{ env.UE5_ROOT }}
+          project-name: ${{ env.PROJECT_NAME }}
+
+  # =============================================================================
+  # Configure Job - Determines which package configurations to run
+  # =============================================================================
+  # Lightweight job (no checkout needed) that outputs a JSON matrix array
+  # based on trigger context. This drives the matrix strategy in the package job.
+  configure:
+    if: github.event_name != 'schedule'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+    steps:
+      - name: Determine package configuration matrix
+        id: set-matrix
+        shell: powershell
+        run: |
+          $event = "${{ github.event_name }}"
+          $ref = "${{ github.ref }}"
+          $inputConfig = "${{ github.event.inputs.configuration }}"
+
+          Write-Host "Event: $event"
+          Write-Host "Ref: $ref"
+          Write-Host "Input config: $inputConfig"
+
+          # Determine matrix based on trigger context
+          switch ($event) {
+            "workflow_dispatch" {
+              if ($inputConfig -eq "All") {
+                $matrix = '["Development","Test","Shipping"]'
+              } else {
+                $matrix = "[`"$inputConfig`"]"
+              }
+            }
+            "push" {
+              # Push to main = package Test AND Shipping for Gauntlet E2E coverage (Phase 17).
+              # Test config required: TargetAutomationTest needs WITH_DEV_AUTOMATION_TESTS=1.
+              # CSV profiling requires CSV_PROFILER=1 (only active in Test/Development builds).
+              $matrix = '["Test","Shipping"]'
+            }
+            default {
+              # Fallback: Shipping only
+              $matrix = '["Shipping"]'
+            }
+          }
+
+          Write-Host "Matrix output: $matrix"
+          echo "matrix=$matrix" >> $env:GITHUB_OUTPUT
+
+  # =============================================================================
+  # Validate Job - Runs asset validation checks before packaging
+  # =============================================================================
+  # Validates assets (missing references, Blueprint compilation, naming conventions,
+  # circular dependencies, unused assets, large files, map integrity) before the
+  # expensive cook+package process. In Shipping mode, validation errors block packaging.
+  validate:
+    needs: [foundation, configure]
+    if: github.event_name != 'schedule'
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        configuration: ${{ fromJson(needs.configure.outputs.matrix) }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          clean: false  # Preserve Binaries/ from build.yml (project module needed by commandlets)
+
+      - name: Verify project module is compiled
+        shell: powershell
+        run: |
+          $binPath = "${{ github.workspace }}\Binaries\Win64"
+          $moduleDll = Get-ChildItem "$binPath\UnrealEditor-*.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $moduleDll) {
+            Write-Host "::error::Project module DLL not found in $binPath"
+            Write-Host "::error::The validate job requires compiled project binaries."
+            Write-Host "::error::Ensure build.yml has run successfully for this commit before packaging."
+            Write-Host ""
+            Write-Host "To fix: run the Build workflow first, or trigger package after a push (build runs automatically)."
+            exit 1
+          }
+          Write-Host "Project module found: $($moduleDll.Name)"
+
+      - name: Run asset validation (${{ matrix.configuration }})
+        shell: powershell
+        run: |
+          $outputDir = "${{ github.workspace }}\ValidationOutput"
+          New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
+
+          & "${{ github.workspace }}\.github\scripts\Invoke-AssetValidation.ps1" `
+            -ProjectPath "${{ github.workspace }}\${{ github.event.repository.name }}.uproject" `
+            -Configuration "${{ matrix.configuration }}" `
+            -OutputDir $outputDir
+
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report-${{ matrix.configuration }}-${{ github.sha }}
+          path: ValidationOutput/validation-report.json
+          retention-days: 7
+          if-no-files-found: warn
+
+  # =============================================================================
+  # Package Job - Cooks, packages, and archives UE5 builds per configuration
+  # =============================================================================
+  # Runs once per configuration in the matrix. With max-parallel: 1 on a single
+  # runner, configurations execute sequentially. fail-fast: true means if the
+  # first config fails, subsequent configs are skipped.
+  package:
+    needs: [foundation, configure, validate]
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 120
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        configuration: ${{ fromJson(needs.configure.outputs.matrix) }}
+
+    outputs:
+      status: ${{ steps.collect-results.outputs.status }}
+      duration: ${{ steps.collect-results.outputs.duration }}
+      error_excerpt: ${{ steps.collect-results.outputs.error_excerpt }}
+      failed_stage: ${{ steps.collect-results.outputs.failed_stage }}
+      stage_duration: ${{ steps.collect-results.outputs.stage_duration }}
+
+    steps:
+      - name: Log package info
+        shell: powershell
+        run: |
+          Write-Host "Job started by: ${{ github.actor }}"
+          Write-Host "Triggered by: ${{ github.event_name }}"
+          Write-Host "Ref: ${{ github.ref }}"
+          Write-Host "Runner: ${{ runner.name }}"
+          Write-Host "Configuration: ${{ matrix.configuration }}"
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Clean previous packaging artifacts
+        shell: powershell
+        run: |
+          # Remove previous packaging output to ensure clean state
+          # Do NOT remove DerivedDataCache (hours to rebuild)
+          $cleanPaths = @(
+            "${{ github.workspace }}\Saved\StagedBuilds",
+            "${{ github.workspace }}\Saved\Cooked",
+            "${{ github.workspace }}\PackagedBuilds",
+            "${{ github.workspace }}\Artifacts"
+          )
+
+          foreach ($path in $cleanPaths) {
+            if (Test-Path $path) {
+              Write-Host "Removing: $path"
+              Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+              Write-Host "  Removed"
+            } else {
+              Write-Host "Not found (clean): $path"
+            }
+          }
+
+          Write-Host "Previous packaging artifacts cleaned"
+
+      - name: Prepare archive directory
+        shell: powershell
+        run: |
+          $archiveDir = "${{ github.workspace }}\PackagedBuilds\${{ matrix.configuration }}"
+          New-Item -ItemType Directory -Force -Path $archiveDir | Out-Null
+          Write-Host "Archive directory created: $archiveDir"
+
+      - name: Run BuildCookRun (${{ matrix.configuration }})
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+          # Define paths
+          $ue5Root = if ($env:UE5_ROOT) { $env:UE5_ROOT } else { "${{ env.UE5_ROOT }}" }
+          $runUAT = Join-Path $ue5Root "Engine\Build\BatchFiles\RunUAT.bat"
+          $project = "${{ github.workspace }}\${{ github.event.repository.name }}.uproject"
+          $configuration = "${{ matrix.configuration }}"
+          $archiveDir = "${{ github.workspace }}\PackagedBuilds\$configuration"
+
+          Write-Host "========================================"
+          Write-Host "UE5 Package Configuration"
+          Write-Host "========================================"
+          Write-Host "UE5 Root: $ue5Root"
+          Write-Host "RunUAT: $runUAT"
+          Write-Host "Project: $project"
+          Write-Host "Platform: Win64"
+          Write-Host "Configuration: $configuration"
+          Write-Host "Archive Dir: $archiveDir"
+          Write-Host "========================================"
+
+          # Verify paths exist
+          if (-not (Test-Path $runUAT)) {
+            Write-Host "::error::RunUAT.bat not found at: $runUAT"
+            exit 1
+          }
+
+          if (-not (Test-Path $project)) {
+            Write-Host "::error::Project file not found at: $project"
+            exit 1
+          }
+
+          # Config-specific flags
+          $configFlags = @()
+          switch ($configuration) {
+            "Shipping" { $configFlags += @("-distribution", "-prereqs", "-nodebuginfo") }
+            # Test: no special flags needed
+          }
+
+          $flagsDisplay = if ($configFlags.Count -gt 0) { $configFlags -join " " } else { "(none)" }
+          Write-Host "Config-specific flags: $flagsDisplay"
+          Write-Host ""
+
+          $uatArgs = @(
+            "BuildCookRun",
+            "-project=`"$project`"",
+            "-noP4",
+            "-NoCompile",
+            "-platform=Win64",
+            "-clientconfig=$configuration",
+            "-build",
+            "-cook",
+            "-stage",
+            "-pak",
+            "-package",
+            "-archive",
+            "-archivedirectory=`"$archiveDir`"",
+            "-utf8output",
+            "-unattended"
+          ) + $configFlags
+
+          Write-Host "Starting BuildCookRun..."
+          Write-Host "Command: RunUAT.bat $($uatArgs -join ' ')"
+          Write-Host ""
+
+          # Track stage timing from log output
+          $cookStartTime = $null
+          $stageStartTime = $null
+          $packageEndTime = $null
+
+          & "$runUAT" @uatArgs 2>&1 | ForEach-Object {
+            $line = $_
+            Write-Host $line
+
+            # Track cook/stage timing markers
+            if ($line -match 'CookCommandlet') {
+              if (-not $cookStartTime) { $cookStartTime = [DateTime]::UtcNow }
+            }
+            if ($line -match 'Creating Staging Manifest|CopyBuildToStagingDirectory|Copying NonUFSFiles to staging') {
+              if (-not $stageStartTime) { $stageStartTime = [DateTime]::UtcNow }
+            }
+            if ($line -match 'PackagingResults|BUILD SUCCESSFUL|AutomationTool exiting') {
+              $packageEndTime = [DateTime]::UtcNow
+            }
+          }
+
+          $buildExitCode = $LASTEXITCODE
+          $stopwatch.Stop()
+          $elapsed = $stopwatch.Elapsed
+          $minutes = [math]::Floor($elapsed.TotalMinutes)
+          $seconds = $elapsed.Seconds
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "BuildCookRun completed in ${minutes}m ${seconds}s"
+          Write-Host "Exit code: $buildExitCode"
+          Write-Host "========================================"
+
+          # Compute stage durations
+          $cookDuration = "N/A"
+          $stageDuration = "N/A"
+          if ($cookStartTime -and $stageStartTime) {
+            $cookElapsed = $stageStartTime - $cookStartTime
+            $cookMin = [math]::Floor($cookElapsed.TotalMinutes)
+            $cookSec = $cookElapsed.Seconds
+            $cookDuration = "${cookMin}m ${cookSec}s"
+          }
+          if ($stageStartTime -and $packageEndTime) {
+            $stageElapsed = $packageEndTime - $stageStartTime
+            $stageMin = [math]::Floor($stageElapsed.TotalMinutes)
+            $stageSec = $stageElapsed.Seconds
+            $stageDuration = "${stageMin}m ${stageSec}s"
+          }
+
+          # Store results for subsequent steps
+          echo "PACKAGE_DURATION=${minutes}m ${seconds}s" >> $env:GITHUB_ENV
+          echo "COOK_DURATION=$cookDuration" >> $env:GITHUB_ENV
+          echo "STAGE_DURATION=$stageDuration" >> $env:GITHUB_ENV
+
+          if ($buildExitCode -eq 0) {
+            echo "PACKAGE_STATUS=success" >> $env:GITHUB_ENV
+          } else {
+            echo "PACKAGE_STATUS=failed" >> $env:GITHUB_ENV
+            echo "PACKAGE_EXITCODE=$buildExitCode" >> $env:GITHUB_ENV
+            Write-Host "::error::BuildCookRun failed with exit code $buildExitCode (Configuration: $configuration)"
+          }
+
+      - name: Parse cook/package logs for errors
+        if: always()
+        shell: powershell
+        run: |
+          $logsDir = "${{ github.workspace }}\Saved\Logs"
+          if (-not (Test-Path $logsDir)) {
+            Write-Host "No logs directory found at: $logsDir"
+            echo "COOK_ERRORS=" >> $env:GITHUB_ENV
+            exit 0
+          }
+
+          # Key error patterns from cook/package logs
+          $errorPatterns = @(
+            'LogCook: Error:',
+            'PackagingResults: Error:',
+            'Error_UnknownCookFailure',
+            'LogInit: Error:',
+            'LogLinker: Error:',
+            'LogLoad: Error:',
+            'appError called:',
+            'Fatal Error:'
+          )
+
+          $combinedPattern = ($errorPatterns | ForEach-Object { [regex]::Escape($_) }) -join '|'
+
+          $allErrors = @()
+          Get-ChildItem $logsDir -Filter "*.log" -ErrorAction SilentlyContinue | ForEach-Object {
+            $logContent = Get-Content $_.FullName -ErrorAction SilentlyContinue
+            if ($logContent) {
+              $matches = $logContent | Where-Object { $_ -match $combinedPattern }
+              if ($matches) {
+                $allErrors += $matches
+              }
+            }
+          }
+
+          if ($allErrors.Count -gt 0) {
+            Write-Host "Found $($allErrors.Count) error(s) in logs:"
+            $allErrors | ForEach-Object { Write-Host "  $_" }
+
+            # Truncate to 2000 chars to avoid env var limits
+            $errorText = ($allErrors -join "`n")
+            if ($errorText.Length -gt 2000) {
+              $errorText = $errorText.Substring(0, 2000) + "`n... (truncated)"
+            }
+            # Use delimiter syntax for multi-line env vars
+            echo "COOK_ERRORS<<EOF" >> $env:GITHUB_ENV
+            echo "$errorText" >> $env:GITHUB_ENV
+            echo "EOF" >> $env:GITHUB_ENV
+          } else {
+            Write-Host "No cook/package errors found in logs"
+            echo "COOK_ERRORS=" >> $env:GITHUB_ENV
+          }
+
+      - name: Generate build-info.json
+        if: env.PACKAGE_STATUS == 'success'
+        shell: powershell
+        run: |
+          $configuration = "${{ matrix.configuration }}"
+          $archiveDir = "${{ github.workspace }}\PackagedBuilds\$configuration"
+
+          # Find the actual build output directory (may be nested under WindowsNoEditor or Windows)
+          $buildOutputDir = $archiveDir
+          $possibleSubDirs = @(
+            (Join-Path $archiveDir "Windows"),
+            (Join-Path $archiveDir "WindowsNoEditor")
+          )
+          foreach ($subDir in $possibleSubDirs) {
+            if (Test-Path $subDir) {
+              $buildOutputDir = $subDir
+              break
+            }
+          }
+
+          $buildInfo = @{
+            project       = "${{ github.event.repository.name }}"
+            commit        = "${{ github.sha }}"
+            shortSha      = "${{ github.sha }}".Substring(0, 7)
+            branch        = "${{ github.ref_name }}"
+            configuration = $configuration
+            buildNumber   = "${{ github.run_number }}"
+            timestamp     = (Get-Date -Format "o")
+            ue5Version    = "5.7"
+            platform      = "Win64"
+          }
+
+          $buildInfoJson = $buildInfo | ConvertTo-Json -Depth 2
+          $buildInfoPath = Join-Path $buildOutputDir "build-info.json"
+          $buildInfoJson | Out-File -FilePath $buildInfoPath -Encoding utf8
+
+          Write-Host "Generated build-info.json at: $buildInfoPath"
+          Write-Host $buildInfoJson
+
+      - name: Compress packaged build
+        if: env.PACKAGE_STATUS == 'success'
+        shell: powershell
+        run: |
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+          $configuration = "${{ matrix.configuration }}"
+          $archiveDir = "${{ github.workspace }}\PackagedBuilds\$configuration"
+          $branch = "${{ github.ref_name }}" -replace '/', '-'
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $artifactName = "${{ github.event.repository.name }}-${configuration}-${branch}-${shortSha}"
+          $zipPath = "${{ github.workspace }}\Artifacts\${artifactName}.zip"
+
+          # Ensure output directory exists
+          New-Item -ItemType Directory -Force -Path (Split-Path $zipPath) | Out-Null
+
+          Write-Host "Compressing packaged build..."
+          Write-Host "  Source: $archiveDir"
+          Write-Host "  Destination: $zipPath"
+          Write-Host "  Artifact name: $artifactName"
+
+          [System.IO.Compression.ZipFile]::CreateFromDirectory(
+            $archiveDir,
+            $zipPath,
+            [System.IO.Compression.CompressionLevel]::Optimal,
+            $false
+          )
+
+          $zipSize = (Get-Item $zipPath).Length
+          $zipSizeMB = [math]::Round($zipSize / 1MB, 2)
+          Write-Host "Created zip: $zipPath ($zipSizeMB MB)"
+
+          # Store for upload steps
+          echo "ARTIFACT_NAME=$artifactName" >> $env:GITHUB_ENV
+          echo "ZIP_PATH=$zipPath" >> $env:GITHUB_ENV
+          echo "ZIP_SIZE_MB=$zipSizeMB" >> $env:GITHUB_ENV
+
+      - name: Set artifact retention
+        if: env.PACKAGE_STATUS == 'success'
+        id: retention
+        shell: powershell
+        run: |
+          # Config-dependent retention:
+          #   Development: 7 days  (iterative, quick feedback)
+          #   Test:        7 days  (iterative, same as Development)
+          #   Shipping:    30 days (production-quality, keep longer)
+          $retention = switch ("${{ matrix.configuration }}") {
+            "Development" { 7 }
+            "Test"        { 7 }
+            "Shipping"    { 30 }
+            default       { 14 }
+          }
+          Write-Host "Artifact retention for ${{ matrix.configuration }}: $retention days"
+          echo "days=$retention" >> $env:GITHUB_OUTPUT
+
+      - name: Upload packaged build
+        if: env.PACKAGE_STATUS == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: Artifacts/*.zip
+          retention-days: ${{ steps.retention.outputs.days }}
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload build logs (failure only)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-logs-${{ matrix.configuration }}-${{ github.sha }}
+          path: Saved/Logs/
+          retention-days: 14
+
+      - name: Generate package summary
+        if: always()
+        shell: powershell
+        run: |
+          $configuration = "${{ matrix.configuration }}"
+          $status = $env:PACKAGE_STATUS
+          $duration = $env:PACKAGE_DURATION
+          $cookDuration = $env:COOK_DURATION
+          $stageDuration = $env:STAGE_DURATION
+          $exitCode = $env:PACKAGE_EXITCODE
+          $artifactName = $env:ARTIFACT_NAME
+          $zipSizeMB = $env:ZIP_SIZE_MB
+          $cookErrors = $env:COOK_ERRORS
+
+          if ($status -eq 'success') {
+            $statusIcon = ':white_check_mark:'
+            $statusText = 'Success'
+          } else {
+            $statusIcon = ':x:'
+            $statusText = "Failed (exit code: $exitCode)"
+          }
+          if (-not $duration) { $duration = "N/A" }
+          if (-not $cookDuration) { $cookDuration = "N/A" }
+          if (-not $stageDuration) { $stageDuration = "N/A" }
+
+          $sha = "${{ github.sha }}"
+          $trigger = "${{ github.event_name }}"
+          $branch = "${{ github.ref_name }}"
+
+          # Config-specific flags for display
+          $configFlags = switch ($configuration) {
+            "Shipping" { "-distribution -prereqs -nodebuginfo" }
+            "Test"     { "(none)" }
+            default    { "(none)" }
+          }
+
+          $codeBlock = '```'
+
+          $lines = @(
+            "## Package Summary ($configuration) $statusIcon",
+            "",
+            "| Property | Value |",
+            "|----------|-------|",
+            "| **Status** | $statusText |",
+            "| **Total Duration** | $duration |",
+            "| **Cook Duration** | $cookDuration |",
+            "| **Stage/Package Duration** | $stageDuration |",
+            "| **Configuration** | $configuration |",
+            "| **Config Flags** | $configFlags |",
+            "| **Platform** | Win64 |",
+            "| **Trigger** | $trigger |",
+            "| **Branch** | $branch |",
+            "| **Commit** | $sha |"
+          )
+
+          if ($status -eq 'success' -and $artifactName) {
+            $lines += @(
+              "| **Artifact** | $artifactName |",
+              "| **Size** | ${zipSizeMB} MB |"
+            )
+          }
+
+          $lines += @(
+            "",
+            "### BuildCookRun Command",
+            "",
+            $codeBlock,
+            "RunUAT.bat BuildCookRun -project=${{ github.event.repository.name }}.uproject -platform=Win64 -clientconfig=$configuration -build -cook -stage -pak -package -archive -archivedirectory=PackagedBuilds\$configuration $configFlags",
+            $codeBlock
+          )
+
+          # Show errors if any were found
+          if ($cookErrors) {
+            $lines += @(
+              "",
+              "<details>",
+              "<summary>:warning: Cook/Package Errors Detected</summary>",
+              "",
+              $codeBlock,
+              $cookErrors,
+              $codeBlock,
+              "",
+              "</details>"
+            )
+          }
+
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+          # Config status row for at-a-glance view of what was built (Phase 17 locked decision).
+          # Each matrix config appends its own row. max-parallel: 1 ensures sequential execution
+          # so the GitHub step summary accumulates both Test and Shipping entries.
+          $configStatusIcon = if ($status -eq 'success') { ':white_check_mark:' } else { ':x:' }
+          $configArtifactText = if ($status -eq 'success' -and $artifactName) { $artifactName } else { 'N/A' }
+          $configStatusLines = @(
+            "",
+            "### Config Status",
+            "",
+            "| Config | Status | Artifact |",
+            "|--------|--------|----------|",
+            "| $configuration | $configStatusIcon $statusText | $configArtifactText |"
+          )
+          $configStatusLines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+
+      # =========================================================================
+      # Collect Results - Gathers package data for notification job
+      # =========================================================================
+      - name: Collect results for notifications
+        id: collect-results
+        if: always()
+        shell: powershell
+        run: |
+          # Determine overall status
+          $packageStatus = if ($env:PACKAGE_STATUS) { $env:PACKAGE_STATUS } else { "unknown" }
+
+          $status = $packageStatus
+          $failedStage = ""
+          $stageDuration = ""
+          $errorExcerpt = ""
+          # Config identity prefix for notification messages (Phase 17 locked decision:
+          # "Notifications distinguish which config failed.")
+          $configPrefix = "[${{ matrix.configuration }}]"
+
+          if ($packageStatus -eq "failed") {
+              $failedStage = "package"
+              $stageDuration = $env:PACKAGE_DURATION
+
+              # Use cook errors if available, otherwise generic message
+              $cookErrors = $env:COOK_ERRORS
+              if ($cookErrors) {
+                  # Truncate to 900 chars to stay well under webhook field limits
+                  if ($cookErrors.Length -gt 900) {
+                      $cookErrors = $cookErrors.Substring(0, 900) + "... (truncated)"
+                  }
+                  $errorExcerpt = $cookErrors
+              } else {
+                  $errorExcerpt = "BuildCookRun failed with exit code $env:PACKAGE_EXITCODE"
+              }
+
+              # Try to determine which stage failed based on available durations
+              $cookDuration = $env:COOK_DURATION
+              $stagePackDuration = $env:STAGE_DURATION
+              if ($cookDuration -eq "N/A" -and $stagePackDuration -eq "N/A") {
+                  $failedStage = "build"  # Failed before cook started
+              } elseif ($stagePackDuration -eq "N/A") {
+                  $failedStage = "cook"  # Failed during cook
+                  $stageDuration = $cookDuration
+              } else {
+                  $failedStage = "package"  # Failed during stage/package
+                  $stageDuration = $stagePackDuration
+              }
+          }
+
+          $duration = if ($env:PACKAGE_DURATION) { $env:PACKAGE_DURATION } else { "N/A" }
+
+          # Write to GITHUB_OUTPUT
+          echo "status=$status" >> $env:GITHUB_OUTPUT
+          echo "duration=$duration" >> $env:GITHUB_OUTPUT
+          # Prefix failed_stage with config identity so notification messages read
+          # "[Test] cook" or "[Shipping] package" instead of just "cook" or "package"
+          echo "failed_stage=$configPrefix $failedStage" >> $env:GITHUB_OUTPUT
+          echo "stage_duration=$stageDuration" >> $env:GITHUB_OUTPUT
+
+          # Use delimiter syntax for error_excerpt (may contain newlines from COOK_ERRORS)
+          echo "error_excerpt<<EOF" >> $env:GITHUB_OUTPUT
+          echo "$errorExcerpt" >> $env:GITHUB_OUTPUT
+          echo "EOF" >> $env:GITHUB_OUTPUT
+
+          Write-Host "Collected results: status=$status, duration=$duration, failed_stage=$failedStage"
+
+  # =============================================================================
+  # Notify Job - Sends failure notifications (requires package)
+  # =============================================================================
+  notify:
+    needs: [validate, package]
+    if: failure()
+    uses: ./.github/workflows/notify.yml
+    with:
+      status: 'failed'
+      workflow_name: 'UE5 Package'
+      branch: ${{ github.ref_name }}
+      commit_sha: ${{ github.sha }}
+      duration: ${{ needs.package.outputs.duration || 'N/A' }}
+      error_excerpt: ${{ needs.package.outputs.error_excerpt || '' }}
+      failed_stage: ${{ needs.package.outputs.failed_stage || '' }}
+      stage_duration: ${{ needs.package.outputs.stage_duration || '' }}
+      run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    secrets: inherit
+
+  # =============================================================================
+  # Cleanup Report Job - Weekly artifact status report (schedule trigger only)
+  # =============================================================================
+  # Runs independently on schedule trigger. Does NOT depend on foundation,
+  # configure, or package jobs. Reports active and expired artifacts with
+  # retention policy summary.
+  cleanup-report:
+    runs-on: [self-hosted, windows, ue5]
+    if: github.event_name == 'schedule'
+    timeout-minutes: 10
+
+    steps:
+      - name: Report artifact status
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Query all artifacts for this repo
+          $response = gh api repos/${{ github.repository }}/actions/artifacts --paginate 2>$null
+          $data = $response | ConvertFrom-Json
+          $allArtifacts = $data.artifacts
+
+          $expired = @()
+          $active = @()
+          if ($allArtifacts) {
+            $expired = @($allArtifacts | Where-Object { $_.expired -eq $true })
+            $active = @($allArtifacts | Where-Object { $_.expired -eq $false })
+          }
+
+          # Build summary
+          $lines = @(
+            "## Artifact Cleanup Report :broom:",
+            "",
+            "**Report date:** $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC')",
+            "",
+            "### Active Artifacts",
+            "",
+            "| Name | Size | Created | Expires |",
+            "|------|------|---------|---------|"
+          )
+
+          if ($active.Count -gt 0) {
+            $active | ForEach-Object {
+              $sizeMB = [math]::Round($_.size_in_bytes / 1MB, 2)
+              $created = $_.created_at
+              $expires = $_.expires_at
+              $lines += "| $($_.name) | ${sizeMB} MB | $created | $expires |"
+            }
+          } else {
+            $lines += "| (none) | - | - | - |"
+          }
+
+          $lines += @(
+            "",
+            "### Expired Artifacts (auto-cleaned by GitHub)",
+            ""
+          )
+
+          if ($expired.Count -gt 0) {
+            $lines += @(
+              "| Name | Expired At |",
+              "|------|------------|"
+            )
+            $expired | ForEach-Object {
+              $lines += "| $($_.name) | $($_.expires_at) |"
+            }
+          } else {
+            $lines += "No expired artifacts found."
+          }
+
+          $lines += @(
+            "",
+            "### Retention Policy",
+            "",
+            "| Configuration | Retention |",
+            "|---------------|-----------|",
+            "| Development | 7 days |",
+            "| Test | 7 days |",
+            "| Shipping | 30 days |",
+            "| Build logs (failures) | 14 days |"
+          )
+
+          $lines -join "`n" | Out-File -Append -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8

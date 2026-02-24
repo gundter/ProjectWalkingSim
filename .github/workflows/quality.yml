@@ -1,0 +1,165 @@
+# .github/workflows/quality.yml
+# PR Quality Gate - runs actionlint, PSScriptAnalyzer, and yamllint on every PR.
+# All three tools run to completion before the job fails (run-all-then-fail pattern),
+# so contributors see all findings in a single PR check rather than fixing one at a time.
+#
+# Concurrency group: ue5-audit-* (separate from ue5-pipeline-* to avoid cancelling builds)
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [main, development]
+
+# Concurrency group MUST use ue5-audit- prefix.
+# NEVER use ue5-pipeline- here - that would cancel in-progress build/package jobs.
+concurrency:
+  group: ue5-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+# === FORK CONFIGURATION ===
+# Edit these values to match your environment.
+# Search for "FORK CONFIGURATION" to find all config points across workflows.
+# Full setup instructions: docs/quick-start.md
+env:
+  PROJECT_NAME: 'ProjectWalkingSim'  # Must match your .uproject filename
+  RUNNER_LABEL: 'ue5'                # Documentation only — runs-on labels must stay literal
+# === END FORK CONFIGURATION ===
+
+jobs:
+  lint:
+    runs-on: [self-hosted, windows, ue5]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Normalize YAML line endings to LF
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse -Include *.yml,*.yaml |
+            Where-Object { $_.FullName -notmatch '[/\\]\.git[/\\]' } |
+            ForEach-Object {
+              $bytes = [System.IO.File]::ReadAllBytes($_.FullName)
+              $text = [System.Text.Encoding]::UTF8.GetString($bytes) -replace "`r`n", "`n"
+              [System.IO.File]::WriteAllText($_.FullName, $text, (New-Object System.Text.UTF8Encoding $false))
+            }
+          Write-Host "YAML line endings normalized to LF"
+
+      - name: Install actionlint
+        shell: pwsh
+        run: |
+          # Try Chocolatey first; fall back to direct GitHub Releases binary download
+          # (Chocolatey may require admin rights unavailable on self-hosted runners)
+          $binDir = "$env:USERPROFILE\AppData\Local\bin"
+          $actionlintPath = "$binDir\actionlint.exe"
+
+          if (Test-Path $actionlintPath) {
+            Write-Host "actionlint already installed at $actionlintPath"
+          } else {
+            Write-Host "Downloading actionlint from GitHub Releases..."
+            New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+
+            # Fetch latest release tag
+            $release = Invoke-RestMethod -Uri "https://api.github.com/repos/rhysd/actionlint/releases/latest"
+            $tag = $release.tag_name
+            $version = $tag.TrimStart("v")
+            $url = "https://github.com/rhysd/actionlint/releases/download/${tag}/actionlint_${version}_windows_amd64.zip"
+
+            Write-Host "Downloading actionlint $version from $url"
+            $zipPath = "$env:TEMP\actionlint.zip"
+            Invoke-WebRequest -Uri $url -OutFile $zipPath
+            Expand-Archive -Path $zipPath -DestinationPath $binDir -Force
+            Remove-Item $zipPath
+            Write-Host "actionlint installed at $actionlintPath"
+          }
+
+          # Ensure binary is on PATH for subsequent steps
+          $currentPath = [System.Environment]::GetEnvironmentVariable("PATH", "Process")
+          if ($currentPath -notlike "*$binDir*") {
+            [System.Environment]::SetEnvironmentVariable("PATH", "$binDir;$currentPath", "Process")
+            echo "$binDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+
+          & $actionlintPath --version
+
+      - name: Install yamllint
+        shell: pwsh
+        run: |
+          python -m ensurepip --upgrade 2>$null
+          python -m pip install --quiet yamllint
+          python -m yamllint --version
+
+      - name: Install PSScriptAnalyzer
+        shell: pwsh
+        run: |
+          # Force TLS 1.2 and NuGet provider before Install-Module
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
+            Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser | Out-Null
+          }
+          if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+            Install-Module -Name PSScriptAnalyzer -Force -AllowClobber -Scope CurrentUser
+          }
+          Import-Module PSScriptAnalyzer
+          $v = (Get-Module PSScriptAnalyzer).Version
+          Write-Host "PSScriptAnalyzer $v ready"
+
+      - name: Run linters (run-all-then-fail)
+        shell: pwsh
+        run: |
+          # Do NOT set $ErrorActionPreference = "Stop" here.
+          # The run-all-then-fail pattern requires capturing exit codes without halting.
+          $script:actionlintExit = 0
+          $script:psaExit = 0
+          $script:yamllintExit = 0
+
+          # ------------------------------------------------------------------
+          # actionlint - validates GitHub Actions workflow YAML files
+          # Uses annotation format so errors appear as inline PR comments
+          # ------------------------------------------------------------------
+          Write-Host "=== actionlint ==="
+          $binDir = "$env:USERPROFILE\AppData\Local\bin"
+          $actionlintPath = "$binDir\actionlint.exe"
+          & $actionlintPath -format '{{range $err := .}}::error file={{$err.Filepath}},line={{$err.Line}},col={{$err.Column}}::{{$err.Message}}%0A{{end}}'
+          $script:actionlintExit = $LASTEXITCODE
+          Write-Host "actionlint exit code: $script:actionlintExit"
+
+          # ------------------------------------------------------------------
+          # PSScriptAnalyzer - static analysis of PowerShell scripts in .github/scripts/
+          # Settings loaded from .psscriptanalyzer.psd1 (Warning+ severity, suppressions)
+          # Outputs GitHub annotation format for inline PR annotations
+          # ------------------------------------------------------------------
+          Write-Host ""
+          Write-Host "=== PSScriptAnalyzer ==="
+          Import-Module PSScriptAnalyzer
+          $results = Invoke-ScriptAnalyzer -Path ".github/scripts" -Recurse -Settings ".psscriptanalyzer.psd1"
+          if ($results.Count -gt 0) {
+            foreach ($r in $results) {
+              $sev = $r.Severity.ToString().ToLower()
+              Write-Host "::${sev} file=$($r.ScriptPath),line=$($r.Line),col=$($r.Column)::[$($r.RuleName)] $($r.Message)"
+            }
+          }
+          $script:psaExit = if ($results.Count -gt 0) { 1 } else { 0 }
+          Write-Host "PSScriptAnalyzer exit code: $script:psaExit"
+
+          # ------------------------------------------------------------------
+          # yamllint - validates non-workflow YAML files
+          # Workflow files are excluded by the ignore block in .yamllint.yml
+          # Config loaded from .yamllint.yml (120-char limit, LF enforcement)
+          # ------------------------------------------------------------------
+          Write-Host ""
+          Write-Host "=== yamllint ==="
+          python -m yamllint -c .yamllint.yml .
+          $script:yamllintExit = $LASTEXITCODE
+          Write-Host "yamllint exit code: $script:yamllintExit"
+
+          # ------------------------------------------------------------------
+          # Fail if any tool found errors (after ALL tools have reported)
+          # ------------------------------------------------------------------
+          Write-Host ""
+          if ($script:actionlintExit -ne 0 -or $script:psaExit -ne 0 -or $script:yamllintExit -ne 0) {
+            Write-Host "::error::Quality gate failed. actionlint=$script:actionlintExit PSScriptAnalyzer=$script:psaExit yamllint=$script:yamllintExit"
+            exit 1
+          }
+          Write-Host "All quality checks passed."
